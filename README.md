@@ -1,7 +1,7 @@
 # 📱 PhoneMail — Your Phone Number is Your Email Address
 
-[![Docker](https://img.shields.io/badge/Docker-compose%20up%20--d-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Hostinger](https://img.shields.io/badge/Hostinger-Cloud%20Hosting-673AB7?logo=hostinger&logoColor=white)](https://www.hostinger.com/)
 [![Twilio](https://img.shields.io/badge/Twilio-Voice%20IVR%20%26%20SMS-F22F46?logo=twilio&logoColor=white)](https://www.twilio.com/)
 [![SMTP](https://img.shields.io/badge/SMTP-Self--Hosted-0052CC)](https://github.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -9,7 +9,7 @@
 > 🚀 **Built for the AlphaStack 7-Day Buildathon**  
 > Imagine if you didn't need to create complicated email addresses like `john.doe1992@gmail.com`.  
 > What if your email was simply your phone number: **`9876543210@phonemail.com`**?  
-> **PhoneMail makes this real** — with zero paid third-party tools, running completely on **1 domain + 1 hosting server** via Docker.
+> **PhoneMail makes this real** — with zero paid third-party tools, running natively on **Node.js** and deployed on **Hostinger Cloud Hosting** with your custom domain.
 
 ---
 
@@ -23,7 +23,7 @@ PhoneMail connects traditional phone lines (voice calls and SMS) with modern ema
 4. **Power Inbox on Desktop:** Looks and feels just like **Gmail** for power users.
 5. **No Smartphone? No Problem:** If you sign up by phone or kiosk, you receive an **instant SMS text** whenever someone emails you:  
    > *"You have received an email from boss@company.com. Subject: Meeting update."*
-6. **100% Free & Self-Hosted:** No SendGrid, no Mailgun, and no monthly fees. Includes an internal SMTP mail server in Docker.
+6. **100% Free & Self-Hosted:** No SendGrid, no Mailgun, and no monthly fees. Built with lightweight, native Node.js and SQLite.
 
 ---
 
@@ -86,7 +86,7 @@ Generate temporary addresses for discounts and shopping (e.g. `9876543210.shop@p
                                     │ (via Internet SMTP)
                                     ▼
                     ┌───────────────────────────────┐
-                    │    PhoneMail Local Server     │
+                    │    PhoneMail Node.js Engine   │
                     │  (Catches & Parses Email)     │
                     └───────┬───────────────┬───────┘
                             │               │
@@ -144,27 +144,27 @@ You can register an email account in under 10 seconds:
 
 ---
 
-## 🚀 Quickstart: Run in 3 Steps
+## 🚀 Quickstart: Run Locally in 3 Steps
 
-You can run PhoneMail directly with **Node.js** or with **Docker** (optional):
+PhoneMail runs natively on Node.js without any heavy virtualization.
 
-### Option A: Run with Node.js (Recommended & Fastest)
+### Step 1: Clone the Repo
 ```bash
-# 1. Clone the repository
 git clone https://github.com/soumith-64/AlphaStack.git
 cd AlphaStack
-
-# 2. Configure environment
-cp .env.example .env
-
-# 3. Install dependencies & start
-npm install
-npm start
 ```
 
-### Option B: Run with Docker (Optional)
+### Step 2: Set Your Domain
+Copy the example config:
 ```bash
-docker compose up -d
+cp .env.example .env
+```
+*(By default, it is pre-configured to work out of the box with zero setup).*
+
+### Step 3: Install & Start
+```bash
+npm install
+npm start
 ```
 
 🎉 **That's it!** Open your browser:
@@ -197,17 +197,14 @@ We built an interactive **Testing Lab** right into the app at **`/simulator`** s
 
 ---
 
-## 🌐 How to Connect Your Domain & Hosting Server
+## 🌐 Deploying to Hostinger Cloud Hosting
 
-If you want to receive real emails from actual Gmail or Outlook users:
+Deploying to **Hostinger Cloud Hosting** takes just 3 clicks via hPanel:
 
-### Add these DNS records to your Domain Registrar:
-| Type | Name / Host | Value / Points To | Priority | Why it's needed |
-| :--- | :--- | :--- | :--- | :--- |
-| **A** | `@` | `YOUR_SERVER_IP` | — | Directs website visitors to your app |
-| **A** | `mail` | `YOUR_SERVER_IP` | — | Address of your mail server |
-| **MX** | `@` | `mail.yourdomain.com` | `10` | Tells Gmail/Outlook where to send emails |
-| **TXT** | `@` | `v=spf1 mx ip4:YOUR_SERVER_IP ~all` | — | Prevents spam filters from blocking mail |
+1. Log into **Hostinger hPanel** $\rightarrow$ Navigate to **Node.js**.
+2. Select Node version **`20.x`** and set Entry Point to **`src/server.js`**.
+3. Connect your GitHub repository: `https://github.com/soumith-64/AlphaStack.git`.
+4. Click **Deploy**! Hostinger automatically installs dependencies, issues a free SSL certificate, and serves your app at `https://yourdomain.com`.
 
 ---
 
@@ -215,13 +212,13 @@ If you want to receive real emails from actual Gmail or Outlook users:
 
 ```
 AlphaStack/
-├── docker-compose.yml     # Starts entire stack with 1 command
-├── Dockerfile             # Multi-stage container build
+├── package.json           # Node.js dependencies & scripts
 ├── README.md              # Clear project documentation
+├── ROADMAP_5_DAYS.md      # 5-Day implementation roadmap
 ├── HACKATHON_ANALYSIS.md  # Deep technical spec & compliance sheet
 ├── src/
 │   ├── server.js          # Main web & WebSocket server
-│   ├── smtp/              # Built-in local SMTP mail server (Port 25)
+│   ├── smtp/              # Built-in local SMTP mail parser
 │   ├── services/          # Telephony, SMS, and notification logic
 │   ├── database/          # SQLite database (zero config, super fast)
 │   ├── routes/            # REST API & Twilio webhooks
@@ -247,7 +244,7 @@ AlphaStack/
 - [x] **Mobile WhatsApp Design** (4-screen onboarding + device permission flow)
 - [x] **Mobile Spike Mail Inbox** (Chats, compact subject, single-reply, expander, locked To field)
 - [x] **Desktop Gmail Design** (Sidebar folders, search bar, list view, reading pane)
-- [x] **Dockerized** (`docker compose up -d` single command startup)
+- [x] **Pure Node.js & Hostinger Cloud Ready** (Fast, lightweight, zero container overhead)
 
 ---
 
