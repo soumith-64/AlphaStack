@@ -11,7 +11,7 @@ let activeEmail = null;
 let selectedEmailIndex = -1;
 let socket = null;
 
-// ==================== UTILITIES ====================
+// ==================== STRING UTILITIES ====================
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -26,6 +26,18 @@ function getInitials(nameOrEmail) {
   if (!nameOrEmail) return 'P';
   const clean = nameOrEmail.replace(/[@<>\"]/g, '').trim();
   return clean.charAt(0).toUpperCase() || 'P';
+}
+
+function getFolderFriendlyName(folder) {
+  const map = {
+    'INBOX': 'Inbox',
+    'STARRED': 'Starred Messages',
+    'SENT': 'Sent Mail',
+    'DRAFTS': 'Drafts',
+    'SPAM': 'Spam Filter',
+    'TRASH': 'Trash Bin'
+  };
+  return map[folder] || folder;
 }
 
 // ==================== AUTH / LOGIN ====================
@@ -67,19 +79,24 @@ if (authForm) {
   });
 }
 
-// ==================== MAIN WORKSPACE INITIALIZATION ====================
+// ==================== WORKSPACE INITIALIZATION ====================
 function initDesktopApp() {
   document.getElementById('user-avatar-badge').innerText = getInitials(currentUser.name);
   document.getElementById('settings-phone').innerText = currentUser.phone;
   document.getElementById('settings-email').innerText = currentUser.email;
 
-  // Initialize Socket.io Real-time Push
+  const topPhoneChip = document.getElementById('top-phone-chip');
+  if (topPhoneChip) {
+    topPhoneChip.innerText = `📞 ${currentUser.phone}`;
+  }
+
+  // Socket.io Push
   try {
     socket = io();
     socket.emit('join:user', currentUser.phone);
 
     socket.on('email:new', (data) => {
-      console.log('⚡ [SOCKET] New inbound email received:', data);
+      console.log('⚡ [SOCKET] Inbound email received:', data);
       loadEmails();
       showToastNotification(`New email from ${data.sender_email || 'contact'}`);
     });
@@ -91,20 +108,20 @@ function initDesktopApp() {
     console.warn('Socket real-time connection warning:', err);
   }
 
-  // Bind Keyboard Shortcuts (Cmd+K, C, J/K, Esc)
+  // Setup Keyboard Shortcuts
   setupKeyboardShortcuts();
 
-  // Load emails & aliases
+  // Load Data
   loadEmails();
   loadDesktopAliases();
 }
 
-// ==================== KEYBOARD ACCELERATORS (SUPERHUMAN STYLE) ====================
+// ==================== KEYBOARD ACCELERATORS ====================
 function setupKeyboardShortcuts() {
   window.addEventListener('keydown', (e) => {
     const isTyping = ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
 
-    // Cmd+K or Ctrl+K -> Focus Global Search
+    // Cmd+K / Ctrl+K -> Focus Search
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       const search = document.getElementById('desktop-search');
@@ -135,40 +152,33 @@ function setupKeyboardShortcuts() {
       }
     }
 
-    // Keys active only when NOT typing in an input
     if (!isTyping) {
-      // 'c' or 'C' -> Open New Compose
       if (e.key.toLowerCase() === 'c') {
         e.preventDefault();
         openComposeModal();
         return;
       }
 
-      // 'j' -> Next Email
       if (e.key.toLowerCase() === 'j') {
         navigateEmailList(1);
         return;
       }
 
-      // 'k' -> Previous Email
       if (e.key.toLowerCase() === 'k') {
         navigateEmailList(-1);
         return;
       }
 
-      // 'Enter' -> Open current selected email
       if (e.key === 'Enter' && selectedEmailIndex >= 0 && allEmails[selectedEmailIndex]) {
         openEmailDetails(allEmails[selectedEmailIndex]);
         return;
       }
 
-      // 's' -> Star current
       if (e.key.toLowerCase() === 's' && activeEmail) {
         toggleCurrentStar();
         return;
       }
 
-      // '#' or 'Delete' -> Delete current
       if ((e.key === '#' || e.key === 'Delete') && activeEmail) {
         deleteCurrentEmail();
         return;
@@ -181,7 +191,7 @@ function navigateEmailList(delta) {
   if (!allEmails || allEmails.length === 0) return;
   selectedEmailIndex = Math.max(0, Math.min(allEmails.length - 1, selectedEmailIndex + delta));
   
-  const rows = document.querySelectorAll('.email-card-row');
+  const rows = document.querySelectorAll('.email-card-item');
   rows.forEach((r, idx) => {
     if (idx === selectedEmailIndex) {
       r.classList.add('keyboard-focused');
@@ -228,8 +238,8 @@ function renderEmailList(emails) {
   if (emails.length === 0) {
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-dim); padding: 80px 20px;">
-        <div style="font-size: 48px; margin-bottom: 14px; filter: drop-shadow(0 0 16px rgba(99,102,241,0.3));">✨</div>
-        <h3 style="font-size: 16px; color: #f1f5f9; margin-bottom: 6px;">All Clear</h3>
+        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
+        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">Inbox Zero</h3>
         <p style="font-size: 13px;">No messages found in ${getFolderFriendlyName(currentFolder)}.</p>
       </div>
     `;
@@ -238,7 +248,7 @@ function renderEmailList(emails) {
 
   emails.forEach((email, index) => {
     const row = document.createElement('div');
-    row.className = `email-card-row ${email.is_read === 0 ? 'unread' : ''}`;
+    row.className = `email-card-item ${email.is_read === 0 ? 'unread' : ''}`;
     row.onclick = () => {
       selectedEmailIndex = index;
       openEmailDetails(email);
@@ -260,35 +270,23 @@ function renderEmailList(emails) {
         <input type="checkbox" class="row-checkbox">
         <span class="checkmark"></span>
       </label>
-      <span class="star-icon ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+      <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
         ${isStarred ? '★' : '☆'}
       </span>
-      <div class="row-avatar">${avatarInitial}</div>
-      <div class="row-sender-text" title="${escapeHtml(email.sender_email)}">${escapeHtml(cleanSender)}</div>
-      <div class="row-preview-text">
-        <strong>${escapeHtml(email.subject || '(No Subject)')}</strong>
-        <span class="row-preview-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
+      <div class="item-avatar-circle">${avatarInitial}</div>
+      <div class="item-sender-col" title="${escapeHtml(email.sender_email)}">${escapeHtml(cleanSender)}</div>
+      <div class="item-content-preview">
+        <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
+        <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
       </div>
-      <div class="row-date-badge">${timeDisplay}</div>
+      <div class="item-date-col">${timeDisplay}</div>
     `;
     container.appendChild(row);
   });
 }
 
-function getFolderFriendlyName(folder) {
-  const map = {
-    'INBOX': 'Inbox',
-    'STARRED': 'Starred Messages',
-    'SENT': 'Sent Mail',
-    'DRAFTS': 'Drafts',
-    'SPAM': 'Spam Filter',
-    'TRASH': 'Trash Bin'
-  };
-  return map[folder] || folder;
-}
-
 function switchFolder(folder, element) {
-  document.querySelectorAll('.sidebar-glass .menu-item').forEach(i => i.classList.remove('active'));
+  document.querySelectorAll('.folder-nav .nav-item').forEach(i => i.classList.remove('active'));
   if (element) element.classList.add('active');
   
   const titleEl = document.getElementById('current-folder-title');
@@ -296,6 +294,8 @@ function switchFolder(folder, element) {
     titleEl.innerText = getFolderFriendlyName(folder);
   }
 
+  // Close mobile sidebar if open
+  closeMobileSidebar();
   closeReadingPane();
   loadEmails(folder);
 }
@@ -334,7 +334,7 @@ function openEmailDetails(email) {
   if (starBtn) {
     const isStarred = email.is_starred === 1;
     starBtn.innerText = isStarred ? '★' : '☆';
-    starBtn.style.color = isStarred ? '#facc15' : 'var(--text-dim)';
+    starBtn.style.color = isStarred ? 'var(--accent-amber)' : 'var(--text-dim)';
   }
 }
 
@@ -346,7 +346,7 @@ function closeReadingPane() {
   if (mailList) mailList.style.display = 'flex';
   
   activeEmail = null;
-  loadEmails(); // Refresh unread badges and state
+  loadEmails(); // Refresh unread count
 }
 
 // ==================== STAR & MOVE ACTIONS ====================
@@ -362,7 +362,7 @@ async function toggleStar(id, e) {
         const starBtn = document.getElementById('pane-star-btn');
         if (starBtn) {
           starBtn.innerText = data.is_starred === 1 ? '★' : '☆';
-          starBtn.style.color = data.is_starred === 1 ? '#facc15' : 'var(--text-dim)';
+          starBtn.style.color = data.is_starred === 1 ? 'var(--accent-amber)' : 'var(--text-dim)';
         }
       }
     }
@@ -406,14 +406,20 @@ function filterEmails(query) {
   renderEmailList(filtered);
 }
 
-// ==================== COMPOSE DOCK ====================
+function toggleSelectAll(masterCheckbox) {
+  const isChecked = masterCheckbox.checked;
+  const checkboxes = document.querySelectorAll('.row-checkbox');
+  checkboxes.forEach(cb => { cb.checked = isChecked; });
+}
+
+// ==================== COMPOSE MODAL ====================
 function openComposeModal() {
   const modal = document.getElementById('desktop-compose-modal');
   if (!modal) return;
   document.getElementById('desk-compose-to').value = '';
   document.getElementById('desk-compose-subject').value = '';
   document.getElementById('desk-compose-body').value = '';
-  modal.style.display = 'flex';
+  modal.style.display = 'block';
   setTimeout(() => document.getElementById('desk-compose-to').focus(), 50);
 }
 
@@ -496,10 +502,10 @@ async function loadDesktopAliases() {
         // Render in Settings Modal
         if (list) {
           const item = document.createElement('div');
-          item.className = 'alias-item-lux';
+          item.className = 'alias-item-bright';
           item.innerHTML = `
-            <div class="alias-name">🏷️ ${escapeHtml(a.alias_email)}</div>
-            <div class="alias-label">${escapeHtml(a.label || 'Sub-number')}</div>
+            <div class="alias-addr">🏷️ ${escapeHtml(a.alias_email)}</div>
+            <div class="alias-lbl">${escapeHtml(a.label || 'Sub-number')}</div>
           `;
           list.appendChild(item);
         }
@@ -507,11 +513,11 @@ async function loadDesktopAliases() {
         // Render in Left Sidebar
         if (sidebarChips) {
           const chip = document.createElement('div');
-          chip.className = 'alias-tag-pill';
+          chip.className = 'alias-chip';
           chip.onclick = () => openDesktopSettings();
           chip.innerHTML = `
-            <span>🏷️ .${escapeHtml(a.alias_tag)}</span>
-            <span class="tag-status">Active</span>
+            <span class="chip-tag">🏷️ .${escapeHtml(a.alias_tag)}</span>
+            <span class="chip-status">Active</span>
           `;
           sidebarChips.appendChild(chip);
         }
@@ -520,14 +526,14 @@ async function loadDesktopAliases() {
       if (list) list.innerHTML = '<p style="font-size: 13px; color: var(--text-dim);">No aliases configured yet.</p>';
       if (sidebarChips) {
         sidebarChips.innerHTML = `
-          <div class="alias-tag-pill" onclick="openDesktopSettings()" style="opacity: 0.6;">
-            <span>+ Add Alias</span>
+          <div class="alias-chip" onclick="openDesktopSettings()" style="opacity: 0.7;">
+            <span class="chip-tag">+ Add Sub-number</span>
           </div>
         `;
       }
     }
   } catch (err) {
-    if (list) list.innerHTML = '<div style="color:#ef4444; font-size:12px;">Failed to load aliases</div>';
+    if (list) list.innerHTML = '<div style="color:var(--accent-rose); font-size:12px;">Failed to load aliases</div>';
   }
 }
 
@@ -549,7 +555,7 @@ async function addDesktopAlias() {
       document.getElementById('desk-new-tag').value = '';
       document.getElementById('desk-new-label').value = '';
       loadDesktopAliases();
-      showToastNotification(`Alias .${tag} created!`);
+      showToastNotification(`Sub-number .${tag} created!`);
     } else {
       alert(data.error || 'Failed to add alias');
     }
@@ -558,24 +564,37 @@ async function addDesktopAlias() {
   }
 }
 
+// ==================== RESPONSIVE SIDEBAR TOGGLE ====================
 function toggleSidebar() {
   const sidebar = document.getElementById('gmail-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
   if (!sidebar) return;
-  sidebar.classList.toggle('collapsed');
+
+  sidebar.classList.toggle('open');
+  if (backdrop) {
+    backdrop.classList.toggle('active', sidebar.classList.contains('open'));
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('gmail-sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (sidebar) sidebar.classList.remove('open');
+  if (backdrop) backdrop.classList.remove('active');
 }
 
 // ==================== TOAST NOTIFICATION ====================
 function showToastNotification(msg) {
-  let toast = document.getElementById('lux-toast');
+  let toast = document.getElementById('bright-toast');
   if (!toast) {
     toast = document.createElement('div');
-    toast.id = 'lux-toast';
-    toast.className = 'lux-toast-pill';
+    toast.id = 'bright-toast';
+    toast.className = 'bright-toast-pill';
     document.body.appendChild(toast);
   }
   toast.innerText = msg;
   toast.classList.add('visible');
   setTimeout(() => {
     toast.classList.remove('visible');
-  }, 3200);
+  }, 3000);
 }

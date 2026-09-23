@@ -2,224 +2,237 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PhoneMail — Desktop Next-Gen Client</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PhoneMail — Phone-Powered Unified Email</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
-  <!-- Background Ambient Glow Blobs -->
-  <div class="ambient-glow glow-1"></div>
-  <div class="ambient-glow glow-2"></div>
+  <!-- Backdrop overlay for mobile drawer sidebar -->
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 
-  <!-- ==================== DESKTOP LOGIN / SIGNUP SCREEN ==================== -->
+  <!-- ==================== SIGN IN SCREEN (CLEAN LIGHT DESIGN) ==================== -->
   <div id="desktop-auth-container" class="auth-wrapper">
-    <div class="auth-glass-card">
-      <div class="brand-badge-glow">
-        <span class="pulse-dot"></span> PhoneMail Desktop OS
+    <div class="auth-card">
+      <div class="brand-badge">
+        <span class="online-dot"></span> Phone-Number-Powered Email
       </div>
-      <h2 class="auth-title">Welcome Back</h2>
-      <p class="auth-subtitle">Sign in using your phone number to access your unified inbox</p>
+      <h1 class="auth-title">Welcome to PhoneMail</h1>
+      <p class="auth-subtitle">Sign in with your phone number to access your unified inbox on laptop, tablet, or phone.</p>
 
       <form id="desktop-login-form">
-        <div class="input-glass-group">
-          <label>PHONE NUMBER</label>
-          <div class="input-with-icon">
-            <span class="input-icon">📱</span>
+        <div class="form-group">
+          <label for="desktop-phone-input">PHONE NUMBER</label>
+          <div class="input-box">
+            <span class="input-addon">📱</span>
             <input type="tel" id="desktop-phone-input" placeholder="9876543210" value="9876543210" required>
           </div>
         </div>
 
-        <div class="input-glass-group" id="otp-group">
+        <div class="form-group" id="otp-group">
           <div class="label-row">
-            <label>VERIFICATION CODE</label>
-            <span class="demo-tag" onclick="document.getElementById('desktop-otp-input').value='123456'">Demo Code: 123456</span>
+            <label for="desktop-otp-input">ONE-TIME PASSCODE</label>
+            <button type="button" class="demo-pill-btn" onclick="document.getElementById('desktop-otp-input').value='123456'">Auto-fill: 123456</button>
           </div>
-          <div class="input-with-icon">
-            <span class="input-icon">🔑</span>
+          <div class="input-box">
+            <span class="input-addon">🔑</span>
             <input type="text" id="desktop-otp-input" placeholder="123456" value="123456" maxlength="6" required>
           </div>
         </div>
 
-        <!-- SPEC REQUIREMENT: "Above the button, display 'By signing up, you agree to the Terms of Service', with Terms of Service hyperlinked." -->
         <div class="terms-disclaimer">
           By signing up, you agree to the <a href="#" onclick="alert('PhoneMail Terms of Service & Privacy Policy'); return false;">Terms of Service</a>
         </div>
 
-        <div class="auth-actions">
-          <button type="submit" class="btn-gradient-glow full-width" id="btn-desktop-next">
-            <span>Continue to Inbox</span>
-            <span class="btn-arrow">→</span>
-          </button>
-        </div>
+        <button type="submit" class="btn-primary full-width" id="btn-desktop-next">
+          <span>Open Inbox</span>
+          <span class="btn-arrow">→</span>
+        </button>
       </form>
+
+      <div class="auth-footer-note">
+        ⚡ Self-hosted SMTP port 2525 • Pure Node.js & Hostinger Cloud Ready
+      </div>
     </div>
   </div>
 
-  <!-- ==================== NEXT-GEN DESKTOP HOME SCREEN ==================== -->
-  <div id="desktop-main-container" class="desktop-wrapper" style="display: none;">
+  <!-- ==================== MAIN WORKSPACE (LAPTOP & PHONE BALANCED) ==================== -->
+  <div id="desktop-main-container" class="main-wrapper" style="display: none;">
 
-    <!-- Top Navigation Header -->
-    <header class="desktop-header">
-      <div class="header-left">
-        <button class="nav-toggle-btn" onclick="toggleSidebar()">
-          <span></span><span></span><span></span>
+    <!-- Top Navigation Bar -->
+    <header class="top-nav-bar">
+      <div class="nav-left">
+        <button class="menu-toggle-btn" onclick="toggleSidebar()" aria-label="Toggle Menu" title="Toggle Navigation">
+          <span class="bar"></span>
+          <span class="bar"></span>
+          <span class="bar"></span>
         </button>
-        <div class="brand-logo">
-          <div class="logo-box">⚡</div>
-          <div class="logo-text">Phone<span>Mail</span></div>
+        <div class="brand-cluster">
+          <div class="brand-icon">⚡</div>
+          <div class="brand-name">Phone<span>Mail</span></div>
         </div>
-        <span class="workspace-pill">PRO</span>
+        <div class="phone-handle-chip" id="top-phone-chip" title="Your PhoneMail Identity">
+          📞 9876543210
+        </div>
       </div>
 
-      <div class="header-search-container">
-        <div class="search-glass-bar">
+      <div class="nav-center">
+        <div class="search-bar">
           <span class="search-icon">🔍</span>
-          <input type="text" id="desktop-search" placeholder="Search phone numbers, subjects, or keywords... (Press ⌘K)" oninput="filterEmails(this.value)">
-          <kbd class="search-kbd">⌘K</kbd>
+          <input type="text" id="desktop-search" placeholder="Search phone numbers, contacts, subjects... (⌘K)" oninput="filterEmails(this.value)">
+          <kbd class="kbd-hint">⌘K</kbd>
         </div>
       </div>
 
-      <div class="header-right">
-        <button class="action-circle-btn" onclick="loadEmails()" title="Sync Messages">
+      <div class="nav-right">
+        <button class="nav-icon-btn" onclick="loadEmails()" title="Sync Messages" aria-label="Sync">
           🔄
         </button>
-        <button class="action-circle-btn" onclick="openDesktopSettings()" title="Settings & Aliases">
+        <button class="nav-icon-btn" onclick="openDesktopSettings()" title="Settings & Sub-Numbers" aria-label="Settings">
           ⚙️
         </button>
-        <div class="profile-avatar-pill" onclick="openDesktopSettings()" id="user-avatar-badge" title="View Profile">
+        <div class="user-avatar-pill" onclick="openDesktopSettings()" id="user-avatar-badge" title="Account Settings">
           S
         </div>
       </div>
     </header>
 
-    <!-- Main Workspace (Sidebar + Mail Stream + Reading Pane) -->
-    <div class="workspace-body">
-      
-      <!-- Left Glass Sidebar -->
-      <nav class="sidebar-glass" id="gmail-sidebar">
-        <!-- Floating Gradient Compose Button -->
-        <button class="btn-compose-lux" onclick="openComposeModal()">
-          <span class="compose-icon">✨</span>
-          <span class="compose-label">New Email</span>
+    <!-- App Body: Sidebar + Stream / Reading Split -->
+    <div class="app-layout">
+
+      <!-- Responsive Sidebar (Drawer on Phone, Panel on Laptop) -->
+      <aside class="sidebar-panel" id="gmail-sidebar">
+        <!-- Compose Trigger -->
+        <button class="btn-compose" onclick="openComposeModal()">
+          <span class="compose-plus">✏️</span>
+          <span class="compose-text">Compose Email</span>
           <kbd class="compose-kbd">C</kbd>
         </button>
 
-        <div class="nav-section-title">MAILBOXES</div>
-        <div class="nav-menu">
-          <div class="menu-item active" onclick="switchFolder('INBOX', this)">
-            <span class="menu-icon">📥</span>
-            <span class="menu-text">Inbox</span>
-            <span class="menu-badge" id="inbox-count-badge">2</span>
-          </div>
-          <div class="menu-item" onclick="switchFolder('STARRED', this)">
-            <span class="menu-icon">⭐</span>
-            <span class="menu-text">Starred</span>
-          </div>
-          <div class="menu-item" onclick="switchFolder('SENT', this)">
-            <span class="menu-icon">🚀</span>
-            <span class="menu-text">Sent</span>
-          </div>
-          <div class="menu-item" onclick="switchFolder('DRAFTS', this)">
-            <span class="menu-icon">📝</span>
-            <span class="menu-text">Drafts</span>
-          </div>
-          <div class="menu-item" onclick="switchFolder('SPAM', this)">
-            <span class="menu-icon">🛡️</span>
-            <span class="menu-text">Spam</span>
-          </div>
-          <div class="menu-item" onclick="switchFolder('TRASH', this)">
-            <span class="menu-icon">🗑️</span>
-            <span class="menu-text">Trash</span>
-          </div>
-        </div>
+        <!-- Navigation Folders -->
+        <div class="sidebar-group-title">MAILBOXES</div>
+        <nav class="folder-nav">
+          <button class="nav-item active" onclick="switchFolder('INBOX', this)">
+            <span class="nav-icon">📥</span>
+            <span class="nav-label">Inbox</span>
+            <span class="nav-badge" id="inbox-count-badge">2</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('STARRED', this)">
+            <span class="nav-icon">⭐</span>
+            <span class="nav-label">Starred</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('SENT', this)">
+            <span class="nav-icon">🚀</span>
+            <span class="nav-label">Sent</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('DRAFTS', this)">
+            <span class="nav-icon">📝</span>
+            <span class="nav-label">Drafts</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('SPAM', this)">
+            <span class="nav-icon">🛡️</span>
+            <span class="nav-label">Spam</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('TRASH', this)">
+            <span class="nav-icon">🗑️</span>
+            <span class="nav-label">Trash</span>
+          </button>
+        </nav>
 
         <div class="sidebar-divider"></div>
 
-        <div class="nav-section-title">QUICK ALIASES</div>
-        <div class="quick-alias-list" id="sidebar-alias-chips">
-          <div class="alias-tag-pill" onclick="openDesktopSettings()">
-            <span>🏷️ .work</span>
-            <span class="tag-status">Active</span>
+        <!-- Sub-number Aliases -->
+        <div class="sidebar-group-title">SUB-NUMBERS & ALIASES</div>
+        <div class="alias-chips-container" id="sidebar-alias-chips">
+          <div class="alias-chip" onclick="openDesktopSettings()">
+            <span class="chip-tag">🏷️ .work</span>
+            <span class="chip-status">Active</span>
           </div>
-          <div class="alias-tag-pill" onclick="openDesktopSettings()">
-            <span>🏷️ .1</span>
-            <span class="tag-status">Active</span>
+          <div class="alias-chip" onclick="openDesktopSettings()">
+            <span class="chip-tag">🏷️ .banking</span>
+            <span class="chip-status">Active</span>
           </div>
         </div>
 
-        <div class="sidebar-bottom-card">
-          <div class="storage-text">⚡ Self-Hosted Port 2525</div>
-          <div class="storage-bar"><div class="storage-progress"></div></div>
-          <div class="storage-sub">Zero API Fees • Native Node.js</div>
+        <!-- Infrastructure Status Card -->
+        <div class="sidebar-system-card">
+          <div class="system-status-row">
+            <span class="green-indicator"></span>
+            <strong>Hostinger Port 2525</strong>
+          </div>
+          <p class="system-status-desc">Inbound SMTP running directly on native Node.js.</p>
         </div>
-      </nav>
+      </aside>
 
-      <!-- Center / Split Content Area -->
-      <main class="content-split-area">
-        
-        <!-- Mail List Column -->
-        <div class="mail-list-column" id="mail-list-pane">
-          <!-- Glass Toolbar -->
-          <div class="mail-toolbar-glass">
+      <!-- Main Content Stream & Reading Pane -->
+      <main class="content-viewport">
+
+        <!-- Email List View -->
+        <section class="email-list-panel" id="mail-list-pane">
+          <!-- Toolbar -->
+          <div class="list-toolbar">
             <div class="toolbar-left">
               <label class="custom-checkbox">
-                <input type="checkbox" id="select-all-check">
+                <input type="checkbox" id="select-all-check" onchange="toggleSelectAll(this)">
                 <span class="checkmark"></span>
               </label>
-              <div class="active-folder-label" id="current-folder-title">Inbox</div>
+              <h2 class="folder-header-title" id="current-folder-title">Inbox</h2>
             </div>
             <div class="toolbar-right">
-              <span class="counter-pill" id="mail-page-indicator">2 messages</span>
+              <span class="pill-counter" id="mail-page-indicator">0 messages</span>
             </div>
           </div>
 
           <!-- Email Items Stream -->
-          <div class="email-card-stream" id="email-items-container">
-            <!-- Email rows render here -->
+          <div class="email-cards-list" id="email-items-container">
+            <!-- Cards rendered dynamically via app.js -->
           </div>
-        </div>
+        </section>
 
-        <!-- Detail Reading Pane -->
-        <div class="reading-pane-lux" id="reading-pane" style="display: none;">
-          <div class="reading-top-bar">
-            <button class="btn-glass-back" onclick="closeReadingPane()">
-              ← Back to stream
+        <!-- Detailed Reading View -->
+        <section class="reading-viewport-panel" id="reading-pane" style="display: none;">
+          <!-- Top Sticky Reading Actions Bar -->
+          <div class="reading-header-bar">
+            <button class="btn-back-action" onclick="closeReadingPane()">
+              <span class="back-arrow">←</span> Back to messages
             </button>
-            <div class="action-buttons-group">
-              <button class="tool-glass-btn" id="pane-star-btn" onclick="toggleCurrentStar()" title="Toggle Star">⭐</button>
-              <button class="tool-glass-btn danger" onclick="deleteCurrentEmail()" title="Move to Trash">🗑️</button>
+            <div class="reading-actions">
+              <button class="action-btn" id="pane-star-btn" onclick="toggleCurrentStar()" title="Star Message">⭐</button>
+              <button class="action-btn danger" onclick="deleteCurrentEmail()" title="Move to Trash">🗑️</button>
             </div>
           </div>
 
-          <div class="reading-body-card">
-            <div class="reading-subject-badge">
-              <span class="subject-tag">EMAIL THREAD</span>
-              <h1 class="reading-subject-text" id="full-subject">Email Subject</h1>
+          <div class="reading-card">
+            <!-- Email Subject Header -->
+            <div class="reading-subject-box">
+              <span class="category-tag">EMAIL THREAD</span>
+              <h1 class="reading-title" id="full-subject">Message Subject</h1>
             </div>
-            
-            <div class="sender-profile-card">
-              <div class="sender-avatar-gradient" id="full-avatar">A</div>
-              <div class="sender-info">
-                <div class="sender-name-row">
+
+            <!-- Sender Metadata -->
+            <div class="reading-sender-meta">
+              <div class="sender-avatar" id="full-avatar">A</div>
+              <div class="sender-details">
+                <div class="sender-name-line">
                   <strong id="full-sender">sender@domain.com</strong>
-                  <span class="verified-pill">✓ Verified</span>
+                  <span class="badge-verified">✓ Verified</span>
                 </div>
-                <div class="sender-to-row">to: <span id="full-to">me</span></div>
+                <div class="sender-sub-line">to <span id="full-to">me</span></div>
               </div>
-              <div class="email-timestamp-badge" id="full-date">12:30 PM</div>
+              <div class="reading-timestamp" id="full-date">12:30 PM</div>
             </div>
 
-            <div class="email-message-content" id="full-body">
-              Email body text here...
+            <!-- Email Body Content -->
+            <div class="reading-body-text" id="full-body">
+              Email contents will be displayed here...
             </div>
 
-            <!-- Quick Action Floating Bar -->
-            <div class="quick-reply-dock">
+            <!-- Quick Action Dock -->
+            <div class="reading-action-dock">
               <button class="dock-btn primary" onclick="startQuickReply()">
                 <span>↩️</span> Reply to Sender
               </button>
@@ -227,11 +240,11 @@
                 <span>↪️</span> Forward
               </button>
               <button class="dock-btn secondary" onclick="openDesktopSettings()">
-                <span>🏷️</span> Assign Alias
+                <span>🏷️</span> Assign Sub-number
               </button>
             </div>
           </div>
-        </div>
+        </section>
 
       </main>
 
@@ -239,76 +252,78 @@
 
   </div>
 
-  <!-- ==================== GMAIL COMPOSE FLOATING DOCK ==================== -->
-  <div id="desktop-compose-modal" class="compose-dock-card" style="display: none;">
-    <div class="compose-dock-header">
-      <div class="compose-title-cluster">
-        <span class="dock-icon">✨</span>
-        <strong>New Email Message</strong>
+  <!-- ==================== COMPOSE MODAL (RESPONSIVE DOCK / SHEET) ==================== -->
+  <div id="desktop-compose-modal" class="compose-sheet-modal" style="display: none;">
+    <div class="compose-card">
+      <div class="compose-header">
+        <div class="compose-title">
+          <span class="compose-icon">✏️</span>
+          <strong>New Message</strong>
+        </div>
+        <button class="close-btn" onclick="closeComposeModal()" aria-label="Close Compose">✕</button>
       </div>
-      <div class="dock-controls">
-        <button class="control-btn" onclick="closeComposeModal()">✕</button>
+
+      <div class="compose-body">
+        <div class="compose-field">
+          <label>To</label>
+          <input type="text" id="desk-compose-to" placeholder="Phone number (e.g. 9845012345) or email">
+        </div>
+        <div class="compose-field">
+          <label>Subject</label>
+          <input type="text" id="desk-compose-subject" placeholder="Subject">
+        </div>
+        <textarea id="desk-compose-body" rows="8" placeholder="Type your message here..."></textarea>
       </div>
-    </div>
-    <div class="compose-dock-body">
-      <div class="field-row">
-        <label>To</label>
-        <input type="text" id="desk-compose-to" placeholder="Phone number (e.g. 9845012345) or email">
+
+      <div class="compose-footer">
+        <button class="btn-primary" onclick="sendDesktopEmail()">
+          <span>Send Message</span>
+          <span class="btn-arrow">➤</span>
+        </button>
+        <button class="action-btn danger" onclick="closeComposeModal()" title="Discard Draft">🗑️</button>
       </div>
-      <div class="field-row">
-        <label>Subject</label>
-        <input type="text" id="desk-compose-subject" placeholder="Subject line">
-      </div>
-      <textarea id="desk-compose-body" rows="10" placeholder="Type your message here..."></textarea>
-    </div>
-    <div class="compose-dock-footer">
-      <button class="btn-gradient-glow" onclick="sendDesktopEmail()">
-        <span>Send Message</span>
-        <span class="btn-arrow">➤</span>
-      </button>
-      <button class="tool-glass-btn danger" onclick="closeComposeModal()" title="Discard Draft">🗑️</button>
     </div>
   </div>
 
-  <!-- ==================== DESKTOP SETTINGS MODAL ==================== -->
-  <div id="desktop-settings-modal" class="settings-overlay" style="display: none;">
-    <div class="settings-glass-card">
-      <div class="settings-card-header">
-        <div class="settings-title-group">
-          <h3>⚡ PhoneMail Preferences & Aliases</h3>
-          <p>Manage your account identity, extensions, and digital ID</p>
+  <!-- ==================== SETTINGS & SUB-NUMBERS MODAL ==================== -->
+  <div id="desktop-settings-modal" class="settings-modal-overlay" style="display: none;">
+    <div class="settings-dialog">
+      <div class="settings-header">
+        <div>
+          <h3 class="settings-title">PhoneMail Preferences & Sub-Numbers</h3>
+          <p class="settings-subtitle">Manage your phone identity, extensions, and inbound routing</p>
         </div>
-        <button class="control-btn" onclick="closeDesktopSettings()">✕</button>
+        <button class="close-btn" onclick="closeDesktopSettings()" aria-label="Close Settings">✕</button>
       </div>
-      <div class="settings-card-body">
-        
-        <!-- Identity Summary -->
-        <div class="glass-section">
-          <h4>PRIMARY IDENTITY</h4>
-          <div class="id-row">
-            <div>
-              <div style="font-size: 11px; color: #94a3b8;">Registered Phone Number</div>
-              <strong style="font-size: 16px; color: #fff;" id="settings-phone">9876543210</strong>
+
+      <div class="settings-content">
+        <!-- Primary Identity Card -->
+        <div class="settings-section">
+          <h4>PRIMARY ACCOUNT IDENTITY</h4>
+          <div class="identity-grid">
+            <div class="id-item">
+              <span class="id-label">Registered Phone Number</span>
+              <strong class="id-value" id="settings-phone">9876543210</strong>
             </div>
-            <div>
-              <div style="font-size: 11px; color: #94a3b8;">Default Global Email ID</div>
-              <strong style="font-size: 16px; color: #38bdf8;" id="settings-email">9876543210@phonemail.com</strong>
+            <div class="id-item">
+              <span class="id-label">Default Email Address</span>
+              <strong class="id-value accent" id="settings-email">9876543210@phonemail.com</strong>
             </div>
           </div>
         </div>
 
-        <!-- Manage Alias IDs (Sub-Numbers) -->
-        <div class="glass-section">
-          <h4>MANAGE ALIAS IDs (SUB-NUMBERS)</h4>
-          <p style="font-size: 13px; color: #94a3b8; margin-bottom: 12px;">Create purpose-based sub-numbers for work, banking, or family sharing.</p>
-          <div id="desk-aliases-list"></div>
-          <div class="alias-add-row">
+        <!-- Sub-Number Aliases -->
+        <div class="settings-section">
+          <h4>SUB-NUMBER ALIASES</h4>
+          <p class="section-help-text">Create dedicated extensions (e.g., <code>9876543210.work@phonemail.com</code>) to organize your life.</p>
+          <div id="desk-aliases-list" class="aliases-scroll-list"></div>
+          
+          <div class="add-alias-form">
             <input type="text" id="desk-new-tag" placeholder="Tag (e.g. work, son, 1)">
             <input type="text" id="desk-new-label" placeholder="Label (e.g. Work)">
-            <button class="btn-gradient-glow" style="padding: 10px 18px; font-size: 13px;" onclick="addDesktopAlias()">+ Create Alias</button>
+            <button class="btn-primary" onclick="addDesktopAlias()">+ Add Alias</button>
           </div>
         </div>
-
       </div>
     </div>
   </div>

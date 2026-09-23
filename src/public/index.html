@@ -2,74 +2,93 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PhoneMail — Phone-Number-Powered Email</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PhoneMail — Phone-Number-Powered Email Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
-    body, html { width: 100%; height: 100%; overflow: hidden; background: #0b141a; color: #fff; }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body, html { width: 100%; height: 100%; overflow: hidden; background: #f8fafc; color: #0f172a; }
 
-    /* Top Judge / Evaluator Switcher Bar */
+    /* Top Shell Navigation Bar */
     .top-switcher-bar {
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
       height: 48px;
-      background: rgba(18, 27, 34, 0.95);
+      background: rgba(255, 255, 255, 0.92);
       backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
       z-index: 99999;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
     }
 
     .brand-title {
-      font-weight: 700;
+      font-weight: 800;
       font-size: 15px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      color: #25D366;
+      gap: 6px;
+      color: #0f172a;
+      flex-shrink: 0;
     }
 
-    .brand-title span { color: #fff; font-size: 13px; font-weight: 400; opacity: 0.8; }
+    .brand-title .logo-accent {
+      color: #4f46e5;
+    }
+
+    .brand-title span {
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 500;
+    }
 
     .nav-pills {
       display: flex;
-      gap: 8px;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      padding: 2px 0;
+    }
+
+    .nav-pills::-webkit-scrollbar {
+      display: none;
     }
 
     .pill-btn {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      color: #e9edef;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 500;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      color: #475569;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 12.5px;
+      font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-      text-decoration: none;
+      gap: 5px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
     }
 
     .pill-btn:hover {
-      background: rgba(255, 255, 255, 0.18);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: #e2e8f0;
+      color: #0f172a;
     }
 
     .pill-btn.active {
-      background: #25D366;
-      color: #0b141a;
-      border-color: #25D366;
-      font-weight: 600;
+      background: #4f46e5;
+      color: #ffffff;
+      border-color: #4f46e5;
+      box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
     }
 
     .frame-container {
@@ -86,37 +105,39 @@
       width: 100%;
       height: 100%;
       border: none;
+      background: #f8fafc;
     }
 
     @media (max-width: 650px) {
+      .top-switcher-bar { padding: 0 10px; }
       .brand-title span { display: none; }
-      .pill-btn { padding: 4px 8px; font-size: 11px; }
+      .pill-btn { padding: 4px 9px; font-size: 11.5px; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Floating Switcher Bar for Hackathon Judges -->
+  <!-- Top Switcher Bar for Hackathon Judges & Multi-device Preview -->
   <div class="top-switcher-bar">
     <div class="brand-title">
-      📱 PhoneMail <span>(AlphaStack Buildathon)</span>
+      ⚡ Phone<span class="logo-accent">Mail</span> <span>(AlphaStack Buildathon)</span>
     </div>
     <div class="nav-pills">
+      <button class="pill-btn" id="btn-desktop" onclick="switchView('desktop')">💻 Desktop / Web</button>
       <button class="pill-btn" id="btn-mobile" onclick="switchView('mobile')">📱 Mobile Client</button>
-      <button class="pill-btn" id="btn-desktop" onclick="switchView('desktop')">💻 Desktop Client</button>
       <button class="pill-btn" id="btn-portal" onclick="switchView('portal')">🌐 2-Field Portal</button>
       <button class="pill-btn" id="btn-simulator" onclick="switchView('simulator')">🧪 Judge Lab</button>
     </div>
   </div>
 
   <div class="frame-container">
-    <iframe id="main-frame" src="/mobile/"></iframe>
+    <iframe id="main-frame" src="/desktop/"></iframe>
   </div>
 
   <script>
     // Intelligent viewport detection
     const isMobileViewport = window.innerWidth < 768;
-    const initialView = isMobileViewport ? 'mobile' : 'desktop';
+    const defaultView = isMobileViewport ? 'mobile' : 'desktop';
 
     function switchView(viewName) {
       document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
@@ -130,7 +151,7 @@
 
     // Check query params or viewport
     const urlParams = new URLSearchParams(window.location.search);
-    const requestedView = urlParams.get('view') || initialView;
+    const requestedView = urlParams.get('view') || defaultView;
     switchView(requestedView);
   </script>
 
