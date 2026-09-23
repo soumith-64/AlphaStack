@@ -1,38 +1,86 @@
-/* ==================== PHONEMAIL AESTHETIC BOTANICAL GREEN DESIGN SYSTEM ==================== */
-:root {
-  --bg-app: #f4f7f5;
+/* ==================== PHONEMAIL TIRANGA (INDIAN FLAG) DESIGN SYSTEM ====================
+   Kesari Saffron: #FF671F | Chakra Navy: #06038D / #1E3A8A | India Green: #046A38 / #10B981
+   Supports both Light (Daylight Bharat) and Dark (Midnight Chakra) Themes
+======================================================================================== */
+
+:root, [data-theme="light"] {
+  --theme-mode: 'light';
+  --bg-app: #fbfdfc;
   --bg-surface: #ffffff;
-  --bg-subtle: #edf3f0;
-  --bg-hover: #e6f0ec;
-  --border-light: #dde6e2;
-  --border-focus: #10b981;
+  --bg-subtle: #f0f5f2;
+  --bg-hover: #e6efe9;
+  --border-light: #dde6e1;
+  --border-focus: #FF671F;
   
-  /* Primary Botanical & Forest Green Palette */
-  --primary-green: #059669;
-  --primary-dark: #047857;
-  --primary-subtle: #ecfdf5;
-  --primary-border: #a7f3d0;
-  --primary-hover: #d1fae5;
-  --accent-emerald: #10b981;
-  --accent-mint: #e6fbf3;
+  /* Indian Tricolor Accents */
+  --saffron-main: #FF671F;
+  --saffron-dark: #e0530e;
+  --saffron-subtle: #fff7ed;
+  --saffron-border: #fed7aa;
+  
+  --green-main: #046A38;
+  --green-dark: #034f2a;
+  --green-vibrant: #10B981;
+  --green-subtle: #ecfdf5;
+  --green-border: #a7f3d0;
+  
+  --chakra-navy: #06038D;
+  --chakra-blue: #1E3A8A;
+  --chakra-subtle: #eff6ff;
+  
   --accent-amber: #f59e0b;
   --accent-rose: #ef4444;
   --accent-rose-subtle: #fef2f2;
   
-  /* High-Contrast Organic Text Hierarchy */
-  --text-main: #062e24;
-  --text-muted: #3d5a52;
-  --text-dim: #7a9a90;
-  
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-pill: 9999px;
+  /* High-Contrast Typography */
+  --text-main: #0b1727;
+  --text-muted: #3d5147;
+  --text-dim: #7a8f83;
   
   --shadow-sm: 0 1px 2px rgba(6, 46, 36, 0.04);
   --shadow-card: 0 1px 3px rgba(6, 46, 36, 0.04), 0 4px 12px -2px rgba(6, 46, 36, 0.03);
   --shadow-hover: 0 4px 16px -2px rgba(6, 46, 36, 0.08), 0 2px 4px -1px rgba(6, 46, 36, 0.03);
-  --shadow-modal: 0 20px 40px -8px rgba(6, 46, 36, 0.14), 0 8px 16px -4px rgba(6, 46, 36, 0.06);
+  --shadow-modal: 0 20px 40px -8px rgba(6, 46, 36, 0.16), 0 8px 16px -4px rgba(6, 46, 36, 0.06);
+}
+
+[data-theme="dark"] {
+  --theme-mode: 'dark';
+  --bg-app: #080e1a;
+  --bg-surface: #0f1a2e;
+  --bg-subtle: #0b1322;
+  --bg-hover: #16243d;
+  --border-light: rgba(255, 255, 255, 0.09);
+  --border-focus: #FF7722;
+  
+  /* Indian Tricolor Accents (Dark Mode Adjusted) */
+  --saffron-main: #FF7722;
+  --saffron-dark: #FF671F;
+  --saffron-subtle: rgba(255, 103, 31, 0.14);
+  --saffron-border: rgba(255, 103, 31, 0.35);
+  
+  --green-main: #10B981;
+  --green-dark: #059669;
+  --green-vibrant: #34d399;
+  --green-subtle: rgba(16, 185, 129, 0.14);
+  --green-border: rgba(16, 185, 129, 0.35);
+  
+  --chakra-navy: #3b82f6;
+  --chakra-blue: #60a5fa;
+  --chakra-subtle: rgba(59, 130, 246, 0.14);
+  
+  --accent-amber: #fbbf24;
+  --accent-rose: #f87171;
+  --accent-rose-subtle: rgba(239, 68, 68, 0.15);
+  
+  /* High-Contrast Typography */
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 4px 20px -2px rgba(0, 0, 0, 0.6);
+  --shadow-modal: 0 20px 40px -8px rgba(0, 0, 0, 0.8), 0 8px 16px -4px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -41,6 +89,7 @@
   box-sizing: border-box;
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
 }
 
 html, body {
@@ -52,7 +101,28 @@ html, body {
   font-size: 14px;
 }
 
-/* ==================== BUTTONS & INTERACTIVE ELEMENTS ==================== */
+/* ==================== TIRANGA TOP ACCENT RIBBON ==================== */
+.tiranga-ribbon {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, 
+    #FF671F 0%, #FF671F 33.33%, 
+    #ffffff 33.33%, #ffffff 66.66%, 
+    #046A38 66.66%, #046A38 100%);
+  z-index: 99999;
+}
+
+[data-theme="dark"] .tiranga-ribbon {
+  background: linear-gradient(90deg, 
+    #FF7722 0%, #FF7722 33.33%, 
+    #cbd5e1 33.33%, #cbd5e1 66.66%, 
+    #10B981 66.66%, #10B981 100%);
+}
+
+/* ==================== BUTTONS ==================== */
 button {
   cursor: pointer;
   border: none;
@@ -66,20 +136,19 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--primary-green);
+  background: linear-gradient(135deg, var(--saffron-main) 0%, var(--saffron-dark) 100%);
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
   font-size: 14px;
   padding: 10px 18px;
-  border-radius: var(--radius-sm);
-  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(255, 103, 31, 0.35);
   transition: all 0.18s ease;
 }
 
 .btn-primary:hover {
-  background: var(--primary-dark);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.28);
+  box-shadow: 0 4px 14px rgba(255, 103, 31, 0.45);
 }
 
 .btn-primary:active {
@@ -90,14 +159,15 @@ button {
   width: 100%;
 }
 
-/* ==================== AUTH SCREEN (AESTHETIC LIGHT GREEN) ==================== */
+/* ==================== AUTH SCREEN ==================== */
 .auth-wrapper {
   position: fixed;
   inset: 0;
+  top: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f4f7f5 0%, #ecfdf5 100%);
+  background: var(--bg-app);
   padding: 20px;
   z-index: 5000;
   overflow-y: auto;
@@ -108,7 +178,7 @@ button {
   max-width: 440px;
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
+  border-radius: 18px;
   padding: 36px 32px;
   box-shadow: var(--shadow-modal);
 }
@@ -117,35 +187,42 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
-  color: var(--primary-dark);
+  background: var(--saffron-subtle);
+  border: 1px solid var(--saffron-border);
+  color: var(--saffron-dark);
   font-weight: 700;
   font-size: 11.5px;
   padding: 5px 12px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   margin-bottom: 20px;
   letter-spacing: 0.3px;
   text-transform: uppercase;
 }
 
+[data-theme="dark"] .brand-badge {
+  color: var(--saffron-main);
+}
+
 .online-dot {
   width: 8px;
   height: 8px;
-  background: var(--accent-emerald);
+  background: var(--green-vibrant);
   border-radius: 50%;
   display: inline-block;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 6px var(--green-vibrant);
 }
 
 .auth-title {
   font-family: 'Outfit', sans-serif;
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-main);
   margin-bottom: 8px;
   letter-spacing: -0.5px;
 }
+
+.saffron-text { color: var(--saffron-main); }
+.green-text { color: var(--green-main); }
 
 .auth-subtitle {
   font-size: 13.5px;
@@ -176,37 +253,38 @@ button {
 
 .demo-pill-btn {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--primary-dark);
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
+  font-weight: 700;
+  color: var(--green-main);
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
   padding: 3px 8px;
   border-radius: 6px;
-}
-
-.demo-pill-btn:hover {
-  background: var(--primary-hover);
 }
 
 .input-box {
   display: flex;
   align-items: center;
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   padding: 10px 12px;
   transition: all 0.15s ease;
 }
 
 .input-box:focus-within {
-  border-color: var(--primary-green);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+  border-color: var(--saffron-main);
+  box-shadow: 0 0 0 3px var(--saffron-subtle);
+}
+
+.flag-addon {
+  font-weight: 700;
+  color: var(--text-main);
+  font-size: 13.5px;
 }
 
 .input-addon {
   margin-right: 10px;
-  font-size: 16px;
-  opacity: 0.8;
+  font-size: 15px;
 }
 
 .input-box input {
@@ -215,7 +293,7 @@ button {
   outline: none;
   font-size: 14.5px;
   color: var(--text-main);
-  font-weight: 500;
+  font-weight: 600;
   background: transparent;
 }
 
@@ -228,9 +306,9 @@ button {
 }
 
 .terms-disclaimer a {
-  color: var(--primary-green);
+  color: var(--saffron-main);
   text-decoration: underline;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .auth-footer-note {
@@ -248,6 +326,7 @@ button {
   height: 100%;
   display: flex;
   flex-direction: column;
+  padding-top: 4px;
 }
 
 .top-nav-bar {
@@ -261,7 +340,7 @@ button {
   flex-shrink: 0;
   z-index: 100;
   position: relative;
-  box-shadow: 0 1px 3px rgba(6, 46, 36, 0.02);
+  box-shadow: var(--shadow-sm);
 }
 
 .nav-left {
@@ -278,7 +357,7 @@ button {
   width: 36px;
   height: 36px;
   padding: 6px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   background: transparent;
 }
 
@@ -291,7 +370,6 @@ button {
   height: 2px;
   background: var(--text-muted);
   border-radius: 2px;
-  transition: all 0.2s ease;
 }
 
 .brand-cluster {
@@ -303,10 +381,10 @@ button {
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: var(--primary-subtle);
-  color: var(--primary-green);
-  border: 1px solid var(--primary-border);
-  border-radius: var(--radius-sm);
+  background: var(--saffron-subtle);
+  color: var(--saffron-main);
+  border: 1px solid var(--saffron-border);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -318,24 +396,30 @@ button {
   font-family: 'Outfit', sans-serif;
   font-size: 19px;
   font-weight: 800;
-  color: var(--text-main);
   letter-spacing: -0.4px;
 }
 
-.brand-name span {
-  color: var(--primary-green);
+.tiranga-tag {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
+  color: var(--green-main);
+  padding: 2px 7px;
+  border-radius: 9999px;
+  margin-left: 2px;
 }
 
 .phone-handle-chip {
   display: inline-flex;
   align-items: center;
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
-  color: var(--primary-dark);
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
+  color: var(--green-main);
   font-size: 12px;
   font-weight: 700;
   padding: 4px 10px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
 }
 
 .nav-center {
@@ -349,15 +433,15 @@ button {
   align-items: center;
   background: var(--bg-subtle);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
   padding: 7px 16px;
   transition: all 0.15s ease;
 }
 
 .search-bar:focus-within {
-  background: #ffffff;
-  border-color: var(--primary-green);
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+  background: var(--bg-surface);
+  border-color: var(--saffron-main);
+  box-shadow: 0 0 0 3px var(--saffron-subtle);
 }
 
 .search-icon {
@@ -378,7 +462,7 @@ button {
 .kbd-hint {
   font-size: 11px;
   color: var(--text-muted);
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1px solid var(--border-light);
   padding: 2px 6px;
   border-radius: 4px;
@@ -394,7 +478,7 @@ button {
 .nav-icon-btn {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -408,19 +492,29 @@ button {
   border-color: var(--border-light);
 }
 
+.theme-toggle-btn {
+  font-size: 17px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-subtle);
+}
+
+.theme-toggle-btn:hover {
+  border-color: var(--saffron-main);
+}
+
 .user-avatar-pill {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  background: linear-gradient(135deg, #FF671F 0%, #046A38 100%);
   color: #ffffff;
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
 /* ==================== WORKSPACE LAYOUT ==================== */
@@ -450,20 +544,19 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--primary-green);
+  background: linear-gradient(135deg, #FF671F 0%, #EA580C 100%);
   color: #ffffff;
   padding: 12px 18px;
-  border-radius: var(--radius-pill);
-  font-weight: 600;
+  border-radius: 9999px;
+  font-weight: 700;
   font-size: 14px;
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+  box-shadow: 0 3px 10px rgba(255, 103, 31, 0.35);
   margin-bottom: 22px;
   transition: all 0.18s ease;
 }
 
 .btn-compose:hover {
-  background: var(--primary-dark);
-  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  box-shadow: 0 4px 16px rgba(255, 103, 31, 0.45);
   transform: translateY(-1px);
 }
 
@@ -497,7 +590,7 @@ button {
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   color: var(--text-muted);
   font-weight: 500;
   font-size: 13.5px;
@@ -511,9 +604,9 @@ button {
 }
 
 .nav-item.active {
-  background: var(--primary-subtle);
-  color: var(--primary-dark);
-  border-left: 3px solid var(--primary-green);
+  background: var(--green-subtle);
+  color: var(--green-main);
+  border-left: 3.5px solid var(--green-main);
   font-weight: 700;
 }
 
@@ -521,12 +614,12 @@ button {
 .nav-label { flex: 1; }
 
 .nav-badge {
-  background: var(--primary-green);
+  background: var(--green-main);
   color: #ffffff;
   font-size: 11px;
   font-weight: 700;
   padding: 1px 7px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
 }
 
 .sidebar-divider {
@@ -550,25 +643,25 @@ button {
   background: var(--bg-subtle);
   border: 1px solid var(--border-light);
   padding: 7px 10px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-size: 12.5px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .alias-chip:hover {
-  border-color: var(--primary-border);
-  background: var(--primary-subtle);
+  border-color: var(--green-border);
+  background: var(--green-subtle);
 }
 
 .chip-tag { font-weight: 600; color: var(--text-main); }
-.chip-status { font-size: 10.5px; color: var(--accent-emerald); font-weight: 600; }
+.chip-status { font-size: 10.5px; color: var(--green-main); font-weight: 700; }
 
 .sidebar-system-card {
   margin-top: 20px;
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
-  border-radius: var(--radius-sm);
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
+  border-radius: 8px;
   padding: 12px;
 }
 
@@ -577,16 +670,18 @@ button {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--primary-dark);
+  color: var(--green-main);
+  font-weight: 700;
   margin-bottom: 4px;
 }
 
 .green-indicator {
   width: 7px;
   height: 7px;
-  background: var(--accent-emerald);
+  background: var(--green-vibrant);
   border-radius: 50%;
   display: inline-block;
+  box-shadow: 0 0 6px var(--green-vibrant);
 }
 
 .system-status-desc {
@@ -642,18 +737,18 @@ button {
   height: 17px;
   border: 1.5px solid var(--text-dim);
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--bg-surface);
   transition: all 0.15s ease;
 }
 
 .custom-checkbox input:checked ~ .checkmark {
-  background: var(--primary-green);
-  border-color: var(--primary-green);
+  background: var(--saffron-main);
+  border-color: var(--saffron-main);
 }
 
 .folder-header-title {
   font-size: 15px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-main);
 }
 
@@ -663,7 +758,8 @@ button {
   background: var(--bg-subtle);
   border: 1px solid var(--border-light);
   padding: 3px 10px;
-  border-radius: var(--radius-pill);
+  border-radius: 9999px;
+  font-weight: 600;
 }
 
 /* Email Cards List Stream */
@@ -679,7 +775,7 @@ button {
 .email-card-item {
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -690,14 +786,18 @@ button {
 }
 
 .email-card-item:hover {
-  border-color: var(--primary-border);
+  border-color: var(--saffron-border);
   box-shadow: var(--shadow-hover);
   transform: translateY(-1px);
 }
 
 .email-card-item.unread {
-  background: #ffffff;
-  border-left: 4px solid var(--primary-green);
+  background: var(--bg-surface);
+  border-left: 4px solid var(--green-main);
+}
+
+[data-theme="dark"] .email-card-item.unread {
+  background: #121e36;
 }
 
 .email-card-item.unread .item-subject-title {
@@ -706,8 +806,8 @@ button {
 }
 
 .email-card-item.keyboard-focused {
-  outline: 2px solid var(--primary-green);
-  border-color: var(--primary-green);
+  outline: 2px solid var(--saffron-main);
+  border-color: var(--saffron-main);
 }
 
 .item-star {
@@ -726,22 +826,26 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
-  color: var(--primary-dark);
+  background: var(--saffron-subtle);
+  border: 1px solid var(--saffron-border);
+  color: var(--saffron-dark);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 13.5px;
   margin-right: 14px;
   flex-shrink: 0;
 }
 
+[data-theme="dark"] .item-avatar-circle {
+  color: var(--saffron-main);
+}
+
 .item-sender-col {
   width: 170px;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
@@ -772,7 +876,7 @@ button {
   color: var(--text-dim);
   margin-left: 12px;
   flex-shrink: 0;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ==================== READING VIEWPORT PANEL ==================== */
@@ -804,16 +908,16 @@ button {
   align-items: center;
   gap: 6px;
   font-size: 13.5px;
-  font-weight: 600;
-  color: var(--primary-dark);
+  font-weight: 700;
+  color: var(--green-main);
   padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
+  border-radius: 8px;
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
 }
 
 .btn-back-action:hover {
-  background: var(--primary-hover);
+  background: var(--green-border);
 }
 
 .reading-actions {
@@ -825,7 +929,7 @@ button {
 .action-btn {
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -857,20 +961,24 @@ button {
 .category-tag {
   display: inline-block;
   font-size: 11px;
-  font-weight: 700;
-  color: var(--primary-dark);
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
+  font-weight: 800;
+  color: var(--saffron-dark);
+  background: var(--saffron-subtle);
+  border: 1px solid var(--saffron-border);
   padding: 2px 8px;
   border-radius: 4px;
   margin-bottom: 6px;
   letter-spacing: 0.4px;
 }
 
+[data-theme="dark"] .category-tag {
+  color: var(--saffron-main);
+}
+
 .reading-title {
   font-family: 'Outfit', sans-serif;
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-main);
   line-height: 1.3;
 }
@@ -889,15 +997,15 @@ button {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  background: linear-gradient(135deg, #FF671F 0%, #046A38 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 800;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .sender-details {
@@ -913,10 +1021,10 @@ button {
 
 .badge-verified {
   font-size: 11px;
-  font-weight: 600;
-  color: var(--primary-dark);
-  background: var(--primary-subtle);
-  border: 1px solid var(--primary-border);
+  font-weight: 700;
+  color: var(--green-main);
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -930,12 +1038,13 @@ button {
 .reading-timestamp {
   font-size: 12px;
   color: var(--text-dim);
+  font-weight: 600;
 }
 
 .reading-body-text {
   font-size: 15px;
   line-height: 1.7;
-  color: #1f3b33;
+  color: var(--text-main);
   margin-bottom: 32px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -955,11 +1064,11 @@ button {
   align-items: center;
   gap: 8px;
   padding: 9px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
   border: 1px solid var(--border-light);
-  background: #ffffff;
+  background: var(--bg-surface);
   color: var(--text-main);
   transition: all 0.15s ease;
 }
@@ -969,13 +1078,17 @@ button {
 }
 
 .dock-btn.primary {
-  background: var(--primary-subtle);
-  border-color: var(--primary-border);
-  color: var(--primary-dark);
+  background: var(--saffron-subtle);
+  border-color: var(--saffron-border);
+  color: var(--saffron-dark);
+}
+
+[data-theme="dark"] .dock-btn.primary {
+  color: var(--saffron-main);
 }
 
 .dock-btn.primary:hover {
-  background: var(--primary-hover);
+  background: var(--saffron-border);
 }
 
 /* ==================== COMPOSE DOCK / SHEET ==================== */
@@ -991,7 +1104,7 @@ button {
 .compose-card {
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   box-shadow: var(--shadow-modal);
   display: flex;
   flex-direction: column;
@@ -1000,7 +1113,7 @@ button {
 
 .compose-header {
   padding: 12px 18px;
-  background: #ffffff;
+  background: var(--bg-surface);
   border-bottom: 1px solid var(--border-light);
   display: flex;
   align-items: center;
@@ -1012,7 +1125,7 @@ button {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-main);
 }
 
@@ -1026,7 +1139,7 @@ button {
 
 .compose-body {
   padding: 14px 18px;
-  background: #ffffff;
+  background: var(--bg-surface);
 }
 
 .compose-field {
@@ -1049,6 +1162,7 @@ button {
   outline: none;
   font-size: 14px;
   color: var(--text-main);
+  background: transparent;
 }
 
 #desk-compose-body {
@@ -1059,6 +1173,7 @@ button {
   font-size: 14px;
   line-height: 1.6;
   color: var(--text-main);
+  background: transparent;
   resize: none;
 }
 
@@ -1075,7 +1190,7 @@ button {
 .settings-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 46, 36, 0.4);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -1089,7 +1204,7 @@ button {
   max-width: 520px;
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-lg);
+  border-radius: 18px;
   padding: 26px;
   box-shadow: var(--shadow-modal);
   max-height: 90vh;
@@ -1107,7 +1222,7 @@ button {
 
 .settings-title {
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-main);
 }
 
@@ -1120,7 +1235,7 @@ button {
 .settings-section {
   background: var(--bg-subtle);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-md);
+  border-radius: 12px;
   padding: 16px;
   margin-bottom: 16px;
 }
@@ -1128,9 +1243,13 @@ button {
 .settings-section h4 {
   font-size: 11px;
   font-weight: 800;
-  color: var(--primary-green);
+  color: var(--saffron-dark);
   letter-spacing: 0.6px;
   margin-bottom: 10px;
+}
+
+[data-theme="dark"] .settings-section h4 {
+  color: var(--saffron-main);
 }
 
 .identity-grid {
@@ -1153,10 +1272,11 @@ button {
 .id-value {
   font-size: 15px;
   color: var(--text-main);
+  font-weight: 600;
 }
 
 .id-value.accent {
-  color: var(--primary-dark);
+  color: var(--green-main);
   font-weight: 700;
 }
 
@@ -1177,16 +1297,16 @@ button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   padding: 9px 12px;
   font-size: 13px;
 }
 
 .alias-item-bright .alias-addr {
-  font-weight: 600;
-  color: var(--primary-dark);
+  font-weight: 700;
+  color: var(--green-main);
   font-family: monospace;
 }
 
@@ -1207,16 +1327,17 @@ button {
 .add-alias-form input {
   flex: 1;
   min-width: 120px;
-  background: #ffffff;
+  background: var(--bg-surface);
   border: 1.5px solid var(--border-light);
-  border-radius: var(--radius-sm);
+  border-radius: 8px;
   padding: 8px 10px;
   font-size: 13px;
   outline: none;
+  color: var(--text-main);
 }
 
 .add-alias-form input:focus {
-  border-color: var(--primary-green);
+  border-color: var(--saffron-main);
 }
 
 /* ==================== TOAST NOTIFICATION PILL ==================== */
@@ -1225,13 +1346,14 @@ button {
   bottom: 24px;
   left: 50%;
   transform: translateX(-50%) translateY(70px);
-  background: #062e24;
-  color: #ffffff;
+  background: var(--text-main);
+  color: var(--bg-surface);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   padding: 10px 20px;
-  border-radius: var(--radius-pill);
-  box-shadow: 0 10px 25px rgba(6, 46, 36, 0.25);
+  border-radius: 9999px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--saffron-border);
   z-index: 9999;
   pointer-events: none;
   opacity: 0;
@@ -1246,14 +1368,14 @@ button {
   opacity: 1;
 }
 
-/* ==================== RESPONSIVE DESIGN (BALANCED FOR ALL LAP & PHONE) ==================== */
+/* ==================== RESPONSIVE DESIGN (LAPTOP, TABLET & PHONE) ==================== */
 
 /* Backdrop overlay when sidebar is open on mobile */
 .sidebar-backdrop {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(6, 46, 36, 0.4);
+  background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(2px);
   z-index: 40;
 }
@@ -1277,10 +1399,9 @@ button {
     display: none;
   }
 
-  /* Off-canvas sidebar */
   .sidebar-panel {
     position: fixed;
-    top: 60px;
+    top: 64px;
     bottom: 0;
     left: 0;
     width: 270px;
@@ -1306,6 +1427,10 @@ button {
 
   .brand-name {
     font-size: 17px;
+  }
+
+  .tiranga-tag {
+    display: none;
   }
 
   .search-bar {
@@ -1346,7 +1471,6 @@ button {
     font-size: 20px;
   }
 
-  /* Full Screen Bottom Sheet for Compose on Phones */
   .compose-sheet-modal {
     inset: 0;
     bottom: 0;

@@ -40,6 +40,32 @@ function getFolderFriendlyName(folder) {
   return map[folder] || folder;
 }
 
+// ==================== THEME MANAGEMENT (TIRANGA LIGHT & DARK) ====================
+function initTheme() {
+  const savedTheme = localStorage.getItem('phonemail-theme') || 'light';
+  applyTheme(savedTheme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('phonemail-theme', theme);
+  const toggleBtn = document.getElementById('theme-toggle-btn');
+  if (toggleBtn) {
+    toggleBtn.innerText = theme === 'dark' ? '☀️' : '🌙';
+    toggleBtn.title = theme === 'dark' ? 'Switch to Tiranga Light Mode' : 'Switch to Tiranga Dark Mode';
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const nextTheme = current === 'dark' ? 'light' : 'dark';
+  applyTheme(nextTheme);
+  showToastNotification(`Switched to Tiranga ${nextTheme === 'dark' ? 'Dark' : 'Light'} Mode 🇮🇳`);
+}
+
+// Auto-run theme initialization immediately
+initTheme();
+
 // ==================== AUTH / LOGIN ====================
 const authForm = document.getElementById('desktop-login-form');
 if (authForm) {
@@ -87,7 +113,7 @@ function initDesktopApp() {
 
   const topPhoneChip = document.getElementById('top-phone-chip');
   if (topPhoneChip) {
-    topPhoneChip.innerText = `📞 ${currentUser.phone}`;
+    topPhoneChip.innerText = `📞 +91 ${currentUser.phone}`;
   }
 
   // Socket.io Push

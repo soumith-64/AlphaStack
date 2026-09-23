@@ -1,34 +1,37 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PhoneMail — Phone-Powered Unified Email</title>
+  <title>PhoneMail — India's Phone-Number-Powered Email</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
 
+  <!-- Top Tricolor Ribbon (Tiranga: Kesari Saffron - White - India Green) -->
+  <div class="tiranga-ribbon"></div>
+
   <!-- Backdrop overlay for mobile drawer sidebar -->
   <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 
-  <!-- ==================== SIGN IN SCREEN (CLEAN LIGHT DESIGN) ==================== -->
+  <!-- ==================== SIGN IN SCREEN ==================== -->
   <div id="desktop-auth-container" class="auth-wrapper">
     <div class="auth-card">
       <div class="brand-badge">
-        <span class="online-dot"></span> Phone-Number-Powered Email
+        <span class="online-dot"></span> 🇮🇳 Bharat's Phone-Email Engine
       </div>
-      <h1 class="auth-title">Welcome to PhoneMail</h1>
-      <p class="auth-subtitle">Sign in with your phone number to access your unified inbox on laptop, tablet, or phone.</p>
+      <h1 class="auth-title">Welcome to <span class="saffron-text">Phone</span><span class="green-text">Mail</span></h1>
+      <p class="auth-subtitle">Sign in using your 10-digit mobile number to access your unified inbox.</p>
 
       <form id="desktop-login-form">
         <div class="form-group">
-          <label for="desktop-phone-input">PHONE NUMBER</label>
+          <label for="desktop-phone-input">INDIAN MOBILE NUMBER</label>
           <div class="input-box">
-            <span class="input-addon">📱</span>
+            <span class="input-addon flag-addon">🇮🇳 +91</span>
             <input type="tel" id="desktop-phone-input" placeholder="9876543210" value="9876543210" required>
           </div>
         </div>
@@ -49,7 +52,7 @@
         </div>
 
         <button type="submit" class="btn-primary full-width" id="btn-desktop-next">
-          <span>Open Inbox</span>
+          <span>Enter PhoneMail Inbox</span>
           <span class="btn-arrow">→</span>
         </button>
       </form>
@@ -60,7 +63,7 @@
     </div>
   </div>
 
-  <!-- ==================== MAIN WORKSPACE (LAPTOP & PHONE BALANCED) ==================== -->
+  <!-- ==================== MAIN WORKSPACE ==================== -->
   <div id="desktop-main-container" class="main-wrapper" style="display: none;">
 
     <!-- Top Navigation Bar -->
@@ -73,10 +76,13 @@
         </button>
         <div class="brand-cluster">
           <div class="brand-icon">⚡</div>
-          <div class="brand-name">Phone<span>Mail</span></div>
+          <div class="brand-name">
+            <span class="saffron-text">Phone</span><span class="green-text">Mail</span>
+          </div>
+          <span class="tiranga-tag">🇮🇳 Bharat</span>
         </div>
         <div class="phone-handle-chip" id="top-phone-chip" title="Your PhoneMail Identity">
-          📞 9876543210
+          📞 +91 9876543210
         </div>
       </div>
 
@@ -89,6 +95,10 @@
       </div>
 
       <div class="nav-right">
+        <!-- Theme Toggle Button (Light / Dark) -->
+        <button class="nav-icon-btn theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch Light / Dark Theme" aria-label="Toggle Theme">
+          🌙
+        </button>
         <button class="nav-icon-btn" onclick="loadEmails()" title="Sync Messages" aria-label="Sync">
           🔄
         </button>
@@ -106,7 +116,7 @@
 
       <!-- Responsive Sidebar (Drawer on Phone, Panel on Laptop) -->
       <aside class="sidebar-panel" id="gmail-sidebar">
-        <!-- Compose Trigger -->
+        <!-- Compose Trigger (Saffron Gradient) -->
         <button class="btn-compose" onclick="openComposeModal()">
           <span class="compose-plus">✏️</span>
           <span class="compose-text">Compose Email</span>
@@ -162,7 +172,7 @@
         <div class="sidebar-system-card">
           <div class="system-status-row">
             <span class="green-indicator"></span>
-            <strong>Hostinger Port 2525</strong>
+            <strong>Self-Hosted Port 2525</strong>
           </div>
           <p class="system-status-desc">Inbound SMTP running directly on native Node.js.</p>
         </div>
@@ -252,7 +262,7 @@
 
   </div>
 
-  <!-- ==================== COMPOSE MODAL (RESPONSIVE DOCK / SHEET) ==================== -->
+  <!-- ==================== COMPOSE MODAL ==================== -->
   <div id="desktop-compose-modal" class="compose-sheet-modal" style="display: none;">
     <div class="compose-card">
       <div class="compose-header">
@@ -291,7 +301,7 @@
       <div class="settings-header">
         <div>
           <h3 class="settings-title">PhoneMail Preferences & Sub-Numbers</h3>
-          <p class="settings-subtitle">Manage your phone identity, extensions, and inbound routing</p>
+          <p class="settings-subtitle">Manage your Indian phone identity, extensions, and routing</p>
         </div>
         <button class="close-btn" onclick="closeDesktopSettings()" aria-label="Close Settings">✕</button>
       </div>
@@ -303,7 +313,7 @@
           <div class="identity-grid">
             <div class="id-item">
               <span class="id-label">Registered Phone Number</span>
-              <strong class="id-value" id="settings-phone">9876543210</strong>
+              <strong class="id-value" id="settings-phone">+91 9876543210</strong>
             </div>
             <div class="id-item">
               <span class="id-label">Default Email Address</span>
