@@ -136,19 +136,19 @@ button {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--saffron-main) 0%, var(--saffron-dark) 100%);
+  background: linear-gradient(135deg, var(--green-main) 0%, var(--green-dark) 100%);
   color: #ffffff;
   font-weight: 700;
   font-size: 14px;
   padding: 10px 18px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(255, 103, 31, 0.35);
+  box-shadow: 0 2px 8px rgba(4, 106, 56, 0.35);
   transition: all 0.18s ease;
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(255, 103, 31, 0.45);
+  box-shadow: 0 4px 14px rgba(4, 106, 56, 0.45);
 }
 
 .btn-primary:active {
@@ -381,9 +381,9 @@ button {
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: var(--saffron-subtle);
-  color: var(--saffron-main);
-  border: 1px solid var(--saffron-border);
+  background: var(--green-subtle);
+  color: var(--green-main);
+  border: 1px solid var(--green-border);
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -544,19 +544,20 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: linear-gradient(135deg, #FF671F 0%, #EA580C 100%);
+  background: linear-gradient(135deg, #046A38 0%, #059669 100%);
   color: #ffffff;
   padding: 12px 18px;
   border-radius: 9999px;
   font-weight: 700;
   font-size: 14px;
-  box-shadow: 0 3px 10px rgba(255, 103, 31, 0.35);
+  box-shadow: 0 3px 10px rgba(4, 106, 56, 0.35);
   margin-bottom: 22px;
   transition: all 0.18s ease;
 }
 
 .btn-compose:hover {
-  box-shadow: 0 4px 16px rgba(255, 103, 31, 0.45);
+  background: linear-gradient(135deg, #03522b 0%, #047857 100%);
+  box-shadow: 0 4px 16px rgba(4, 106, 56, 0.45);
   transform: translateY(-1px);
 }
 
@@ -742,8 +743,8 @@ button {
 }
 
 .custom-checkbox input:checked ~ .checkmark {
-  background: var(--saffron-main);
-  border-color: var(--saffron-main);
+  background: var(--green-main);
+  border-color: var(--green-main);
 }
 
 .folder-header-title {
@@ -786,7 +787,7 @@ button {
 }
 
 .email-card-item:hover {
-  border-color: var(--saffron-border);
+  border-color: var(--green-border);
   box-shadow: var(--shadow-hover);
   transform: translateY(-1px);
 }
@@ -806,8 +807,8 @@ button {
 }
 
 .email-card-item.keyboard-focused {
-  outline: 2px solid var(--saffron-main);
-  border-color: var(--saffron-main);
+  outline: 2px solid var(--green-main);
+  border-color: var(--green-main);
 }
 
 .item-star {
@@ -826,9 +827,9 @@ button {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--saffron-subtle);
-  border: 1px solid var(--saffron-border);
-  color: var(--saffron-dark);
+  background: var(--green-subtle);
+  border: 1.5px solid var(--green-border);
+  color: var(--green-main);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -839,7 +840,9 @@ button {
 }
 
 [data-theme="dark"] .item-avatar-circle {
-  color: var(--saffron-main);
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: var(--green-vibrant);
 }
 
 .item-sender-col {

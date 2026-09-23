@@ -536,14 +536,15 @@ async function loadDesktopAliases() {
           list.appendChild(item);
         }
 
+        const tag = a.alias_tag || (a.alias_email && a.alias_email.includes('.') ? a.alias_email.split('@')[0].split('.')[1] : null) || a.label || 'ext';
         // Render in Left Sidebar
         if (sidebarChips) {
           const chip = document.createElement('div');
           chip.className = 'alias-chip';
           chip.onclick = () => openDesktopSettings();
           chip.innerHTML = `
-            <span class="chip-tag">🏷️ .${escapeHtml(a.alias_tag)}</span>
-            <span class="chip-status">Active</span>
+            <span class="chip-tag">🏷️ .${escapeHtml(tag)}</span>
+            <span class="chip-status">${escapeHtml(a.label || 'Active')}</span>
           `;
           sidebarChips.appendChild(chip);
         }
