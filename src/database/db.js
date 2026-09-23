@@ -9,18 +9,27 @@ const __dirname = path.dirname(__filename);
 
 const dbPath = path.resolve(config.dbPath.endsWith('.db') ? config.dbPath.replace('.db', '.sqlite') : config.dbPath);
 const dbDir = path.dirname(dbPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+try {
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+} catch (err) {
+  console.warn('Notice: Could not create persistent DB directory:', err.message);
 }
 
 const SQL = await initSqlJs();
 let db;
 
 // Load existing database if available, or create new
-if (fs.existsSync(dbPath)) {
-  const fileBuffer = fs.readFileSync(dbPath);
-  db = new SQL.Database(fileBuffer);
-} else {
+try {
+  if (fs.existsSync(dbPath)) {
+    const fileBuffer = fs.readFileSync(dbPath);
+    db = new SQL.Database(fileBuffer);
+  } else {
+    db = new SQL.Database();
+  }
+} catch (err) {
+  console.warn('Notice: Could not load DB file from disk, using in-memory DB:', err.message);
   db = new SQL.Database();
 }
 
@@ -31,14 +40,18 @@ function saveToDisk() {
     const buffer = Buffer.from(data);
     fs.writeFileSync(dbPath, buffer);
   } catch (err) {
-    console.error('Failed to persist database:', err.message);
+    // Non-fatal warning if container disk is read-only
   }
 }
 
 // Initialize schema
-const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
-db.run(schemaSql);
-saveToDisk();
+try {
+  const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
+  db.run(schemaSql);
+  saveToDisk();
+} catch (err) {
+  console.error('Schema initialization warning:', err.message);
+}
 
 // Database abstraction layer
 export const dbOps = {

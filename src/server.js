@@ -35,6 +35,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health check route for Hostinger reverse proxy
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -59,23 +64,27 @@ io.on('connection', (socket) => {
   });
 });
 
-// Start Inbound SMTP Server
-try {
-  startSmtpServer();
-} catch (err) {
-  console.warn('SMTP Server startup notice:', err.message);
+// Start Inbound SMTP Server (only in local dev or if explicitly enabled)
+if (config.enableSmtp || !config.isProduction) {
+  try {
+    startSmtpServer();
+  } catch (err) {
+    console.warn('SMTP Server startup notice:', err.message);
+  }
 }
 
-// Start HTTP & WebSocket Server
-server.listen(config.port, () => {
+// Start HTTP & WebSocket Server bound to 0.0.0.0
+server.listen(config.port, config.host, () => {
   console.log(`\n======================================================`);
   console.log(`🚀 PhoneMail Server is running!`);
-  console.log(`🌐 Web Interfaces: http://localhost:${config.port}`);
-  console.log(`📱 Mobile (WhatsApp + Spike): http://localhost:${config.port}/mobile`);
-  console.log(`💻 Desktop (Gmail): http://localhost:${config.port}/desktop`);
-  console.log(`📋 2-Field Portal: http://localhost:${config.port}/portal`);
-  console.log(`🧪 Judge Testing Lab: http://localhost:${config.port}/simulator`);
-  console.log(`📧 Local Inbound SMTP Port: ${config.smtpPort}`);
+  console.log(`🌐 Bound to: http://${config.host}:${config.port}`);
+  console.log(`📱 Mobile (WhatsApp + Spike): http://${config.host}:${config.port}/mobile`);
+  console.log(`💻 Desktop (Gmail): http://${config.host}:${config.port}/desktop`);
+  console.log(`📋 2-Field Portal: http://${config.host}:${config.port}/portal`);
+  console.log(`🧪 Judge Testing Lab: http://${config.host}:${config.port}/simulator`);
+  if (config.enableSmtp || !config.isProduction) {
+    console.log(`📧 Inbound SMTP Port: ${config.smtpPort}`);
+  }
   console.log(`======================================================\n`);
 });
 
