@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PhoneMail — Mobile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+
+  <!-- ==================== ONBOARDING FLOW (WHATSAPP DESIGN LANGUAGE) ==================== -->
+  <div id="onboarding-container" class="onboarding-wrapper">
+
+    <!-- Screen 1: Language Selection -->
+    <div id="screen-language" class="onboarding-screen active">
+      <div class="ob-header">
+        <div class="whatsapp-logo-icon">🌐</div>
+        <h2>Welcome to PhoneMail</h2>
+        <p>Choose your language to get started</p>
+      </div>
+      <div class="language-list">
+        <label class="lang-option">
+          <input type="radio" name="lang" value="en" checked>
+          <div class="lang-text"><strong>English</strong> <span>(Default)</span></div>
+          <span class="custom-radio"></span>
+        </label>
+        <label class="lang-option">
+          <input type="radio" name="lang" value="hi">
+          <div class="lang-text"><strong>हिन्दी</strong> <span>(Hindi)</span></div>
+          <span class="custom-radio"></span>
+        </label>
+        <label class="lang-option">
+          <input type="radio" name="lang" value="ta">
+          <div class="lang-text"><strong>தமிழ்</strong> <span>(Tamil)</span></div>
+          <span class="custom-radio"></span>
+        </label>
+        <label class="lang-option">
+          <input type="radio" name="lang" value="te">
+          <div class="lang-text"><strong>తెలుగు</strong> <span>(Telugu)</span></div>
+          <span class="custom-radio"></span>
+        </label>
+        <label class="lang-option">
+          <input type="radio" name="lang" value="es">
+          <div class="lang-text"><strong>Español</strong> <span>(Spanish)</span></div>
+          <span class="custom-radio"></span>
+        </label>
+      </div>
+      <div class="ob-footer">
+        <button class="btn-wa-next" onclick="goToScreen('screen-terms')">➔</button>
+      </div>
+    </div>
+
+    <!-- Screen 2: Terms & Conditions -->
+    <div id="screen-terms" class="onboarding-screen">
+      <div class="terms-hero">
+        <div class="hero-circle">✉️</div>
+        <h2>Welcome to PhoneMail</h2>
+        <p>Read our <a href="#">Privacy Policy</a>. Tap "Agree & Continue" to accept the <a href="#">Terms of Service</a>.</p>
+      </div>
+      <div class="ob-footer">
+        <button class="btn-wa-green full-width" onclick="goToScreen('screen-phone')">AGREE AND CONTINUE</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: Phone Verification (SIM auto-detection) -->
+    <div id="screen-phone" class="onboarding-screen">
+      <div class="phone-verify-header">
+        <h3>Enter your phone number</h3>
+        <p>PhoneMail will send an SMS to verify your number. Carrier charges may apply.</p>
+      </div>
+      <div class="country-picker">
+        <span>India</span>
+        <span class="arrow">▼</span>
+      </div>
+      <div class="phone-input-row">
+        <div class="country-code">+91</div>
+        <input type="tel" id="mobile-phone-input" value="9876543210" maxlength="10">
+      </div>
+      <div class="sim-pill">
+        <span>📶 SIM 1 detected: 9876543210</span>
+      </div>
+      <div class="ob-footer">
+        <button class="btn-wa-green" onclick="requestOTP()">NEXT</button>
+      </div>
+    </div>
+
+    <!-- Screen 4: OTP Verification -->
+    <div id="screen-otp" class="onboarding-screen">
+      <div class="otp-header">
+        <h3>Verifying your number</h3>
+        <p>Waiting to automatically detect an SMS sent to <strong id="verify-phone-label">+91 9876543210</strong>. <a href="#" onclick="goToScreen('screen-phone')">Wrong number?</a></p>
+      </div>
+      
+      <!-- Simulated SMS Detection Toast -->
+      <div class="sms-auto-detect-banner" id="sms-banner" onclick="autoFillOTP()">
+        <span>📩 SMS detected: PhoneMail code is <strong>123456</strong></span>
+        <button class="chip-autofill">Tap to Auto-fill</button>
+      </div>
+
+      <div class="otp-inputs">
+        <input type="text" class="otp-digit" maxlength="1" autofocus oninput="onOtpDigit(this, 0)">
+        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 1)">
+        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 2)">
+        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 3)">
+        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 4)">
+        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 5)">
+      </div>
+      <p class="otp-hint">Enter 6-digit code</p>
+    </div>
+
+  </div>
+
+  <!-- ==================== MAIN SPIKE MAIL CONVERSATIONAL APP ==================== -->
+  <div id="app-container" class="app-wrapper">
+
+    <!-- Top WhatsApp Header -->
+    <div class="app-header">
+      <div class="header-left">
+        <button class="icon-btn" onclick="toggleDrawer()">☰</button>
+        <span class="app-title">PhoneMail</span>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" onclick="openProfileModal()">👤</button>
+      </div>
+    </div>
+
+    <!-- Search Bar & Filter Chips (Spike Mail Style) -->
+    <div class="search-filter-section">
+      <div class="search-bar-row">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="chat-search" placeholder="Search phone number or email..." oninput="onSearchInput(this.value)">
+      </div>
+      <div class="filter-chips">
+        <button class="chip active" onclick="setFilter('all', this)">All</button>
+        <button class="chip" onclick="setFilter('unread', this)">Unread</button>
+        <button class="chip" onclick="setFilter('attachments', this)">Attachments</button>
+        <button class="chip" onclick="setFilter('starred', this)">Favorites</button>
+      </div>
+    </div>
+
+    <!-- Unified Chat / Conversations List (Spike Mail) -->
+    <div class="chat-list" id="conversations-list">
+      <!-- Conversation items render here -->
+    </div>
+
+    <!-- Floating Action Button for Traditional Compose -->
+    <button class="fab-compose" title="Compose New Email" onclick="openTraditionalCompose()">
+      ✏️
+    </button>
+
+  </div>
+
+  <!-- ==================== INSIDE CHAT / CONVERSATION VIEW (SPIKE MAIL) ==================== -->
+  <div id="chat-view-container" class="chat-view-wrapper">
+    <div class="chat-header">
+      <button class="icon-btn back-btn" onclick="closeChatView()">←</button>
+      <div class="chat-contact-info">
+        <div class="contact-name" id="chat-contact-name">hr@alphastack.tech</div>
+        <div class="contact-status" id="chat-contact-status">PhoneMail Active</div>
+      </div>
+      <div class="chat-header-actions">
+        <!-- WhatsApp Camera Slot used for Traditional Email Mode toggle -->
+        <button class="icon-btn camera-tab-toggle" title="Traditional Email Mode (To field locked)" onclick="toggleTraditionalInChat()">✉️</button>
+      </div>
+    </div>
+
+    <!-- Compact Subject Bar right above messages -->
+    <div class="chat-subject-bar" id="chat-subject-bar">
+      <span>📌 Subject:</span> <strong id="chat-subject-text">Welcome to AlphaStack!</strong>
+    </div>
+
+    <!-- Chat Message Stream -->
+    <div class="chat-messages-stream" id="chat-messages-stream">
+      <!-- Bubbles render here -->
+    </div>
+
+    <!-- Quoted Message Preview Bar (Swipe right reply) -->
+    <div class="quote-preview-bar" id="quote-preview-bar" style="display: none;">
+      <div class="quote-content" id="quote-preview-text">Replying to message...</div>
+      <button class="close-quote-btn" onclick="cancelQuote()">✕</button>
+    </div>
+
+    <!-- Message Input Box with Compact Subject Field -->
+    <div class="chat-input-bar">
+      <input type="text" id="chat-message-input" placeholder="Type an email..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+      <button class="send-btn" onclick="sendChatMessage()">➤</button>
+    </div>
+  </div>
+
+  <!-- ==================== TRADITIONAL COMPOSE MODAL ==================== -->
+  <div id="traditional-modal" class="modal-wrapper">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="trad-modal-title">New Email</h3>
+        <button class="close-modal-btn" onclick="closeTraditionalCompose()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="trad-field">
+          <label>To:</label>
+          <input type="text" id="trad-to" placeholder="Phone number (e.g. 9845012345) or email">
+        </div>
+        <div class="trad-field">
+          <label>Subject:</label>
+          <input type="text" id="trad-subject" placeholder="Subject">
+        </div>
+        <div class="trad-field">
+          <textarea id="trad-body" rows="6" placeholder="Compose email..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeTraditionalCompose()">Discard</button>
+        <button class="btn-wa-green" onclick="submitTraditionalCompose()">Send Email</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== PROFILE & ALIASES MODAL ==================== -->
+  <div id="profile-modal" class="modal-wrapper">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Account & Alias Settings</h3>
+        <button class="close-modal-btn" onclick="closeProfileModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="profile-hero">
+          <div class="profile-avatar-large">👤</div>
+          <h4 id="profile-name">Soumith V</h4>
+          <p id="profile-email">9876543210@phonemail.com</p>
+        </div>
+
+        <!-- Digital ID QR Card for Village / Offline Users -->
+        <div class="qr-card-box">
+          <div class="qr-header">🪪 Digital PhoneMail ID Card</div>
+          <div class="qr-code-placeholder">
+            <div style="font-size: 32px;">📱</div>
+            <div style="font-weight: 700; margin-top: 4px;">9876543210</div>
+            <div style="font-size: 11px; opacity: 0.8;">Scan or share at banks & govt offices</div>
+          </div>
+        </div>
+
+        <!-- Manage Alias IDs (Sub-Numbers) -->
+        <div class="aliases-section">
+          <h4>Manage Alias IDs (Sub-Numbers)</h4>
+          <p style="font-size: 12px; color: #667781; margin-bottom: 8px;">Create extensions for family members or work without extra phone numbers.</p>
+          <div id="aliases-list">
+            <!-- Aliases render here -->
+          </div>
+          <div class="add-alias-row">
+            <input type="text" id="new-alias-tag" placeholder="Tag (e.g. 1, son, work)">
+            <input type="text" id="new-alias-label" placeholder="Label">
+            <button class="btn-wa-green" style="padding: 8px 12px; font-size: 12px;" onclick="addAlias()">+ Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Drawer Navigation -->
+  <div id="drawer-menu" class="drawer-wrapper" onclick="toggleDrawer()">
+    <div class="drawer-content" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <div class="profile-avatar-small">👤</div>
+        <div style="font-weight: 700;" id="drawer-username">Soumith V</div>
+        <div style="font-size: 12px; opacity: 0.8;" id="drawer-email">9876543210@phonemail.com</div>
+      </div>
+      <div class="drawer-items">
+        <div class="drawer-item active" onclick="toggleDrawer()"><span>📥</span> Home (Unified Chats)</div>
+        <div class="drawer-item" onclick="alert('Drafts feature ready'); toggleDrawer();"><span>📝</span> Drafts</div>
+        <div class="drawer-item" onclick="alert('Spam filter active'); toggleDrawer();"><span>🚫</span> Spam</div>
+        <div class="drawer-item" onclick="alert('Trash folder'); toggleDrawer();"><span>🗑️</span> Trash</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

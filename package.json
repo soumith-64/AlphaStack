@@ -1,0 +1,25 @@
+{
+  "name": "alphastack-phonemail",
+  "version": "1.0.0",
+  "description": "Phone-number-powered email platform built for AlphaStack Hackathon",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "mailparser": "^3.7.2",
+    "nodemailer": "^6.10.0",
+    "smtp-server": "^3.13.6",
+    "socket.io": "^4.8.1",
+    "sql.js": "^1.14.2"
+  },
+  "allowScripts": {
+    "better-sqlite3@11.10.0": true
+  }
+}

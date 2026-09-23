@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PhoneMail — Judge Evaluation Lab & Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .badge-lab {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .grid-panels {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .panel {
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+
+    input, textarea {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #38bdf8;
+    }
+
+    .btn {
+      background: #38bdf8;
+      color: #0f172a;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn:hover { background: #0284c7; color: #fff; }
+    .btn-green { background: #22c55e; color: #052e16; }
+    .btn-green:hover { background: #16a34a; color: #fff; }
+
+    /* Phone Dialpad Simulator */
+    .dialpad-box {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+
+    .call-status {
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      margin-bottom: 12px;
+      color: #cbd5e1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #64748b;
+    }
+
+    .status-dot.active { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+
+    .keypad-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 240px;
+      margin: 0 auto;
+    }
+
+    .keypad-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      padding: 12px 0;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .keypad-btn:hover { background: rgba(56, 189, 248, 0.2); border-color: #38bdf8; }
+
+    /* Live Audit Log Section */
+    .log-panel {
+      background: #090d16;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    .log-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .log-stream {
+      background: #030712;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px;
+      height: 280px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+
+    .log-line {
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border-left: 3px solid #64748b;
+      background: rgba(255, 255, 255, 0.02);
+      line-height: 1.4;
+    }
+
+    .log-line.sms {
+      border-left-color: #22c55e;
+      background: rgba(34, 197, 94, 0.05);
+    }
+
+    .log-line.ivr {
+      border-left-color: #38bdf8;
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .log-meta {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 4px;
+    }
+
+    .log-content { color: #f1f5f9; }
+
+    @media (max-width: 850px) {
+      .grid-panels { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="page-header">
+      <div>
+        <h1 style="font-size: 22px; font-weight: 700; color: #fff;">🧪 PhoneMail Judge Evaluation Lab</h1>
+        <p style="font-size: 13px; color: #94a3b8; margin-top: 4px;">Zero-cost testing sandbox for IVR Calls, Inbound SMTP, and Targeted SMS Notifications.</p>
+      </div>
+      <div class="badge-lab">Interactive Testing Mode</div>
+    </div>
+
+    <div class="grid-panels">
+      <!-- Panel 1: Toll-Free IVR Call Simulator -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>📞</span> 1. Toll-Free IVR Voice Call Simulator
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">Simulate calling the toll-free number from an ordinary phone. Press <strong>1</strong> to create an account, or <strong>2</strong> to hear your emails read aloud.</p>
+
+        <div class="form-group">
+          <label>Caller Phone Number</label>
+          <input type="text" id="ivr-phone" value="9812345678" maxlength="10">
+        </div>
+
+        <button class="btn btn-green" id="btn-call" onclick="startCall()">📞 Call Toll-Free (IVR)</button>
+
+        <div class="dialpad-box" id="dialpad-box">
+          <div class="call-status">
+            <span class="status-dot" id="status-dot"></span>
+            <span id="call-status-text">Call Idle. Click button above to connect.</span>
+          </div>
+
+          <div class="keypad-grid">
+            <button class="keypad-btn" onclick="pressKey(1)">1</button>
+            <button class="keypad-btn" onclick="pressKey(2)">2</button>
+            <button class="keypad-btn" onclick="pressKey(3)">3</button>
+            <button class="keypad-btn" onclick="pressKey(4)">4</button>
+            <button class="keypad-btn" onclick="pressKey(5)">5</button>
+            <button class="keypad-btn" onclick="pressKey(6)">6</button>
+            <button class="keypad-btn" onclick="pressKey(7)">7</button>
+            <button class="keypad-btn" onclick="pressKey(8)">8</button>
+            <button class="keypad-btn" onclick="pressKey(9)">9</button>
+            <button class="keypad-btn" onclick="pressKey('*')">*</button>
+            <button class="keypad-btn" onclick="pressKey(0)">0</button>
+            <button class="keypad-btn" onclick="pressKey('#')">#</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Inbound Email Dispatcher -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>✉️</span> 2. Inbound SMTP Email Injector
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 14px;">Injects an email directly into the parser. If the recipient does not have the mobile app, watch the SMS Audit Log fire in real time!</p>
+
+        <div class="form-group">
+          <label>External Sender Address</label>
+          <input type="text" id="email-from" value="hr@google.com">
+        </div>
+
+        <div class="form-group">
+          <label>Recipient Address (Phone Number)</label>
+          <input type="text" id="email-to" value="9812345678@phonemail.com">
+        </div>
+
+        <div class="form-group">
+          <label>Subject</label>
+          <input type="text" id="email-subject" value="Interview Schedule & Offer Details">
+        </div>
+
+        <div class="form-group">
+          <label>Email Body</label>
+          <textarea id="email-body" rows="3">Congratulations! Please review the attached offer details and reply to confirm your joining date.</textarea>
+        </div>
+
+        <button class="btn" onclick="sendInboundEmail()">🚀 Dispatch Inbound Email</button>
+      </div>
+    </div>
+
+    <!-- Panel 3: Live Real-Time Telephony & SMS Audit Log -->
+    <div class="log-panel">
+      <div class="log-header">
+        <div>
+          <h2 style="font-size: 16px; font-weight: 700; color: #fff;">📋 Live Telephony & SMS Audit Stream</h2>
+          <p style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Real-time feed showing IVR voice triggers, caller registrations, and targeted SMS notifications.</p>
+        </div>
+        <button class="btn" style="padding: 6px 12px; font-size: 11px;" onclick="fetchLogs()">🔄 Refresh</button>
+      </div>
+
+      <div class="log-stream" id="log-stream">
+        <!-- Log entries render here -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const logStream = document.getElementById('log-stream');
+    let callConnected = false;
+
+    // Fetch initial logs
+    async function fetchLogs() {
+      try {
+        const res = await fetch('/api/simulator/logs');
+        const data = await res.json();
+        logStream.innerHTML = '';
+        if (data.logs && data.logs.length > 0) {
+          data.logs.forEach(addLogEntry);
+        } else {
+          logStream.innerHTML = '<div style="color: #64748b; text-align: center; padding: 20px;">No telephony logs recorded yet.</div>';
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function addLogEntry(log) {
+      const line = document.createElement('div');
+      const isSms = log.type && log.type.includes('SMS');
+      line.className = `log-line ${isSms ? 'sms' : 'ivr'}`;
+
+      const time = new Date(log.created_at || Date.now()).toLocaleTimeString();
+      line.innerHTML = `
+        <div class="log-meta">[${time}] • ${log.type} • Phone: ${log.phone_number} • Provider: ${log.provider || 'SIMULATOR'}</div>
+        <div class="log-content">💬 <strong>${log.content}</strong></div>
+      `;
+      logStream.prepend(line);
+    }
+
+    // Real-time socket listener
+    socket.on('telephony:log', (log) => {
+      addLogEntry(log);
+    });
+
+    // IVR Call Simulation
+    async function startCall() {
+      const phone = document.getElementById('ivr-phone').value.trim();
+      const statusText = document.getElementById('call-status-text');
+      const statusDot = document.getElementById('status-dot');
+
+      statusText.innerHTML = 'Connecting to Toll-Free IVR...';
+      const res = await fetch('/api/simulator/call', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fromNumber: phone })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        callConnected = true;
+        statusDot.classList.add('active');
+        statusText.innerHTML = `🔊 Connected! IVR Voice: "<em>${data.prompt}</em>"`;
+      }
+    }
+
+    async function pressKey(digit) {
+      if (!callConnected) {
+        alert('Please click "Call Toll-Free (IVR)" first to initiate the call.');
+        return;
+      }
+      const phone = document.getElementById('ivr-phone').value.trim();
+      const statusText = document.getElementById('call-status-text');
+      const statusDot = document.getElementById('status-dot');
+
+      const res = await fetch('/api/simulator/keypad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ digit, fromNumber: phone })
+      });
+      const data = await res.json();
+
+      if (digit == '1') {
+        statusText.innerHTML = `✅ Keypad 1 pressed! Account provisioned for ${phone}. Confirmation SMS sent.`;
+        callConnected = false;
+        statusDot.classList.remove('active');
+      } else if (digit == '2') {
+        statusText.innerHTML = `🔊 Keypad 2 pressed! Reading latest unread emails via Voice Text-to-Speech.`;
+      } else {
+        statusText.innerHTML = `Keypad ${digit} pressed.`;
+      }
+    }
+
+    // Inbound Email Simulation
+    async function sendInboundEmail() {
+      const from = document.getElementById('email-from').value.trim();
+      const to = document.getElementById('email-to').value.trim();
+      const subject = document.getElementById('email-subject').value.trim();
+      const body = document.getElementById('email-body').value.trim();
+
+      const res = await fetch('/api/simulator/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to, subject, body })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('🚀 Email dispatched successfully! Check the SMS Audit Stream below if recipient has no mobile app.');
+      }
+    }
+
+    fetchLogs();
+  </script>
+</body>
+</html>
