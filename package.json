@@ -13,7 +13,6 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mailparser": "^3.7.2",
-    "nodemailer": "^6.10.0",
     "smtp-server": "^3.13.6",
     "socket.io": "^4.8.1",
     "sql.js": "^1.14.2"
