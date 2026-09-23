@@ -78,10 +78,7 @@
       </div>
       <div class="phone-input-row">
         <div class="country-code">+91</div>
-        <input type="tel" id="mobile-phone-input" value="9876543210" maxlength="10">
-      </div>
-      <div class="sim-pill">
-        <span>📶 SIM 1 detected: 9876543210</span>
+        <input type="tel" id="mobile-phone-input" placeholder="Phone number" maxlength="10">
       </div>
       <div class="ob-footer">
         <button class="btn-wa-green" onclick="requestOTP()">NEXT</button>
@@ -92,13 +89,7 @@
     <div id="screen-otp" class="onboarding-screen">
       <div class="otp-header">
         <h3>Verifying your number</h3>
-        <p>Waiting to automatically detect an SMS sent to <strong id="verify-phone-label">+91 9876543210</strong>. <a href="#" onclick="goToScreen('screen-phone')">Wrong number?</a></p>
-      </div>
-      
-      <!-- Simulated SMS Detection Toast -->
-      <div class="sms-auto-detect-banner" id="sms-banner" onclick="autoFillOTP()">
-        <span>📩 SMS detected: PhoneMail code is <strong>123456</strong></span>
-        <button class="chip-autofill">Tap to Auto-fill</button>
+        <p>Waiting to automatically detect an SMS sent to <strong id="verify-phone-label">your number</strong>. <a href="#" onclick="goToScreen('screen-phone')">Wrong number?</a></p>
       </div>
 
       <div class="otp-inputs">

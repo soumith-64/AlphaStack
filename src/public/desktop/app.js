@@ -1,9 +1,5 @@
 // ==================== STATE MANAGEMENT ====================
-let currentUser = {
-  phone: '9876543210',
-  name: 'Soumith V',
-  email: '9876543210@phonemail.com'
-};
+let currentUser = null;
 
 let currentFolder = 'INBOX';
 let allEmails = [];
@@ -92,6 +88,8 @@ if (authForm) {
           name: data.user.display_name || `User ${data.user.phone_number}`,
           email: data.user.email_address
         };
+
+        sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
 
         document.getElementById('desktop-auth-container').style.display = 'none';
         document.getElementById('desktop-main-container').style.display = 'flex';
@@ -625,3 +623,40 @@ function showToastNotification(msg) {
     toast.classList.remove('visible');
   }, 3000);
 }
+
+// ==================== SESSION RESTORATION & LOGOUT ====================
+function restoreSession() {
+  const saved = sessionStorage.getItem('phonemail-user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      const auth = document.getElementById('desktop-auth-container');
+      const main = document.getElementById('desktop-main-container');
+      if (auth && main) {
+        auth.style.display = 'none';
+        main.style.display = 'flex';
+        initDesktopApp();
+      }
+    } catch (e) {
+      sessionStorage.removeItem('phonemail-user');
+      currentUser = null;
+    }
+  }
+}
+
+function logoutDesktop() {
+  sessionStorage.removeItem('phonemail-user');
+  currentUser = null;
+  const auth = document.getElementById('desktop-auth-container');
+  const main = document.getElementById('desktop-main-container');
+  if (auth && main) {
+    main.style.display = 'none';
+    auth.style.display = 'flex';
+    document.getElementById('desktop-phone-input').value = '';
+    document.getElementById('desktop-otp-input').value = '';
+  }
+  showToastNotification('Logged out successfully');
+}
+
+// Check session on startup
+restoreSession();

@@ -1,9 +1,6 @@
 // ==================== STATE MANAGEMENT ====================
-let currentUser = {
-  phone: '9876543210',
-  name: 'Soumith V',
-  email: '9876543210@phonemail.com'
-};
+let currentUser = null;
+let pendingPhone = '';
 
 let activeConversation = null;
 let currentMessages = [];
@@ -24,23 +21,18 @@ async function requestOTP() {
     alert('Please enter a valid 10-digit phone number');
     return;
   }
-  currentUser.phone = phone;
-  document.getElementById('verify-phone-label').innerText = `+91 ${phone}`;
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  pendingPhone = cleanPhone;
+  document.getElementById('verify-phone-label').innerText = `+91 ${cleanPhone}`;
 
   try {
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumber: phone })
+      body: JSON.stringify({ phoneNumber: cleanPhone })
     });
     const data = await res.json();
     goToScreen('screen-otp');
-
-    // Simulate SMS auto-detection
-    setTimeout(() => {
-      const banner = document.getElementById('sms-banner');
-      if (banner) banner.style.display = 'flex';
-    }, 800);
   } catch (err) {
     alert('Failed to request verification: ' + err.message);
   }
@@ -73,7 +65,7 @@ async function verifyOTP(otp) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        phoneNumber: currentUser.phone,
+        phoneNumber: pendingPhone || (currentUser && currentUser.phone),
         otp,
         clientType: 'MOBILE_CLIENT'
       })
@@ -86,6 +78,8 @@ async function verifyOTP(otp) {
         name: data.user.display_name || `User ${data.user.phone_number}`,
         email: data.user.email_address
       };
+
+      sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
 
       // Transition to Main App
       document.getElementById('onboarding-container').style.display = 'none';
@@ -470,6 +464,14 @@ function toggleDrawer() {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
-  // If already authenticated or testing, you can auto-initialize or show onboarding
-  // For judging demonstration, show Screen 1 first
+  const saved = sessionStorage.getItem('phonemail-mobile-user');
+  if (saved) {
+    try {
+      currentUser = JSON.parse(saved);
+      document.getElementById('onboarding-container').style.display = 'none';
+      initMainApp();
+    } catch (e) {
+      sessionStorage.removeItem('phonemail-mobile-user');
+    }
+  }
 });

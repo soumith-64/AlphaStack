@@ -26,8 +26,7 @@ router.post('/send-otp', (req, res) => {
   res.json({
     success: true,
     message: 'OTP sent successfully',
-    phoneNumber: cleanNumber,
-    demoOtp: otp // Provided for effortless hackathon judging / auto-fill
+    phoneNumber: cleanNumber
   });
 });
 
