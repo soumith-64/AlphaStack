@@ -28,7 +28,7 @@ export const notificationService = {
     console.log(`📱 [TARGETED SMS DISPATCH] To: ${recipientUser.phone_number} | Body: "${smsBody}"`);
 
     // Log to audit table
-    const logId = dbOps.logTelephony(
+    const logId = await dbOps.logTelephony(
       recipientUser.phone_number,
       'OUTGOING_NOTIFICATION_SMS',
       smsBody,

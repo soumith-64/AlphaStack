@@ -1,4 +1,5 @@
 import initSqlJs from 'sql.js';
+import mysql from 'mysql2/promise';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -7,8 +8,33 @@ import { config } from '../config.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+let mysqlPool = null;
+const useMysql = Boolean(config.db.name && config.db.user);
+
+if (useMysql) {
+  try {
+    mysqlPool = mysql.createPool({
+      host: config.db.host,
+      port: config.db.port,
+      user: config.db.user,
+      password: config.db.password,
+      database: config.db.name,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0
+    });
+    console.log(`🔌 [MySQL] Connection pool created for database: ${config.db.name}`);
+  } catch (err) {
+    console.error('❌ [MySQL Pool Creation Error]:', err.message);
+    mysqlPool = null;
+  }
+}
+
+// Fallback SQLite (WebAssembly) initialization
+let db = null;
 const dbPath = path.resolve(config.dbPath.endsWith('.db') ? config.dbPath.replace('.db', '.sqlite') : config.dbPath);
 const dbDir = path.dirname(dbPath);
+
 try {
   if (!fs.existsSync(dbDir)) {
     fs.mkdirSync(dbDir, { recursive: true });
@@ -18,9 +44,7 @@ try {
 }
 
 const SQL = await initSqlJs();
-let db;
 
-// Load existing database if available, or create new
 try {
   if (fs.existsSync(dbPath)) {
     const fileBuffer = fs.readFileSync(dbPath);
@@ -33,8 +57,8 @@ try {
   db = new SQL.Database();
 }
 
-// Function to persist database to disk
 function saveToDisk() {
+  if (mysqlPool || !db) return;
   try {
     const data = db.export();
     const buffer = Buffer.from(data);
@@ -44,18 +68,29 @@ function saveToDisk() {
   }
 }
 
-// Initialize schema
-try {
-  const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
-  db.run(schemaSql);
-  saveToDisk();
-} catch (err) {
-  console.error('Schema initialization warning:', err.message);
+// Initialize SQLite schema if MySQL is not configured
+if (!mysqlPool) {
+  try {
+    const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
+    db.run(schemaSql);
+    saveToDisk();
+  } catch (err) {
+    console.error('Schema initialization warning:', err.message);
+  }
 }
 
-// Database abstraction layer
+// Database abstraction layer (supports both MySQL and SQLite seamlessly)
 export const dbOps = {
-  queryAll(sql, params = []) {
+  async queryAll(sql, params = []) {
+    if (mysqlPool) {
+      try {
+        const [rows] = await mysqlPool.execute(sql, params);
+        return rows;
+      } catch (err) {
+        console.error('MySQL queryAll error:', err.message);
+        throw err;
+      }
+    }
     const stmt = db.prepare(sql);
     stmt.bind(params);
     const results = [];
@@ -66,27 +101,34 @@ export const dbOps = {
     return results;
   },
 
-  queryOne(sql, params = []) {
-    const all = this.queryAll(sql, params);
+  async queryOne(sql, params = []) {
+    const all = await this.queryAll(sql, params);
     return all.length > 0 ? all[0] : null;
   },
 
-  execute(sql, params = []) {
+  async execute(sql, params = []) {
+    if (mysqlPool) {
+      try {
+        const [result] = await mysqlPool.execute(sql, params);
+        return { changes: result.affectedRows };
+      } catch (err) {
+        console.error('MySQL execute error:', err.message);
+        throw err;
+      }
+    }
     db.run(sql, params);
     saveToDisk();
     return { changes: 1 };
   },
 
-  logTelephony(phoneNumber, type, content, provider = 'VIRTUAL_SIMULATOR', status = 'DELIVERED') {
+  async logTelephony(phoneNumber, type, content, provider = 'VIRTUAL_SIMULATOR', status = 'DELIVERED') {
     const id = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
-    db.run(
+    await this.execute(
       `INSERT INTO telephony_logs (id, phone_number, type, content, provider, status) VALUES (?, ?, ?, ?, ?, ?)`,
       [id, phoneNumber, type, content, provider, status]
     );
-    saveToDisk();
     return id;
   }
 };
 
-export { db };
-
+export { db, mysqlPool };

@@ -11,11 +11,11 @@ export const telephonyService = {
   /**
    * Generates initial TwiML for incoming toll-free calls
    */
-  handleIncomingCall(fromNumber) {
+  async handleIncomingCall(fromNumber) {
     const cleanNumber = (fromNumber || 'Unknown').replace(/\D/g, '');
     console.log(`📞 [INCOMING CALL] From: ${cleanNumber}`);
 
-    const logId = dbOps.logTelephony(
+    const logId = await dbOps.logTelephony(
       cleanNumber,
       'INCOMING_CALL_IVR',
       `Inbound phone call connected. Playing PhoneMail IVR menu.`
@@ -46,17 +46,17 @@ export const telephonyService = {
   /**
    * Processes DTMF digit pressed by caller
    */
-  handleGather(digits, fromNumber) {
+  async handleGather(digits, fromNumber) {
     const cleanNumber = (fromNumber || '9876543210').replace(/\D/g, '').slice(-10);
     console.log(`📞 [IVR GATHER] Digits: ${digits} | From: ${cleanNumber}`);
 
     if (digits === '1') {
       // Create user if not exists
-      let user = dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+      let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
       if (!user) {
         const userId = 'user_' + Date.now();
         const email = `${cleanNumber}@${config.domainName}`;
-        dbOps.execute(`
+        await dbOps.execute(`
           INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
           VALUES (?, ?, ?, ?, 'IVR', 0)
         `, [userId, cleanNumber, email, `User ${cleanNumber}`]);
@@ -64,7 +64,7 @@ export const telephonyService = {
       }
 
       const welcomeMsg = `Welcome to PhoneMail! Your email address is ${cleanNumber}@${config.domainName}. You will receive SMS alerts for new emails.`;
-      const logId = dbOps.logTelephony(cleanNumber, 'OUTGOING_NOTIFICATION_SMS', welcomeMsg);
+      const logId = await dbOps.logTelephony(cleanNumber, 'OUTGOING_NOTIFICATION_SMS', welcomeMsg);
 
       if (ioInstance) {
         ioInstance.emit('telephony:log', {
@@ -85,7 +85,7 @@ export const telephonyService = {
 </Response>`;
     } else if (digits === '2') {
       // Audio mailbox readout
-      const user = dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+      const user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
       if (!user) {
         return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -94,7 +94,7 @@ export const telephonyService = {
 </Response>`;
       }
 
-      const unreadEmails = dbOps.queryAll(`
+      const unreadEmails = await dbOps.queryAll(`
         SELECT * FROM emails 
         WHERE recipient_emails LIKE ? AND is_read = 0 
         ORDER BY created_at DESC LIMIT 3
@@ -128,22 +128,22 @@ export const telephonyService = {
   /**
    * Handles incoming SMS registration
    */
-  handleIncomingSMS(fromNumber, body) {
+  async handleIncomingSMS(fromNumber, body) {
     const cleanNumber = (fromNumber || '').replace(/\D/g, '').slice(-10);
     console.log(`💬 [INCOMING SMS] From: ${cleanNumber} | Body: ${body}`);
 
-    let user = dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+    let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
     if (!user) {
       const userId = 'user_' + Date.now();
       const email = `${cleanNumber}@${config.domainName}`;
-      dbOps.execute(`
+      await dbOps.execute(`
         INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
         VALUES (?, ?, ?, ?, 'SMS', 0)
       `, [userId, cleanNumber, email, `User ${cleanNumber}`]);
     }
 
     const replyMsg = `Welcome to PhoneMail! Your email address is ${cleanNumber}@${config.domainName}. Send and receive emails easily.`;
-    const logId = dbOps.logTelephony(cleanNumber, 'OUTGOING_NOTIFICATION_SMS', replyMsg);
+    const logId = await dbOps.logTelephony(cleanNumber, 'OUTGOING_NOTIFICATION_SMS', replyMsg);
 
     if (ioInstance) {
       ioInstance.emit('telephony:log', {
