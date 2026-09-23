@@ -73,19 +73,29 @@ if (config.enableSmtp || !config.isProduction) {
   }
 }
 
-// Start HTTP & WebSocket Server bound to 0.0.0.0
-server.listen(config.port, config.host, () => {
-  console.log(`\n======================================================`);
-  console.log(`🚀 PhoneMail Server is running!`);
-  console.log(`🌐 Bound to: http://${config.host}:${config.port}`);
-  console.log(`📱 Mobile (WhatsApp + Spike): http://${config.host}:${config.port}/mobile`);
-  console.log(`💻 Desktop (Gmail): http://${config.host}:${config.port}/desktop`);
-  console.log(`📋 2-Field Portal: http://${config.host}:${config.port}/portal`);
-  console.log(`🧪 Judge Testing Lab: http://${config.host}:${config.port}/simulator`);
-  if (config.enableSmtp || !config.isProduction) {
-    console.log(`📧 Inbound SMTP Port: ${config.smtpPort}`);
-  }
-  console.log(`======================================================\n`);
-});
+// Start HTTP & WebSocket Server (supports TCP port, 0.0.0.0, and Phusion Passenger sockets)
+const rawPort = config.port;
+if (typeof rawPort === 'string' && !/^\d+$/.test(rawPort)) {
+  // Named pipe or Phusion Passenger unix socket
+  server.listen(rawPort, () => {
+    console.log(`🚀 PhoneMail Server running on Passenger socket: ${rawPort}`);
+  });
+} else {
+  // Standard TCP port
+  const numericPort = Number(rawPort) || 3000;
+  server.listen(numericPort, config.host, () => {
+    console.log(`\n======================================================`);
+    console.log(`🚀 PhoneMail Server is running!`);
+    console.log(`🌐 Bound to: http://${config.host}:${numericPort}`);
+    console.log(`📱 Mobile (WhatsApp + Spike): http://${config.host}:${numericPort}/mobile`);
+    console.log(`💻 Desktop (Gmail): http://${config.host}:${numericPort}/desktop`);
+    console.log(`📋 2-Field Portal: http://${config.host}:${numericPort}/portal`);
+    console.log(`🧪 Judge Testing Lab: http://${config.host}:${numericPort}/simulator`);
+    if (config.enableSmtp || !config.isProduction) {
+      console.log(`📧 Inbound SMTP Port: ${config.smtpPort}`);
+    }
+    console.log(`======================================================\n`);
+  });
+}
 
 export { app, server, io };

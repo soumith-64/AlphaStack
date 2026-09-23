@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 export const config = {
-  port: process.env.PORT ? parseInt(process.env.PORT, 10) : 3000,
+  port: process.env.PORT || 3000,
   host: process.env.HOST || '0.0.0.0',
   smtpPort: parseInt(process.env.SMTP_PORT || '2525', 10),
   enableSmtp: process.env.ENABLE_SMTP === 'true',

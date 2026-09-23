@@ -30,35 +30,13 @@ if (useMysql) {
   }
 }
 
-// Fallback SQLite (WebAssembly) initialization
+// Fallback SQLite (WebAssembly) initialization - only run if MySQL is not active
 let db = null;
 const dbPath = path.resolve(config.dbPath.endsWith('.db') ? config.dbPath.replace('.db', '.sqlite') : config.dbPath);
 const dbDir = path.dirname(dbPath);
 
-try {
-  if (!fs.existsSync(dbDir)) {
-    fs.mkdirSync(dbDir, { recursive: true });
-  }
-} catch (err) {
-  console.warn('Notice: Could not create persistent DB directory:', err.message);
-}
-
-const SQL = await initSqlJs();
-
-try {
-  if (fs.existsSync(dbPath)) {
-    const fileBuffer = fs.readFileSync(dbPath);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    db = new SQL.Database();
-  }
-} catch (err) {
-  console.warn('Notice: Could not load DB file from disk, using in-memory DB:', err.message);
-  db = new SQL.Database();
-}
-
 function saveToDisk() {
-  if (mysqlPool || !db) return;
+  if (useMysql || !db) return;
   try {
     const data = db.export();
     const buffer = Buffer.from(data);
@@ -68,14 +46,28 @@ function saveToDisk() {
   }
 }
 
-// Initialize SQLite schema if MySQL is not configured
-if (!mysqlPool) {
+if (!useMysql) {
   try {
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+  } catch (err) {
+    console.warn('Notice: Could not create persistent DB directory:', err.message);
+  }
+
+  try {
+    const SQL = await initSqlJs();
+    if (fs.existsSync(dbPath)) {
+      const fileBuffer = fs.readFileSync(dbPath);
+      db = new SQL.Database(fileBuffer);
+    } else {
+      db = new SQL.Database();
+    }
     const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
     db.run(schemaSql);
     saveToDisk();
   } catch (err) {
-    console.error('Schema initialization warning:', err.message);
+    console.warn('Notice: SQLite initialization warning:', err.message);
   }
 }
 
