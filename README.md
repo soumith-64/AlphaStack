@@ -144,24 +144,25 @@ You can register an email account in under 10 seconds:
 
 ---
 
-## 🚀 Quickstart: Run with Docker in 3 Steps
+## 🚀 Quickstart: Run in 3 Steps
 
-Everything is packaged into a single container. You only need **Docker** installed.
+You can run PhoneMail directly with **Node.js** or with **Docker** (optional):
 
-### Step 1: Clone the Repo
+### Option A: Run with Node.js (Recommended & Fastest)
 ```bash
+# 1. Clone the repository
 git clone https://github.com/soumith-64/AlphaStack.git
 cd AlphaStack
-```
 
-### Step 2: Set Your Domain
-Copy the example config:
-```bash
+# 2. Configure environment
 cp .env.example .env
-```
-*(By default, it is pre-configured to work out of the box with zero setup).*
 
-### Step 3: Start the App
+# 3. Install dependencies & start
+npm install
+npm start
+```
+
+### Option B: Run with Docker (Optional)
 ```bash
 docker compose up -d
 ```
