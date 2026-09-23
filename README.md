@@ -10,6 +10,8 @@
 > Imagine if you didn't need to create complicated email addresses like `john.doe1992@gmail.com`.  
 > What if your email was simply your phone number: **`9876543210@phonemail.com`**?  
 > **PhoneMail makes this real** — with zero paid third-party tools, running natively on **Node.js** and deployed on **Hostinger Cloud Hosting** with your custom domain.
+> 
+> 📋 **Sprint Tracking:** See our [5-Day Fast-Track Roadmap (ROADMAP_5_DAYS.md)](ROADMAP_5_DAYS.md).
 
 ---
 
@@ -24,6 +26,51 @@ PhoneMail connects traditional phone lines (voice calls and SMS) with modern ema
 5. **No Smartphone? No Problem:** If you sign up by phone or kiosk, you receive an **instant SMS text** whenever someone emails you:  
    > *"You have received an email from boss@company.com. Subject: Meeting update."*
 6. **100% Free & Self-Hosted:** No SendGrid, no Mailgun, and no monthly fees. Built with lightweight, native Node.js and SQLite.
+
+---
+
+## 🛠️ Technology Stack
+
+| Layer | Technologies Used | Purpose |
+| :--- | :--- | :--- |
+| **Runtime & Backend** | **Node.js 18+**, **Express.js** | Core API, HTTP services, session routing |
+| **Real-Time Engine** | **Socket.io (WebSockets)** | Instant zero-latency inbox updates without page refresh |
+| **Database** | **SQLite (WAL Mode)** | Zero-config, ultra-fast persistent storage |
+| **Inbound Mail Parsing** | **smtp-server**, **mailparser** | Accepts & parses standard MIME emails without external APIs |
+| **Telephony Gateway** | **Twilio Voice (TwiML)**, **Twilio SMS** | Toll-free IVR (Press '1' & '2'), SMS registration & notifications |
+| **Frontend Interfaces** | **HTML5**, **Vanilla CSS**, **JavaScript** | Responsive Mobile (WhatsApp + Spike) & Desktop (Gmail) UI |
+| **Hosting & Cloud** | **Hostinger Cloud Hosting** | 1-Click Git deployment, free SSL, and domain routing |
+
+---
+
+## 🏗️ System Architecture & Data Flow
+
+```mermaid
+graph TD
+    subgraph Inbound Channels
+        Call[Toll-Free Voice Call] -->|TwiML Stream| IVR[Twilio Voice IVR]
+        SMSIn[SMS 'REGISTER'] -->|Inbound Text| SMSGate[Twilio SMS Gateway]
+        ExtMail[External Mail Server<br/>Gmail / Outlook] -->|SMTP Port 25 / Catch-All| MailParser[Inbound Mail Service<br/>smtp-server + mailparser]
+        MobUser[Mobile Web User] -->|HTTP / WebSocket| MobUI[Mobile Client<br/>WhatsApp + Spike Mail UI]
+        DeskUser[Desktop Web User] -->|HTTP / WebSocket| DeskUI[Desktop Client<br/>Gmail UI]
+    end
+
+    subgraph PhoneMail Node.js Engine
+        IVR -->|POST /api/twilio/voice-gather| CoreAPI[Express Core Engine]
+        SMSGate -->|POST /api/twilio/sms| CoreAPI
+        MailParser --> CoreAPI
+
+        CoreAPI --> DB[(SQLite Database<br/>WAL Mode)]
+        CoreAPI --> NotifDispatcher[SMS Notification Dispatcher]
+        CoreAPI --> WS[Socket.io Realtime Server]
+    end
+
+    subgraph Outbound & Alerts
+        NotifDispatcher -->|if !hasMobileApp| SMSOut[SMS Notification<br/>"New email from X..."]
+        WS -->|Instant Chat Sync| MobUI
+        WS -->|Instant Inbox Sync| DeskUI
+    end
+```
 
 ---
 
@@ -72,33 +119,6 @@ Users can claim a custom name linked to their phone number (e.g., `soumith@phone
 
 ### 4. Disposable "Spam-Shield" Aliases
 Generate temporary addresses for discounts and shopping (e.g. `9876543210.shop@phonemail.com`). A simple **ON / OFF switch** in settings lets users block spam with 1 tap.
-
----
-
-## 🖼️ How It Works (Visual Flow)
-
-```
-                    ┌───────────────────────────────┐
-                    │ External Sender (e.g. Gmail)  │
-                    │ sends email to:               │
-                    │ 9876543210@phonemail.com      │
-                    └───────────────┬───────────────┘
-                                    │ (via Internet SMTP)
-                                    ▼
-                    ┌───────────────────────────────┐
-                    │    PhoneMail Node.js Engine   │
-                    │  (Catches & Parses Email)     │
-                    └───────┬───────────────┬───────┘
-                            │               │
-        Has Mobile App?     │               │ No Mobile App?
-       (Smartphone User)    │               │ (Basic Phone / Kiosk)
-                            ▼               ▼
-               ┌──────────────────────┐  ┌──────────────────────┐
-               │ 📱 Mobile Web App    │  │ 💬 Instant SMS Alert │
-               │ Real-time Chat Inbox │  │ "New email from X:   │
-               │ (WhatsApp + Spike)   │  │  Subject: Y"         │
-               └──────────────────────┘  └──────────────────────┘
-```
 
 ---
 

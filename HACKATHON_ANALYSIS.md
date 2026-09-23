@@ -2,8 +2,8 @@
 
 > **Project Name:** PhoneMail (phonemail.com / custom domain)  
 > **Core Concept:** An email platform where phone numbers serve as email addresses (e.g., `9876543210@yourdomain.com`).  
-> **Available Resources:** 1 Domain Name + 1 Hosting Plan (VPS/Server). Everything else powered by free/open-source tools.  
-> **Evaluation Pillars:** Feature Completeness, Design Language Adherence (WhatsApp Mobile + Spike Mail Inbox, Gmail Web), Creative Tech Stack, Dockerization (`docker compose up -d`).
+> **Available Resources:** 1 Domain Name + 1 Hostinger Cloud Hosting Plan. Everything else powered by free/open-source tools.  
+> **Evaluation Pillars:** Feature Completeness, Design Language Adherence (WhatsApp Mobile + Spike Mail Inbox, Gmail Web), Creative Tech Stack, Hostinger Cloud Deployment.
 
 ---
 
@@ -21,7 +21,7 @@
 8. [End-to-End System Architecture Diagram](#8-end-to-end-system-architecture-diagram)
 9. [Judge Evaluation Sandbox & Live Simulator](#9-judge-evaluation-sandbox--live-simulator)
 10. [Domain, DNS, and Production Deployment Guide](#10-domain-dns-and-production-deployment-guide)
-11. [Dockerization Strategy (`docker compose up -d`)](#11-dockerization-strategy-docker-compose-up--d)
+11. [Hostinger Cloud Deployment Strategy](#11-hostinger-cloud-deployment-strategy)
 12. [Implementation Roadmap (Phase-by-Phase)](#12-implementation-roadmap-phase-by-phase)
 
 ---
@@ -49,7 +49,7 @@ Email addresses today are disconnected from real-world identity, requiring compl
 | **SMS Notifications** | Sent **only** to users registered via IVR, SMS, Web Portal, or Web Client (not mobile app users) | User model tracks `registrationChannel` and `hasMobileApp`. When inbound SMTP email arrives, if `!user.hasMobileApp`, trigger SMS: `"You have received an email from <Sender>. Subject: <Subject>."` |
 | **Mobile Design** | WhatsApp design language (4 screens onboarding) + Spike Mail chat inbox | Pixel-perfect WhatsApp green UI `#075E54` / `#128C7E` for 4 onboarding screens; Spike Mail conversation view where emails from the same sender collapse into a chat thread. |
 | **Desktop Design** | Gmail design language (traditional email view) | Google Material 3 Gmail UI with collapsible sidebar (Compose, Inbox, Sent, Drafts, Spam, Trash), top search bar, star/checkbox list, and detail view with reply/forward. |
-| **Dockerization** | `docker compose up -d` | Single Docker Compose configuration with multi-stage build containing Web App, REST API, WebSockets, and Local SMTP Server. |
+| **Deployment** | Hostinger Cloud Hosting / Native Node.js | Native Node.js server deployed directly to Hostinger Cloud with 1-click Git deployment and free SSL. |
 
 ---
 
@@ -408,43 +408,14 @@ In the Twilio Console (Phone Numbers -> Manage -> Active Numbers):
 
 ---
 
-## 11. DOCKERIZATION STRATEGY (`docker compose up -d`)
+## 11. HOSTINGER CLOUD DEPLOYMENT STRATEGY
 
-Per the core requirement: **"Entire application dockerized. Software must be up and running at: `docker compose up -d`"**.
-
-### Architecture: Single Unified Container Setup
-To make installation effortless with zero external dependencies:
-- **Port 80/3000:** Web frontend + REST API + WebSockets
-- **Port 25 (or 2525):** Local Inbound SMTP Server
-- **Volume:** `/app/data` for persistent SQLite database and attachments
-
-#### Preview of `docker-compose.yml`:
-```yaml
-version: '3.8'
-
-services:
-  phonemail:
-    build: .
-    container_name: phonemail_app
-    restart: always
-    ports:
-      - "3000:3000"   # Web Client, Mobile Client, Portal, API & WebSockets
-      - "25:25"       # Inbound SMTP Server (Mail receiving)
-    environment:
-      - PORT=3000
-      - SMTP_PORT=25
-      - DOMAIN_NAME=${DOMAIN_NAME:-phonemail.com}
-      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID:-}
-      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN:-}
-      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER:-}
-      - JWT_SECRET=super-secret-jwt-key
-      - NODE_ENV=production
-    volumes:
-      - phonemail_data:/app/data
-
-volumes:
-  phonemail_data:
-```
+By utilizing **Hostinger Cloud Hosting**:
+- **Native Node.js Runtime:** Deployed directly using Hostinger hPanel's built-in Node.js Application Manager with zero virtualization overhead.
+- **Git Auto-Deploy:** Connect your GitHub repository (`soumith-64/AlphaStack`), select Node.js 20.x, set entry point to `src/server.js`, and click deploy.
+- **Free Automated SSL:** Hostinger provisions and auto-renews free Let's Encrypt SSL certificates for `https://yourdomain.com`.
+- **Catch-All Email Ingestion:** Hostinger's free business email forwarder captures any incoming email sent to `*@yourdomain.com` and pipes it to our `/api/email/inbound` webhook.
+- **Port Flexibility:** Runs locally on Port 3000 (Web/API) and Port 2525 (SMTP).
 
 ---
 
@@ -454,9 +425,10 @@ volumes:
 * Set up Node.js backend with Express, WebSockets, and `smtp-server`.
 * Implement SQLite database with User, Conversation, Email, and TelephonyLog models.
 * Implement E.164 phone number extraction from inbound email headers (`<phone>@domain.com`).
+* Create `/api/email/inbound` webhook for Hostinger Catch-All mail routing.
 
 ### Phase 2: Telephony Integration (Twilio & Simulator)
-* Build `/api/twilio/voice` and `/api/twilio/voice-gather` for Press '1' IVR account creation.
+* Build `/api/twilio/voice` and `/api/twilio/voice-gather` for Press '1' IVR account creation and Press '2' audio mailbox.
 * Build `/api/twilio/sms` for SMS-based account creation.
 * Implement SMS notification dispatcher (fires only for non-mobile users).
 * Build the In-App Judge Testing Sandbox for testing IVR, SMS, and SMTP without external fees.
@@ -471,10 +443,11 @@ volumes:
 * Gmail UI: Collapsible sidebar with Compose FAB, unread badges, central email list, Reading pane, quick reply/forward.
 * Dedicated Web Portal (`/portal`): Minimalist 2-field registration with auto-resetting form.
 
-### Phase 5: Dockerization, Testing & Documentation
-* Create optimized multi-stage `Dockerfile` and `docker-compose.yml`.
-* Write clean, comprehensive `README.md` with architectural diagrams, DNS instructions, and quickstart commands.
-* Verify `docker compose up -d` executes cleanly with zero errors.
+### Phase 5: Hostinger Cloud Deployment, Testing & Documentation
+* Deploy to Hostinger Cloud Hosting using hPanel Node.js Application Manager.
+* Configure custom domain DNS and Catch-All email forwarding.
+* Write clean, comprehensive `README.md` with architectural diagrams and quickstart commands.
+* Verify real external emails from Gmail land in your inbox.
 
 ---
-**Verdict:** With this architecture, every single requirement (WhatsApp mobile, Spike Mail inbox, Gmail web, IVR, SMS, local SMTP, Docker) is fulfilled with 100% testability, zero extra software costs, and top-tier polish!
+**Verdict:** With this architecture, every single requirement (WhatsApp mobile, Spike Mail inbox, Gmail web, IVR, SMS, local SMTP, Hostinger Cloud) is fulfilled with 100% testability, zero extra software costs, and top-tier polish!
