@@ -1,16 +1,22 @@
-# 🚀 PhoneMail — 5-Day Fast-Track Roadmap (Hostinger Cloud + Docker)
+# 🚀 PhoneMail — 5-Day Fast-Track Roadmap (Hostinger Cloud & Native Node.js)
 
 > **AlphaStack 7-Day Buildathon Execution Plan**  
-> Tailored specifically for **Hostinger Cloud Hosting + Custom Domain + Docker (`docker compose up -d`)**.  
-> Complete all coding in **5 focused days**, reserving Days 6 & 7 for video submission, presentation rehearsal, and judge Q&A.
+> Tailored for **Hostinger Cloud Hosting + Custom Domain + Native Node.js** (Docker is completely optional).  
+> Complete all development in **5 focused days**, reserving Days 6 & 7 for video submission, presentation rehearsal, and judge Q&A.
 
 ---
 
-## 🏗️ The Dual-Deployment Strategy
+## ⚡ The Lean & Fast Architecture (No Docker Required!)
 
-This roadmap enables **two simultaneous deployment targets** from the same codebase:
-1. 🐳 **Docker Evaluation Mode (`docker compose up -d`):** Satisfies the hackathon requirement for judges testing locally.
-2. ☁️ **Hostinger Cloud Live Site (`https://yourdomain.com`):** Hosted via Hostinger's hPanel Node.js Application Manager with free SSL and Git auto-deploy.
+By running directly on **native Node.js**:
+* 🚀 **Zero Overhead:** No heavy container runtimes or virtualization issues.
+* ☁️ **Hostinger Cloud Native:** Deploys in 1 click using Hostinger hPanel's built-in **Node.js Application Manager** with free SSL (`https://yourdomain.com`).
+* 💻 **Runs Anywhere:** Evaluators or local testers simply run:
+  ```bash
+  npm install
+  npm start
+  ```
+*(A Dockerfile will still be provided as an optional bonus, but it is not required).*
 
 ---
 
@@ -18,32 +24,32 @@ This roadmap enables **two simultaneous deployment targets** from the same codeb
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│ DAY 1: Core Engine, SQLite Database & Inbound SMTP Mail Service       │
+│ DAY 1: Core Engine, SQLite Database & Inbound Mail Service             │
 │ DAY 2: Telephony Integration, SMS Gateway & The Judge Testing Lab      │
 │ DAY 3: Priority Mobile Client (WhatsApp Onboarding + Spike Mail Chats) │
 │ DAY 4: Desktop Web Client (Gmail UI) & 2-Field Registration Portal     │
-│ DAY 5: Hostinger Cloud Live Deploy + Docker Verification & Demo Video  │
+│ DAY 5: 1-Click Hostinger Cloud Deployment, Domain SSL & Demo Video    │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 📅 DAY 1: Core Engine, SQLite DB & Inbound SMTP Service
+### 📅 DAY 1: Core Engine, SQLite DB & Inbound Mail Service
 > **Goal:** Run the backend engine that receives emails for `9876543210@yourdomain.com` and parses them into conversations.
 
 * **Morning (Backend Skeleton & Database):**
-  - Set up Node.js Express server with ES modules.
+  - Initialize Node.js Express server (`package.json`, ES modules).
   - Configure Socket.io for real-time WebSocket communication.
-  - Set up SQLite database (`better-sqlite3` or Prisma) with WAL mode.
+  - Set up SQLite database (`better-sqlite3` or Prisma) with WAL mode for zero-cost, ultra-fast storage.
   - Initialize tables: `users`, `aliases`, `conversations`, `emails`, `attachments`, `telephony_logs`.
-* **Afternoon (Self-Hosted Inbound SMTP Engine):**
-  - Implement local SMTP server using `smtp-server` on port `25` (and dev port `2525`).
-  - Integrate `mailparser` to stream and parse raw MIME messages.
+* **Afternoon (Inbound Mail Service & Parser):**
+  - Implement built-in SMTP listener (`smtp-server` on port `25` / `2525`).
+  - Integrate `mailparser` to parse MIME headers, HTML/Text, and attachments.
   - Extract phone number from recipient headers (`9876543210@yourdomain.com` $\rightarrow$ `9876543210`).
   - Support sub-number aliases (`9876543210.1`, `9876543210.work`).
-* **Evening (Thread Mapping & Storage):**
-  - Automatically associate emails from the same sender into a single conversation thread.
-  - Build Inbound Webhook endpoint (`/api/email/inbound`) so Hostinger Catch-All email can forward emails into the app.
+* **Evening (Thread Mapping & Webhook Ingestion):**
+  - Automatically map incoming emails into threaded conversations.
+  - Create Inbound Webhook (`/api/email/inbound`) so Hostinger Catch-All email can route external mail directly into the database.
   - Test sending a local email and verify it stores in SQLite within 50ms.
 * **🎯 Day 1 Deliverable:** A test email to `9876543210@yourdomain.com` is captured, parsed, and stored in the database!
 
@@ -66,7 +72,7 @@ This roadmap enables **two simultaneous deployment targets** from the same codeb
 * **Evening (In-App Judge Testing Lab at `/simulator`):**
   - Build interactive testing panel:
     1. Keypad to simulate Toll-Free Call and press '1' or '2'.
-    2. Test email composer to send emails directly into the parser.
+    2. Test email composer to inject emails directly into the parser.
     3. Real-time streaming **SMS Audit Log** displaying outbound notification messages.
 * **🎯 Day 2 Deliverable:** Anyone can test IVR calls, simulate incoming mail, and audit SMS notifications directly in the browser!
 
@@ -119,27 +125,27 @@ This roadmap enables **two simultaneous deployment targets** from the same codeb
 
 ---
 
-### 📅 DAY 5: Hostinger Cloud Live Deploy + Docker Verification
-> **Goal:** Deploy live to `yourdomain.com` on Hostinger Cloud and verify `docker compose up -d`.
+### 📅 DAY 5: 1-Click Hostinger Cloud Deployment & Demo Video
+> **Goal:** Deploy live to `https://yourdomain.com` on Hostinger Cloud and record your winning demo.
 
-* **Morning (Dockerization for Hackathon Judges):**
-  - Finalize multi-stage `Dockerfile` and `docker-compose.yml`.
-  - Test on clean machine: `docker compose up -d` boots everything with 0 errors.
-* **Afternoon (Hostinger Cloud Deployment):**
-  - Log into **Hostinger hPanel** $\rightarrow$ **Node.js**.
+* **Morning (Deploying on Hostinger Cloud):**
+  - Log into **Hostinger hPanel** $\rightarrow$ Navigate to **Node.js**.
+  - Select Node version `20.x`, set entry point to `src/server.js`.
   - Connect your GitHub repository: `https://github.com/soumith-64/AlphaStack.git`.
-  - Set Entry Point: `src/server.js` and Node Version: `20.x`.
-  - Click **Deploy**!
+  - Click **Deploy**! Hostinger runs `npm install` and starts the app automatically.
   - Enable free SSL Certificate on `yourdomain.com`.
-  - (Optional) Configure Hostinger Catch-All email forwarding to your webhook.
+* **Afternoon (Catch-All Email & Real-World Inbound Test):**
+  - In Hostinger hPanel $\rightarrow$ **Emails**, enable **Catch-All Email** for your domain.
+  - Send an email from your personal Gmail to `yourphone@yourdomain.com`.
+  - Verify it arrives live on your website!
 * **Evening (Demo Video & Presentation Rehearsal):**
-  - Populate database with realistic seed data.
+  - Populate database with realistic seed demo data.
   - Record a 3-minute video walk-through demonstrating:
     1. IVR Call / Simulator registration.
     2. Inbound email triggering SMS notification.
     3. Mobile WhatsApp onboarding and Spike Mail chat threading.
     4. Desktop Gmail interface.
-* **🎯 Day 5 Deliverable:** Live website running on Hostinger Cloud at `https://yourdomain.com` + Docker repository verified!
+* **🎯 Day 5 Deliverable:** Live website running on Hostinger Cloud at `https://yourdomain.com` ready for submission!
 
 ---
 
