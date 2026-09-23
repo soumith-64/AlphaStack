@@ -79,8 +79,8 @@ Since you only have a **domain** and a **hosting plan (VPS/server)**, all other 
 
 ### 3. Database & Caching (Zero Cloud Cost)
 * **SQLite with WAL Mode (`better-sqlite3` or Prisma):**
-  * Zero memory overhead, no separate DB container needed, instantaneous queries, ACID compliant, easily backed up in Docker volumes.
-  * Can scale to millions of emails locally on a basic $5/month VPS.
+  * Zero memory overhead, no separate DB daemon needed, instantaneous queries, ACID compliant, easily backed up with zero cloud dependencies.
+  * Can scale to millions of emails locally on Hostinger Cloud Hosting.
 
 ---
 
@@ -152,7 +152,7 @@ function onEmailReceived(email, recipientUser) {
 ## 5. INBOUND & OUTBOUND EMAIL ARCHITECTURE (LOCAL SMTP SERVER)
 
 ### Inbound SMTP Engine
-By binding `smtp-server` to port `25` (or `2525` mapped to 25 in Docker):
+By binding `smtp-server` to port `25` (or `2525` for local development):
 1. Any external mail server (Gmail, Outlook, Yahoo) queries DNS MX for `yourdomain.com` -> receives your server's IP.
 2. External server connects to your Node.js SMTP service:
    - `onRcptTo(address, session, callback)`: Validates that the address is `<digits>@yourdomain.com` or an alias `<digits>-<alias>@yourdomain.com`.

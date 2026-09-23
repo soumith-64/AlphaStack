@@ -1,22 +1,21 @@
 # 🚀 PhoneMail — 5-Day Fast-Track Roadmap (Hostinger Cloud & Native Node.js)
 
 > **AlphaStack 7-Day Buildathon Execution Plan**  
-> Tailored for **Hostinger Cloud Hosting + Custom Domain + Native Node.js** (Docker is completely optional).  
+> Tailored for **Hostinger Cloud Hosting + Custom Domain + Pure Native Node.js**.  
 > Complete all development in **5 focused days**, reserving Days 6 & 7 for video submission, presentation rehearsal, and judge Q&A.
 
 ---
 
-## ⚡ The Lean & Fast Architecture (No Docker Required!)
+## ⚡ The Lean & Fast Architecture (Pure Native Node.js)
 
 By running directly on **native Node.js**:
-* 🚀 **Zero Overhead:** No heavy container runtimes or virtualization issues.
+* 🚀 **Zero Overhead:** No heavy virtualization or complex container setups.
 * ☁️ **Hostinger Cloud Native:** Deploys in 1 click using Hostinger hPanel's built-in **Node.js Application Manager** with free SSL (`https://yourdomain.com`).
 * 💻 **Runs Anywhere:** Evaluators or local testers simply run:
   ```bash
   npm install
   npm start
   ```
-*(A Dockerfile will still be provided as an optional bonus, but it is not required).*
 
 ---
 
