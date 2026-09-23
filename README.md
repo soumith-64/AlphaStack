@@ -27,6 +27,54 @@ PhoneMail connects traditional phone lines (voice calls and SMS) with modern ema
 
 ---
 
+## 🌾 Rural & Elderly Accessibility ("The Zero-Domain Experience")
+
+In rural communities and for elderly citizens, typing `@` symbols, remembering `.com` spellings, and reading complex email threads is intimidating. PhoneMail solves this with **4 accessibility breakthroughs**:
+
+* 🚫 **No `@` Symbol Needed (Just 10 Digits):**  
+  Just like **WhatsApp** and **UPI Numbers (PhonePe/Google Pay)**, users **never type an email domain** inside the app. To send an email, they simply type the **10-digit phone number** or select from their contacts. The system handles the internet email routing invisibly.
+* 🎙️ **IVR Voice-Mailbox (Dial & Listen):**  
+  If an elderly or illiterate user receives an email, they don't have to read it. They simply dial the toll-free number and press **`2`**:
+  > *"Namaste! You have 1 new email from Govt Scheme Office. Press 1 to listen."*  
+  The IVR reads the email out loud in their local language using Text-to-Speech!
+* 🪪 **Digital PhoneMail ID Card (QR Code):**  
+  From their profile, users can view or print a simple **Digital ID Card** containing their photo, 10-digit number, and a scannable QR code. Government officers, banks, and hospitals can scan it to email them instantly without spelling errors.
+* 🗣️ **Vernacular Language Support:**  
+  The mobile onboarding begins with **Language Selection** (English, Hindi, Tamil, Telugu, etc.), ensuring the entire interface speaks the user's mother tongue.
+
+---
+
+## 👥 Multiple Email IDs on 1 Phone Number (Family & Privacy Aliases)
+
+> *Hackathon Requirement: "A profile icon in the top-right providing access to account settings. Manage Alias IDs, language, personal details..."*
+
+What if one user wants separate personal and work emails? Or what if **an entire rural household shares a single smartphone**? PhoneMail solves this seamlessly:
+
+### 1. Simple Number Extensions (The UPI / Sub-Number Model)
+Users can append a simple dot or hyphen followed by a digit or tag:
+* **Primary Email:** `9876543210@phonemail.com`
+* **Sub-ID 1 (Personal/Govt):** `9876543210.1@phonemail.com`
+* **Sub-ID 2 (Shopping/OTPs):** `9876543210.2@phonemail.com`
+* **Work Email:** `9876543210.work@phonemail.com`
+
+*For village elders:* They don't need to remember words. They just say: *"My number with a .1 at the end."*
+
+### 2. Multi-Profile "Family Inboxes" (The Netflix Model)
+In households where parents and children share 1 phone:
+* Inside settings, tap **`[ + Add Profile ]`**:
+  * 👨 **Father (Ramesh):** `9876543210.ramesh@phonemail.com`
+  * 👩 **Mother (Sunita):** `9876543210.sunita@phonemail.com`
+  * 🎓 **Son (Rahul - Student):** `9876543210.rahul@phonemail.com`
+* Inside the app, users switch between profiles with a single tap at the top. Rahul's college emails go to Rahul's tab, and the father's agricultural subsidies go to the father's tab.
+
+### 3. Claim a Professional Handle
+Users can claim a custom name linked to their phone number (e.g., `soumith@phonemail.com` $\rightarrow$ links to `9876543210`). Both IDs deliver to the same inbox.
+
+### 4. Disposable "Spam-Shield" Aliases
+Generate temporary addresses for discounts and shopping (e.g. `9876543210.shop@phonemail.com`). A simple **ON / OFF switch** in settings lets users block spam with 1 tap.
+
+---
+
 ## 🖼️ How It Works (Visual Flow)
 
 ```
@@ -188,10 +236,13 @@ AlphaStack/
 ## 📋 Hackathon Checklist
 
 - [x] **Phone number as email address** (e.g. `9876543210@phonemail.com`)
+- [x] **Zero-Domain Addressing** (10-digit number composition without `@` symbol)
 - [x] **IVR Account Creation** (Press '1' on voice call to create account)
+- [x] **IVR Audio Mailbox** (Press '2' to listen to unread emails aloud via Text-to-Speech)
 - [x] **SMS Account Creation** (Text number to create account)
 - [x] **2-Field Web Registration Portal** (Phone + OTP, auto-resets on submit)
 - [x] **Targeted SMS Notifications** (Only sent to non-mobile app users)
+- [x] **Manage Alias IDs & Extensions** (Sub-numbers `.1`, `.2`, family profiles & custom handles)
 - [x] **Mobile WhatsApp Design** (4-screen onboarding + device permission flow)
 - [x] **Mobile Spike Mail Inbox** (Chats, compact subject, single-reply, expander, locked To field)
 - [x] **Desktop Gmail Design** (Sidebar folders, search bar, list view, reading pane)
