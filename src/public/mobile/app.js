@@ -366,7 +366,17 @@ async function completeMobileProfile() {
   }
 }
 
+function loadPhoneEmailScript() {
+  if (document.getElementById('pe-signin-script-mobile')) return;
+  const script = document.createElement('script');
+  script.id = 'pe-signin-script-mobile';
+  script.src = 'https://www.phone.email/sign_in_button_v1.js';
+  script.async = true;
+  document.body.appendChild(script);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  loadPhoneEmailScript();
   initMobileOtpInputs();
 });
 

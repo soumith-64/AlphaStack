@@ -137,6 +137,15 @@ window.phoneEmailListener = async (userObj) => {
   }
 };
 
+function loadPhoneEmailScript() {
+  if (document.getElementById('pe-signin-script')) return;
+  const script = document.createElement('script');
+  script.id = 'pe-signin-script';
+  script.src = 'https://www.phone.email/sign_in_button_v1.js';
+  script.async = true;
+  document.body.appendChild(script);
+}
+
 // ==================== TELEGRAM-STYLE REAL-TIME AUTHENTICATION ====================
 let desktopPendingPhone = '';
 let desktopLiveOtp = '';
@@ -606,8 +615,9 @@ async function handleDesktopProfileSubmit(event) {
   }
 }
 
-// Attach OTP input listeners on DOM ready
+// Attach OTP input listeners and Phone.Email script on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
+  loadPhoneEmailScript();
   initTelegramOtpInputs();
 });
 

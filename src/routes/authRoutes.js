@@ -1,4 +1,5 @@
 import express from 'express';
+import https from 'https';
 import { dbOps } from '../database/db.js';
 import { config } from '../config.js';
 
@@ -253,13 +254,31 @@ router.post('/phone-email-verify', async (req, res) => {
       return res.status(400).json({ error: 'Invalid verification provider URL' });
     }
 
-    const response = await fetch(user_json_url);
-    if (!response.ok) {
-      return res.status(400).json({ error: 'Could not fetch phone verification data from phone.email' });
-    }
+    // Official Phone.Email Node.js https.get implementation
+    const data = await new Promise((resolve, reject) => {
+      https.get(user_json_url, (resp) => {
+        let raw = '';
+        resp.on('data', (chunk) => { raw += chunk; });
+        resp.on('end', () => {
+          try {
+            resolve(JSON.parse(raw));
+          } catch (e) {
+            reject(new Error('Failed to parse phone.email JSON'));
+          }
+        });
+      }).on('error', (err) => {
+        reject(err);
+      });
+    });
 
-    const data = await response.json();
-    const rawNumber = String(data.user_phone_number || '').replace(/\D/g, '');
+    const user_country_code = data.user_country_code || '+91';
+    const user_phone_number = data.user_phone_number || '';
+    const user_first_name = (data.user_first_name || '').trim();
+    const user_last_name = (data.user_last_name || '').trim();
+
+    console.log("📱 [Phone.Email] Verified Phone:", user_country_code, user_phone_number, "Name:", user_first_name, user_last_name);
+
+    const rawNumber = String(user_phone_number).replace(/\D/g, '');
     const cleanNumber = rawNumber.slice(-10);
 
     if (!cleanNumber || cleanNumber.length < 10) {
