@@ -77,6 +77,8 @@ if (config.enableSmtp || !config.isProduction) {
   } catch (err) {
     console.warn('SMTP Server startup notice:', err.message);
   }
+}
+
 // Start Hostinger IMAP Inbound Auto-Sync Worker (fetches incoming mail every 20s)
 try {
   imapSyncService.startAutoSync(20);
