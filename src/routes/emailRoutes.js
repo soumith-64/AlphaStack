@@ -6,23 +6,30 @@ import { config } from '../config.js';
 const router = express.Router();
 
 /**
- * List conversations for Mobile Spike Mail View
+ * List conversations for Mobile Spike Mail View (isolated per user)
  */
 router.get('/conversations', async (req, res) => {
   try {
-    const userPhone = req.query.phone || '9876543210';
+    const userPhone = req.query.phone;
+    if (!userPhone) return res.json({ conversations: [] });
     const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
 
     const conversations = await dbOps.queryAll(`
-      SELECT c.*, 
+      SELECT DISTINCT c.id, c.is_group, c.subject, c.created_at, c.updated_at,
+        COALESCE(
+          (SELECT phone_number FROM conversation_participants WHERE conversation_id = c.id AND phone_number NOT LIKE ? LIMIT 1),
+          c.participant_phone
+        ) as participant_phone,
         (SELECT body_text FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT sender_email FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_sender,
         (SELECT created_at FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_time,
-        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id AND is_read = 0) as unread_count,
+        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id AND is_read = 0 AND sender_email NOT LIKE ?) as unread_count,
         (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id) as message_count
       FROM conversations c
+      JOIN conversation_participants cp ON c.id = cp.conversation_id
+      WHERE cp.phone_number = ? OR cp.phone_number LIKE ?
       ORDER BY c.updated_at DESC
-    `);
+    `, [`%${cleanPhone}%`, `%${cleanPhone}%`, cleanPhone, `%${cleanPhone}%`]);
 
     res.json({ conversations });
   } catch (err) {
@@ -36,9 +43,22 @@ router.get('/conversations', async (req, res) => {
 router.get('/conversations/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const userPhone = req.query.phone;
     const conversation = await dbOps.queryOne('SELECT * FROM conversations WHERE id = ?', [id]);
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    if (userPhone) {
+      const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
+      const otherPart = await dbOps.queryOne(`
+        SELECT phone_number FROM conversation_participants 
+        WHERE conversation_id = ? AND phone_number NOT LIKE ? 
+        LIMIT 1
+      `, [id, `%${cleanPhone}%`]);
+      if (otherPart && otherPart.phone_number) {
+        conversation.participant_phone = otherPart.phone_number;
+      }
     }
 
     const messages = await dbOps.queryAll(`
@@ -47,7 +67,7 @@ router.get('/conversations/:id', async (req, res) => {
       ORDER BY created_at ASC
     `, [id]);
 
-    // Mark all unread messages in this conversation as read
+    // Mark unread messages in this conversation as read
     await dbOps.execute(`UPDATE emails SET is_read = 1 WHERE conversation_id = ?`, [id]);
 
     res.json({ conversation, messages });
@@ -57,32 +77,43 @@ router.get('/conversations/:id', async (req, res) => {
 });
 
 /**
- * List flat emails for Desktop Gmail View
+ * List flat emails for Desktop View (strictly isolated per user & folder)
  */
 router.get('/emails', async (req, res) => {
   try {
     const folder = req.query.folder || 'INBOX';
-    const userPhone = req.query.phone || '9876543210';
+    const userPhone = req.query.phone;
+    if (!userPhone) return res.json({ emails: [] });
+    const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
 
     let emails;
     if (folder.toUpperCase() === 'SENT') {
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
-        WHERE sender_email LIKE ? 
+        WHERE sender_email LIKE ? AND folder != 'TRASH'
         ORDER BY created_at DESC
-      `, [`%${userPhone}%`]);
+      `, [`%${cleanPhone}%`]);
     } else if (folder.toUpperCase() === 'STARRED') {
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
-        WHERE is_starred = 1 
+        WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+          AND is_starred = 1 AND folder != 'TRASH'
         ORDER BY created_at DESC
-      `);
-    } else {
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    } else if (folder.toUpperCase() === 'TRASH' || folder.toUpperCase() === 'SPAM') {
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
-        WHERE folder = ? 
+        WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+          AND folder = ? 
         ORDER BY created_at DESC
-      `, [folder.toUpperCase()]);
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`, folder.toUpperCase()]);
+    } else {
+      // INBOX
+      emails = await dbOps.queryAll(`
+        SELECT * FROM emails 
+        WHERE recipient_emails LIKE ? AND folder = 'INBOX'
+        ORDER BY created_at DESC
+      `, [`%${cleanPhone}%`]);
     }
 
     res.json({ emails });
@@ -175,11 +206,31 @@ router.post('/email/inbound', async (req, res) => {
 });
 
 /**
+ * User Network Contacts (for quick autocomplete in Compose & Chat)
+ */
+router.get('/contacts', async (req, res) => {
+  try {
+    const currentPhone = req.query.phone || '';
+    const cleanPhone = String(currentPhone).replace(/\D/g, '').slice(-10);
+    const contacts = await dbOps.queryAll(`
+      SELECT id, phone_number, email_address, display_name 
+      FROM users 
+      WHERE phone_number != ? 
+      ORDER BY created_at DESC LIMIT 30
+    `, [cleanPhone]);
+    res.json({ contacts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Aliases Management
  */
 router.get('/aliases', async (req, res) => {
   try {
-    const phone = req.query.phone || '9876543210';
+    const phone = req.query.phone;
+    if (!phone) return res.json({ aliases: [] });
     const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
     const user = await dbOps.queryOne('SELECT id FROM users WHERE phone_number = ?', [cleanPhone]);
     if (!user) return res.status(404).json({ error: 'User not found' });

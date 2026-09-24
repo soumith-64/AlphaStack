@@ -76,7 +76,7 @@ async function getSqliteDb() {
   return db;
 }
 
-// Database abstraction layer (supports both MySQL and SQLite seamlessly)
+// Database abstraction layer (supports both MySQL and SQLite seamlessly with graceful fallback)
 export const dbOps = {
   async queryAll(sql, params = []) {
     if (mysqlPool) {
@@ -84,8 +84,8 @@ export const dbOps = {
         const [rows] = await mysqlPool.execute(sql, params);
         return rows;
       } catch (err) {
-        console.error('MySQL queryAll error:', err.message);
-        throw err;
+        console.warn('Notice: MySQL query failed, falling back to local SQLite:', err.message);
+        mysqlPool = null;
       }
     }
     const sqliteDb = await getSqliteDb();
@@ -111,8 +111,8 @@ export const dbOps = {
         const [result] = await mysqlPool.execute(sql, params);
         return { changes: result.affectedRows };
       } catch (err) {
-        console.error('MySQL execute error:', err.message);
-        throw err;
+        console.warn('Notice: MySQL execute failed, falling back to local SQLite:', err.message);
+        mysqlPool = null;
       }
     }
     const sqliteDb = await getSqliteDb();

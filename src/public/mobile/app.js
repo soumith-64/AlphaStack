@@ -92,6 +92,52 @@ async function verifyOTP(otp) {
   }
 }
 
+// ==================== NOTIFICATION CHIME & TOAST ====================
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.12, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880.00, now + 0.1);
+    gain2.gain.setValueAtTime(0.18, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.5);
+  } catch (e) {}
+}
+
+function showMobileToast(msg) {
+  let toast = document.getElementById('mobile-toast-banner');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'mobile-toast-banner';
+    toast.className = 'mobile-toast-banner';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span class="toast-icon">✉️</span><div class="toast-text">${msg}</div>`;
+  toast.classList.add('visible');
+  setTimeout(() => {
+    toast.classList.remove('visible');
+  }, 3500);
+}
+
 // ==================== MAIN SPIKE MAIL CONVERSATIONAL APP ====================
 function initMainApp() {
   // Update header labels
@@ -105,8 +151,23 @@ function initMainApp() {
     socket = io();
     socket.emit('join:user', currentUser.phone);
 
+    socket.on('email:incoming', (data) => {
+      console.log('⚡ [SOCKET] Inbound personal message received:', data);
+      playNotificationChime();
+      const senderDisplay = data.from || (data.email && data.email.sender_email) || 'Network Contact';
+      showMobileToast(`New message from ${senderDisplay}`);
+      loadConversations();
+      if (activeConversation && (activeConversation.id === data.conversationId || (activeConversation.participant_phone && activeConversation.participant_phone.includes(senderDisplay)))) {
+        openConversation(activeConversation.id);
+      }
+    });
+
     socket.on('email:new', (data) => {
       console.log('⚡ New email received:', data);
+      if (data && data.senderPhone && data.senderPhone !== currentUser.phone) {
+        playNotificationChime();
+        showMobileToast(`New email received`);
+      }
       loadConversations();
       if (activeConversation && activeConversation.id === data.conversationId) {
         openConversation(activeConversation.id);
@@ -123,6 +184,7 @@ function initMainApp() {
     console.warn('Socket init notice:', e);
   }
 
+  setupMobileContactsPicker();
   loadConversations();
 }
 
@@ -203,7 +265,8 @@ function onSearchInput(query) {
 // ==================== INSIDE CHAT / CONVERSATION VIEW ====================
 async function openConversation(convId) {
   try {
-    const res = await fetch(`/api/conversations/${convId}`);
+    const phoneQuery = currentUser ? `?phone=${encodeURIComponent(currentUser.phone)}` : '';
+    const res = await fetch(`/api/conversations/${convId}${phoneQuery}`);
     const data = await res.json();
 
     activeConversation = data.conversation;
@@ -326,7 +389,66 @@ async function sendChatMessage() {
   }
 }
 
-// ==================== TRADITIONAL COMPOSE ====================
+// ==================== TRADITIONAL COMPOSE & CONTACTS PICKER ====================
+let mobileCachedContacts = [];
+
+function setupMobileContactsPicker() {
+  const input = document.getElementById('trad-to');
+  const picker = document.getElementById('mobile-contacts-picker');
+  if (!input || !picker) return;
+
+  async function fetchAndRender(query = '') {
+    if (input.disabled) return;
+    try {
+      if (!currentUser) return;
+      if (mobileCachedContacts.length === 0) {
+        const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
+        const data = await res.json();
+        mobileCachedContacts = data.contacts || [];
+      }
+      const q = query.trim().toLowerCase();
+      const matches = mobileCachedContacts.filter(c => 
+        !q ||
+        (c.display_name && c.display_name.toLowerCase().includes(q)) ||
+        (c.phone_number && c.phone_number.includes(q)) ||
+        (c.email_address && c.email_address.toLowerCase().includes(q))
+      );
+      if (matches.length === 0) {
+        picker.style.display = 'none';
+        return;
+      }
+      picker.innerHTML = '';
+      matches.slice(0, 5).forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'mobile-contact-item';
+        item.innerHTML = `
+          <div class="mobile-contact-avatar">${(c.display_name || c.phone_number || 'P').charAt(0).toUpperCase()}</div>
+          <div class="mobile-contact-info">
+            <div class="mobile-contact-name">${c.display_name || `User ${c.phone_number}`}</div>
+            <div class="mobile-contact-phone">📞 +91 ${c.phone_number}</div>
+          </div>
+        `;
+        item.onmousedown = (e) => {
+          e.preventDefault();
+          input.value = c.phone_number;
+          picker.style.display = 'none';
+          document.getElementById('trad-subject').focus();
+        };
+        picker.appendChild(item);
+      });
+      picker.style.display = 'block';
+    } catch (e) {
+      console.warn('Contacts picker error:', e);
+    }
+  }
+
+  input.addEventListener('input', () => fetchAndRender(input.value));
+  input.addEventListener('focus', () => fetchAndRender(input.value));
+  input.addEventListener('blur', () => {
+    setTimeout(() => { picker.style.display = 'none'; }, 200);
+  });
+}
+
 function openTraditionalCompose() {
   document.getElementById('trad-modal-title').innerText = 'New Traditional Email';
   const toInput = document.getElementById('trad-to');
@@ -334,7 +456,10 @@ function openTraditionalCompose() {
   toInput.disabled = false;
   document.getElementById('trad-subject').value = '';
   document.getElementById('trad-body').value = '';
+  const picker = document.getElementById('mobile-contacts-picker');
+  if (picker) picker.style.display = 'none';
   document.getElementById('traditional-modal').classList.add('active');
+  setTimeout(() => toInput.focus(), 50);
 }
 
 function toggleTraditionalInChat() {
@@ -345,6 +470,8 @@ function toggleTraditionalInChat() {
   // SPEC REQUIREMENT: "The To field should be pre-filled and locked."
   toInput.value = activeConversation.participant_phone;
   toInput.disabled = true;
+  const picker = document.getElementById('mobile-contacts-picker');
+  if (picker) picker.style.display = 'none';
 
   document.getElementById('trad-subject').value = `Re: ${activeConversation.subject || ''}`;
   document.getElementById('trad-body').value = '';
@@ -353,6 +480,8 @@ function toggleTraditionalInChat() {
 
 function closeTraditionalCompose() {
   document.getElementById('traditional-modal').classList.remove('active');
+  const picker = document.getElementById('mobile-contacts-picker');
+  if (picker) picker.style.display = 'none';
 }
 
 async function submitTraditionalCompose() {

@@ -190,9 +190,10 @@
         <button class="close-modal-btn" onclick="closeTraditionalCompose()">✕</button>
       </div>
       <div class="modal-body">
-        <div class="trad-field">
+        <div class="trad-field" style="position: relative;">
           <label>To:</label>
-          <input type="text" id="trad-to" placeholder="Phone number (e.g. 9845012345) or email">
+          <input type="text" id="trad-to" placeholder="Phone number (e.g. 9845012345) or email" autocomplete="off">
+          <div id="mobile-contacts-picker" class="mobile-contacts-picker" style="display: none;"></div>
         </div>
         <div class="trad-field">
           <label>Subject:</label>

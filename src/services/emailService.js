@@ -57,10 +57,9 @@ export const emailService = {
       return null;
     }
 
-    // Lookup recipient user
+    // Lookup or auto-provision recipient user
     let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [recipientPhone]);
     if (!user) {
-      // Auto-provision user on first inbound email
       const newUserId = 'user_' + Date.now();
       const newEmail = `${recipientPhone}@${config.domainName}`;
       await dbOps.execute(`
@@ -120,6 +119,10 @@ export const emailService = {
         conversationId,
         recipientPhone
       });
+      ioInstance.to(`user:${recipientPhone}`).emit('email:incoming', {
+        email: savedEmail,
+        conversationId
+      });
     }
 
     // Check and trigger targeted SMS notification if user has no mobile app
@@ -129,18 +132,45 @@ export const emailService = {
   },
 
   /**
-   * Sends an outbound email or reply
+   * Sends an outbound email or reply (True End-to-End User-to-User)
    */
   async sendOutboundEmail({ senderPhone, toRecipients, subject, bodyText, replyToId = null, conversationId = null }) {
-    const sender = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [senderPhone]);
-    const senderEmail = sender ? sender.email_address : `${senderPhone}@${config.domainName}`;
+    const cleanSenderPhone = String(senderPhone).replace(/\D/g, '').slice(-10);
+    let sender = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanSenderPhone]);
+    if (!sender) {
+      const senderId = 'user_' + Date.now();
+      const senderEmail = `${cleanSenderPhone}@${config.domainName}`;
+      await dbOps.execute(`
+        INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
+        VALUES (?, ?, ?, ?, 'WEB_CLIENT', 1)
+      `, [senderId, cleanSenderPhone, senderEmail, `User ${cleanSenderPhone}`]);
+      sender = { id: senderId, phone_number: cleanSenderPhone, email_address: senderEmail };
+    }
+    const senderEmail = sender.email_address;
 
     // Normalize all recipient addresses
-    const normalizedRecipients = (Array.isArray(toRecipients) ? toRecipients : [toRecipients]).map(r => this.parseAddress(r).full);
+    const rawRecipientsList = Array.isArray(toRecipients) ? toRecipients : [toRecipients];
+    const normalizedRecipients = rawRecipientsList.map(r => this.parseAddress(r).full);
+
+    // Auto-provision any internal recipients who haven't registered yet
+    for (const rec of rawRecipientsList) {
+      const parsed = this.parseAddress(rec);
+      if (parsed.phone && parsed.phone !== cleanSenderPhone) {
+        let recipientUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [parsed.phone]);
+        if (!recipientUser) {
+          const recUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+          const recEmail = `${parsed.phone}@${config.domainName}`;
+          await dbOps.execute(`
+            INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
+            VALUES (?, ?, ?, ?, 'INBOUND_EMAIL', 0)
+          `, [recUserId, parsed.phone, recEmail, `User ${parsed.phone}`]);
+        }
+      }
+    }
 
     let targetConvId = conversationId;
 
-    // Check single-reply constraint
+    // Check single-reply constraint if this is a reply to an existing email
     if (replyToId) {
       const parent = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [replyToId]);
       if (parent) {
@@ -162,12 +192,16 @@ export const emailService = {
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
       `, [targetConvId, isGroup ? 1 : 0, subject || 'Conversation', normalizedRecipients[0]]);
 
-      // Add participants
+      // Add sender
       await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
-        [targetConvId, sender ? sender.id : null, senderPhone]);
-      for (const rec of normalizedRecipients) {
+        [targetConvId, sender ? sender.id : null, cleanSenderPhone]);
+      
+      // Add each recipient
+      for (const rec of rawRecipientsList) {
+        const parsed = this.parseAddress(rec);
+        const pPhone = parsed.phone || rec;
         await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
-          [targetConvId, null, rec]);
+          [targetConvId, null, pPhone]);
       }
     } else {
       await dbOps.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [targetConvId]);
@@ -177,7 +211,7 @@ export const emailService = {
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     await dbOps.execute(`
       INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, reply_to_id, has_replied, is_read, folder)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, 'INBOX')
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 'INBOX')
     `, [
       emailId,
       targetConvId,
@@ -190,19 +224,37 @@ export const emailService = {
 
     const sentEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
 
-    // Real-time broadcast
+    // Real-time broadcast to all participants and specific user rooms
     if (ioInstance) {
+      ioInstance.emit('email:new', {
+        email: sentEmail,
+        conversationId: targetConvId,
+        senderPhone: cleanSenderPhone
+      });
+
       ioInstance.emit('email:sent', {
         email: sentEmail,
         conversationId: targetConvId,
-        senderPhone
+        senderPhone: cleanSenderPhone
       });
+
+      // Target each recipient's private room
+      for (const rec of rawRecipientsList) {
+        const parsed = this.parseAddress(rec);
+        if (parsed.phone) {
+          ioInstance.to(`user:${parsed.phone}`).emit('email:incoming', {
+            email: sentEmail,
+            conversationId: targetConvId,
+            from: senderEmail
+          });
+        }
+      }
     }
 
-    // Process delivery to any internal PhoneMail users
-    for (const rec of normalizedRecipients) {
+    // Process delivery notifications to any PhoneMail recipients who do NOT have the app open
+    for (const rec of rawRecipientsList) {
       const parsed = this.parseAddress(rec);
-      if (parsed.phone && parsed.phone !== senderPhone) {
+      if (parsed.phone && parsed.phone !== cleanSenderPhone) {
         const internalUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [parsed.phone]);
         if (internalUser) {
           await notificationService.checkAndNotify(sentEmail, internalUser);

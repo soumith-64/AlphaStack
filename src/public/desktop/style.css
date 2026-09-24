@@ -1494,3 +1494,99 @@ button {
     min-height: 200px;
   }
 }
+
+/* ==================== CONTACTS AUTOCOMPLETE DROPDOWN ==================== */
+.contacts-autocomplete {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  box-shadow: var(--shadow-modal);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1050;
+  animation: fadeInDown 0.15s ease-out;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.contacts-autocomplete-header {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.contact-autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-light);
+  transition: background-color 0.12s ease;
+}
+
+.contact-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.contact-autocomplete-item:hover,
+.contact-autocomplete-item.selected {
+  background: var(--bg-hover);
+}
+
+.contact-item-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--green-main), var(--green-vibrant));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.contact-item-info {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.contact-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.contact-item-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+  display: flex;
+  gap: 6px;
+}
+
+.contact-item-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--saffron-subtle);
+  color: var(--saffron-dark);
+  font-weight: 600;
+}

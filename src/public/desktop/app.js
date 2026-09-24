@@ -6,6 +6,45 @@ let allEmails = [];
 let activeEmail = null;
 let selectedEmailIndex = -1;
 let socket = null;
+let currentReplyToId = null;
+let currentReplyConvId = null;
+let cachedContacts = [];
+
+// ==================== NOTIFICATION CHIME (WEB AUDIO API) ====================
+function playNotificationChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    
+    // Note 1: High crisp D5 (587.33Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(587.33, now);
+    gain1.gain.setValueAtTime(0.12, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.3);
+
+    // Note 2: Bright chime A5 (880.00Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880.00, now + 0.1);
+    gain2.gain.setValueAtTime(0.18, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.5);
+  } catch (e) {
+    // browser auto-play restriction safety
+  }
+}
 
 // ==================== STRING UTILITIES ====================
 function escapeHtml(str) {
@@ -114,15 +153,26 @@ function initDesktopApp() {
     topPhoneChip.innerText = `📞 +91 ${currentUser.phone}`;
   }
 
-  // Socket.io Push
+  // Socket.io Push with targeted personal rooms
   try {
     socket = io();
     socket.emit('join:user', currentUser.phone);
 
-    socket.on('email:new', (data) => {
-      console.log('⚡ [SOCKET] Inbound email received:', data);
+    socket.on('email:incoming', (data) => {
+      console.log('⚡ [SOCKET] Inbound personal email received:', data);
+      playNotificationChime();
+      const senderDisplay = data.from || (data.email && data.email.sender_email) || 'Network Contact';
+      showToastNotification(`📩 New message from ${senderDisplay}!`);
       loadEmails();
-      showToastNotification(`New email from ${data.sender_email || 'contact'}`);
+    });
+
+    socket.on('email:new', (data) => {
+      console.log('⚡ [SOCKET] Inbound email event:', data);
+      if (data && data.senderPhone && data.senderPhone !== currentUser.phone) {
+        playNotificationChime();
+        showToastNotification(`📩 New email received`);
+      }
+      loadEmails();
     });
 
     socket.on('email:sent', () => {
@@ -132,8 +182,9 @@ function initDesktopApp() {
     console.warn('Socket real-time connection warning:', err);
   }
 
-  // Setup Keyboard Shortcuts
+  // Setup Keyboard Shortcuts & Autocomplete
   setupKeyboardShortcuts();
+  setupContactsAutocomplete();
 
   // Load Data
   loadEmails();
@@ -436,13 +487,81 @@ function toggleSelectAll(masterCheckbox) {
   checkboxes.forEach(cb => { cb.checked = isChecked; });
 }
 
-// ==================== COMPOSE MODAL ====================
+// ==================== COMPOSE MODAL & CONTACTS AUTOCOMPLETE ====================
+function setupContactsAutocomplete() {
+  const input = document.getElementById('desk-compose-to');
+  const dropdown = document.getElementById('desk-contacts-dropdown');
+  if (!input || !dropdown) return;
+
+  async function fetchAndRender(query = '') {
+    try {
+      if (!currentUser) return;
+      if (cachedContacts.length === 0) {
+        const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
+        const data = await res.json();
+        cachedContacts = data.contacts || [];
+      }
+      
+      const q = query.trim().toLowerCase();
+      const matches = cachedContacts.filter(c => 
+        !q || 
+        (c.display_name && c.display_name.toLowerCase().includes(q)) ||
+        (c.phone_number && c.phone_number.includes(q)) ||
+        (c.email_address && c.email_address.toLowerCase().includes(q))
+      );
+
+      if (matches.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      dropdown.innerHTML = `
+        <div class="contacts-autocomplete-header">PhoneMail Network Users</div>
+      `;
+      matches.slice(0, 6).forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'contact-autocomplete-item';
+        item.innerHTML = `
+          <div class="contact-item-avatar">${getInitials(c.display_name || c.phone_number)}</div>
+          <div class="contact-item-info">
+            <div class="contact-item-name">${escapeHtml(c.display_name || `User ${c.phone_number}`)}</div>
+            <div class="contact-item-meta">
+              <span>📞 +91 ${escapeHtml(c.phone_number)}</span>
+              <span class="contact-item-badge">Instant</span>
+            </div>
+          </div>
+        `;
+        item.onmousedown = (e) => {
+          e.preventDefault();
+          input.value = c.phone_number;
+          dropdown.style.display = 'none';
+          document.getElementById('desk-compose-subject').focus();
+        };
+        dropdown.appendChild(item);
+      });
+      dropdown.style.display = 'block';
+    } catch (err) {
+      console.warn('Failed to load contacts for autocomplete:', err);
+    }
+  }
+
+  input.addEventListener('input', () => fetchAndRender(input.value));
+  input.addEventListener('focus', () => fetchAndRender(input.value));
+  input.addEventListener('blur', () => {
+    setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+  });
+}
+
 function openComposeModal() {
   const modal = document.getElementById('desktop-compose-modal');
   if (!modal) return;
+  currentReplyToId = null;
+  currentReplyConvId = null;
   document.getElementById('desk-compose-to').value = '';
   document.getElementById('desk-compose-subject').value = '';
   document.getElementById('desk-compose-body').value = '';
+  const dropdown = document.getElementById('desk-contacts-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
   modal.style.display = 'block';
   setTimeout(() => document.getElementById('desk-compose-to').focus(), 50);
 }
@@ -450,11 +569,21 @@ function openComposeModal() {
 function closeComposeModal() {
   const modal = document.getElementById('desktop-compose-modal');
   if (modal) modal.style.display = 'none';
+  const dropdown = document.getElementById('desk-contacts-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+  currentReplyToId = null;
+  currentReplyConvId = null;
 }
 
 function startQuickReply() {
   if (!activeEmail) return;
+  if (activeEmail.has_replied === 1) {
+    alert('Notice: This message has already been replied to. Each message can be replied to only once.');
+    return;
+  }
   openComposeModal();
+  currentReplyToId = activeEmail.id;
+  currentReplyConvId = activeEmail.conversation_id;
   document.getElementById('desk-compose-to').value = activeEmail.sender_email;
   document.getElementById('desk-compose-subject').value = activeEmail.subject.startsWith('Re:')
     ? activeEmail.subject
@@ -482,7 +611,9 @@ async function sendDesktopEmail() {
         senderPhone: currentUser.phone,
         toRecipients: recipients,
         subject,
-        bodyText: body
+        bodyText: body,
+        replyToId: currentReplyToId,
+        conversationId: currentReplyConvId
       })
     });
     const data = await res.json();

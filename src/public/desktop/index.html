@@ -271,9 +271,10 @@
       </div>
 
       <div class="compose-body">
-        <div class="compose-field">
+        <div class="compose-field" style="position: relative;">
           <label>To</label>
-          <input type="text" id="desk-compose-to" placeholder="Phone number (e.g. 9845012345) or email">
+          <input type="text" id="desk-compose-to" placeholder="Phone number (e.g. 9845012345) or email" autocomplete="off">
+          <div id="desk-contacts-dropdown" class="contacts-autocomplete" style="display: none;"></div>
         </div>
         <div class="compose-field">
           <label>Subject</label>
