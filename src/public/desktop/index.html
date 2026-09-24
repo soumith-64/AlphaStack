@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
+  <!-- Official Phone.Email Real-Time SMS & WhatsApp Verification SDK -->
+  <script src="https://www.phone.email/sign_in_button_v1.js" async></script>
 </head>
 <body>
 
@@ -27,7 +29,21 @@
         <span class="online-dot"></span> 🇮🇳 Bharat's Phone-Email Engine
       </div>
       <h1 class="auth-title">Welcome to <span class="saffron-text">Phone</span><span class="green-text">Mail</span></h1>
-      <p class="auth-subtitle">Sign in using your 10-digit mobile number to access or register your unified inbox.</p>
+      <p class="auth-subtitle">Sign in using your mobile number for real-time OTP verification & instant unified inbox access.</p>
+
+      <!-- OFFICIAL PHONE.EMAIL 100% LIVE VERIFICATION BUTTON -->
+      <div id="phone-email-btn-wrap" style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px; padding: 16px; background: var(--green-subtle); border: 1.5px solid var(--green-border); border-radius: 14px; text-align: center;">
+        <div style="font-size: 11.5px; font-weight: 700; color: var(--green-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
+          ⚡ Instant Real-Time OTP via Phone.Email (SMS & WhatsApp)
+        </div>
+        <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
+      </div>
+
+      <div style="display: flex; align-items: center; text-align: center; margin: 16px 0 20px;">
+        <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
+        <span style="padding: 0 10px; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">or sign in with direct otp</span>
+        <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
+      </div>
 
       <form id="desktop-phone-form" onsubmit="handleDesktopPhoneSubmit(event)">
         <div class="form-group">

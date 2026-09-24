@@ -101,6 +101,42 @@ function toggleTheme() {
 // Auto-run theme initialization immediately
 initTheme();
 
+// ==================== PHONE.EMAIL OFFICIAL LISTENER ====================
+window.phoneEmailListener = async (userObj) => {
+  if (!userObj || !userObj.user_json_url) return;
+  const { user_json_url } = userObj;
+  console.log('📱 [Phone.Email Verification Success] JSON URL:', user_json_url);
+  showToastNotification('Phone verified via Phone.Email! Entering mailbox...');
+
+  try {
+    const res = await fetch('/api/auth/phone-email-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_json_url, clientType: 'WEB_CLIENT' })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      currentUser = {
+        phone: data.user.phone_number,
+        name: data.user.display_name || `User ${data.user.phone_number}`,
+        email: data.user.email_address
+      };
+
+      sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+      document.getElementById('desktop-auth-container').style.display = 'none';
+      document.getElementById('desktop-main-container').style.display = 'flex';
+      playNotificationChime();
+      initDesktopApp();
+      showToastNotification(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`);
+    } else {
+      alert(data.error || 'Failed to authenticate phone number with Phone.Email');
+    }
+  } catch (err) {
+    alert('Verification communication error: ' + err.message);
+  }
+};
+
 // ==================== TELEGRAM-STYLE REAL-TIME AUTHENTICATION ====================
 let desktopPendingPhone = '';
 let desktopLiveOtp = '';

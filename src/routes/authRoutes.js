@@ -238,6 +238,71 @@ router.post('/complete-profile', async (req, res) => {
 });
 
 /**
+ * Verify authenticated phone number from Phone.Email (phone.email)
+ */
+router.post('/phone-email-verify', async (req, res) => {
+  try {
+    const { user_json_url, clientType = 'WEB_CLIENT' } = req.body;
+    if (!user_json_url) {
+      return res.status(400).json({ error: 'user_json_url is required' });
+    }
+
+    // Verify origin URL is legitimately from phone.email
+    const parsed = new URL(user_json_url);
+    if (!parsed.hostname.endsWith('phone.email')) {
+      return res.status(400).json({ error: 'Invalid verification provider URL' });
+    }
+
+    const response = await fetch(user_json_url);
+    if (!response.ok) {
+      return res.status(400).json({ error: 'Could not fetch phone verification data from phone.email' });
+    }
+
+    const data = await response.json();
+    const rawNumber = String(data.user_phone_number || '').replace(/\D/g, '');
+    const cleanNumber = rawNumber.slice(-10);
+
+    if (!cleanNumber || cleanNumber.length < 10) {
+      return res.status(400).json({ error: 'Invalid phone number received from provider' });
+    }
+
+    const firstName = (data.user_first_name || '').trim();
+    const lastName = (data.user_last_name || '').trim();
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+    const isNewUser = !user;
+    const isMobile = clientType === 'MOBILE_CLIENT' || clientType === 'MOBILE_APP';
+
+    if (!user) {
+      const userId = 'user_' + Date.now();
+      const email = `${cleanNumber}@${config.domainName}`;
+      const displayName = fullName || `User ${cleanNumber}`;
+      await dbOps.execute(`
+        INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
+        VALUES (?, ?, ?, ?, 'PHONE_EMAIL', ?)
+      `, [userId, cleanNumber, email, displayName, isMobile ? 1 : 0]);
+      user = await dbOps.queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+    } else if (fullName && (user.display_name.startsWith('User ') || !user.display_name)) {
+      await dbOps.execute('UPDATE users SET display_name = ? WHERE id = ?', [fullName, user.id]);
+      user.display_name = fullName;
+    }
+
+    await dbOps.logTelephony(cleanNumber, 'PHONE_EMAIL_AUTH', `User verified via Phone.Email service: +91 ${cleanNumber}`, 'PHONE_EMAIL');
+
+    res.json({
+      success: true,
+      isNewUser,
+      user,
+      token: `token_${user.id}_${Date.now()}`
+    });
+  } catch (err) {
+    console.error('phone.email verification error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Rapid 2-field portal registration (auto-resets)
  */
 router.post('/portal-register', async (req, res) => {

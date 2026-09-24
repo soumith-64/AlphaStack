@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
+  <!-- Official Phone.Email Real-Time SMS & WhatsApp Verification SDK -->
+  <script src="https://www.phone.email/sign_in_button_v1.js" async></script>
 </head>
 <body>
 
@@ -72,6 +74,14 @@
         <h3>Enter your phone number</h3>
         <p>PhoneMail will send an SMS to verify your number. Carrier charges may apply.</p>
       </div>
+
+      <!-- Official Phone.Email One-Click Verified Button -->
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 14px 0; padding: 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; text-align: center;">
+        <span style="font-size: 11px; font-weight: 700; color: #046a38; margin-bottom: 8px;">⚡ Instant Real-Time OTP via Phone.Email</span>
+        <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
+      </div>
+      <div style="text-align: center; font-size: 11px; color: #94a3b8; margin-bottom: 12px; font-weight: 600;">— OR ENTER MOBILE NUMBER —</div>
+
       <div class="country-picker">
         <span>India</span>
         <span class="arrow">▼</span>

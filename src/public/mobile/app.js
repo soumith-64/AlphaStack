@@ -15,6 +15,34 @@ function goToScreen(screenId) {
   if (target) target.classList.add('active');
 }
 
+// ==================== PHONE.EMAIL OFFICIAL LISTENER (MOBILE) ====================
+window.phoneEmailListener = async (userObj) => {
+  if (!userObj || !userObj.user_json_url) return;
+  const { user_json_url } = userObj;
+  try {
+    const res = await fetch('/api/auth/phone-email-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_json_url, clientType: 'MOBILE_CLIENT' })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      currentUser = {
+        phone: data.user.phone_number,
+        name: data.user.display_name || `User ${data.user.phone_number}`,
+        email: data.user.email_address
+      };
+      sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
+      document.getElementById('onboarding-container').style.display = 'none';
+      initMainApp();
+    } else {
+      alert(data.error || 'Failed to authenticate phone number with Phone.Email');
+    }
+  } catch (err) {
+    alert('Verification error: ' + err.message);
+  }
+};
+
 let mobileCountdownTimer = null;
 let mobileCountdownSeconds = 45;
 let mobileLiveOtp = '';
