@@ -4,176 +4,30 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>PhoneMail — Bharat's Phone-Number-Powered Email Platform</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✉️</text></svg>">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
-    body, html { width: 100%; height: 100%; overflow: hidden; background: #fbfdfc; color: #0b1727; }
-
-    /* Top Tricolor Ribbon */
-    .tiranga-ribbon {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3.5px;
-      background: linear-gradient(90deg, #FF671F 0%, #FF671F 33.33%, #ffffff 33.33%, #ffffff 66.66%, #046A38 66.66%, #046A38 100%);
-      z-index: 100000;
-    }
-
-    /* Top Shell Navigation Bar */
-    .top-switcher-bar {
-      position: fixed;
-      top: 3.5px;
-      left: 0;
-      right: 0;
-      height: 48px;
-      background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      z-index: 99999;
-      border-bottom: 1px solid #dde6e1;
-      box-shadow: 0 1px 3px rgba(6, 46, 36, 0.04);
-    }
-
-    .brand-title {
-      font-weight: 800;
-      font-size: 15px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      color: #0b1727;
-      flex-shrink: 0;
-    }
-
-    .brand-title .saffron-text { color: #FF671F; }
-    .brand-title .green-text { color: #046A38; }
-
-    .brand-title .sub-tag {
-      color: #046A38;
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 1px 6px;
-      border-radius: 9999px;
-      margin-left: 4px;
-    }
-
-    .nav-pills {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      scrollbar-width: none;
-      -ms-overflow-style: none;
-      padding: 2px 0;
-    }
-
-    .nav-pills::-webkit-scrollbar {
-      display: none;
-    }
-
-    .pill-btn {
-      background: #f0f5f2;
-      border: 1px solid #dde6e1;
-      color: #3d5147;
-      padding: 5px 12px;
-      border-radius: 9999px;
-      font-size: 12.5px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      transition: all 0.15s ease;
-      white-space: nowrap;
-    }
-
-    .pill-btn:hover {
-      background: #ecfdf5;
-      color: #046A38;
-      border-color: #a7f3d0;
-    }
-
-    .pill-btn.active {
-      background: linear-gradient(135deg, #046A38 0%, #059669 100%);
-      color: #ffffff;
-      border-color: #046A38;
-      box-shadow: 0 2px 6px rgba(4, 106, 56, 0.35);
-    }
-
-    .frame-container {
-      position: absolute;
-      top: 51.5px;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      width: 100%;
-      height: calc(100% - 51.5px);
-    }
-
-    iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-      background: #fbfdfc;
-    }
-
-    @media (max-width: 650px) {
-      .top-switcher-bar { padding: 0 10px; }
-      .brand-title .sub-tag { display: none; }
-      .pill-btn { padding: 4px 9px; font-size: 11.5px; }
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body, html { width: 100%; height: 100%; background: #080e1a; color: #f8fafc; display: flex; align-items: center; justify-content: center; }
+    .loader-box { text-align: center; }
+    .loader-icon { font-size: 48px; margin-bottom: 16px; animation: bounce 1s infinite alternate; }
+    .loader-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
+    .loader-sub { font-size: 13px; color: #94a3b8; margin-top: 6px; }
+    @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
   </style>
+  <script>
+    // Intelligent device-native redirect to the real production application
+    (function() {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+      const target = isMobile ? '/mobile/' : '/desktop/';
+      window.location.replace(target);
+    })();
+  </script>
 </head>
 <body>
-
-  <!-- Top Tricolor Ribbon -->
-  <div class="tiranga-ribbon"></div>
-
-  <!-- Top Switcher Bar for Hackathon Judges & Multi-device Preview -->
-  <div class="top-switcher-bar">
-    <div class="brand-title">
-      ⚡ <span class="saffron-text">Phone</span><span class="green-text">Mail</span>
-      <span class="sub-tag">🇮🇳 Bharat</span>
-    </div>
-    <div class="nav-pills">
-      <button class="pill-btn" id="btn-desktop" onclick="switchView('desktop')">💻 Desktop / Web</button>
-      <button class="pill-btn" id="btn-mobile" onclick="switchView('mobile')">📱 Mobile Client</button>
-      <button class="pill-btn" id="btn-portal" onclick="switchView('portal')">🌐 2-Field Portal</button>
-      <button class="pill-btn" id="btn-simulator" onclick="switchView('simulator')">🧪 Judge Lab</button>
-    </div>
+  <div class="loader-box">
+    <div class="loader-icon">✉️</div>
+    <div class="loader-title">PhoneMail</div>
+    <div class="loader-sub">Connecting to your secure mailbox...</div>
   </div>
-
-  <div class="frame-container">
-    <iframe id="main-frame" src="/desktop/"></iframe>
-  </div>
-
-  <script>
-    // Intelligent viewport detection
-    const isMobileViewport = window.innerWidth < 768;
-    const defaultView = isMobileViewport ? 'mobile' : 'desktop';
-
-    function switchView(viewName) {
-      document.querySelectorAll('.pill-btn').forEach(btn => btn.classList.remove('active'));
-      const activeBtn = document.getElementById(`btn-${viewName}`);
-      if (activeBtn) activeBtn.classList.add('active');
-
-      const frame = document.getElementById('main-frame');
-      frame.src = `/${viewName}/`;
-      history.replaceState(null, null, `?view=${viewName}`);
-    }
-
-    // Check query params or viewport
-    const urlParams = new URLSearchParams(window.location.search);
-    const requestedView = urlParams.get('view') || defaultView;
-    switchView(requestedView);
-  </script>
-
 </body>
 </html>

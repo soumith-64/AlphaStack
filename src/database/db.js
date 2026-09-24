@@ -123,7 +123,7 @@ export const dbOps = {
     return { changes: 1 };
   },
 
-  async logTelephony(phoneNumber, type, content, provider = 'VIRTUAL_SIMULATOR', status = 'DELIVERED') {
+  async logTelephony(phoneNumber, type, content, provider = 'SYSTEM_SMS', status = 'DELIVERED') {
     const id = 'log_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
     await this.execute(
       `INSERT INTO telephony_logs (id, phone_number, type, content, provider, status) VALUES (?, ?, ?, ?, ?, ?)`,

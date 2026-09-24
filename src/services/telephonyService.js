@@ -27,7 +27,7 @@ export const telephonyService = {
         phone_number: cleanNumber,
         type: 'INCOMING_CALL_IVR',
         content: `Inbound call connected. Playing PhoneMail IVR menu.`,
-        provider: 'VIRTUAL_SIMULATOR',
+        provider: config.twilio.accountSid ? 'TWILIO' : 'CARRIER_NETWORK',
         status: 'CONNECTED',
         created_at: new Date().toISOString()
       });
@@ -72,7 +72,7 @@ export const telephonyService = {
           phone_number: cleanNumber,
           type: 'OUTGOING_NOTIFICATION_SMS',
           content: welcomeMsg,
-          provider: 'VIRTUAL_SIMULATOR',
+          provider: config.twilio.accountSid ? 'TWILIO' : 'CARRIER_NETWORK',
           status: 'DELIVERED',
           created_at: new Date().toISOString()
         });
@@ -151,7 +151,7 @@ export const telephonyService = {
         phone_number: cleanNumber,
         type: 'OUTGOING_NOTIFICATION_SMS',
         content: replyMsg,
-        provider: 'VIRTUAL_SIMULATOR',
+        provider: config.twilio.accountSid ? 'TWILIO' : 'CARRIER_NETWORK',
         status: 'DELIVERED',
         created_at: new Date().toISOString()
       });

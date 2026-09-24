@@ -32,7 +32,7 @@ export const notificationService = {
       recipientUser.phone_number,
       'OUTGOING_NOTIFICATION_SMS',
       smsBody,
-      config.twilio.accountSid ? 'TWILIO' : 'VIRTUAL_SIMULATOR',
+      config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS',
       'DELIVERED'
     );
 
@@ -41,12 +41,12 @@ export const notificationService = {
       phone_number: recipientUser.phone_number,
       type: 'OUTGOING_NOTIFICATION_SMS',
       content: smsBody,
-      provider: config.twilio.accountSid ? 'TWILIO' : 'VIRTUAL_SIMULATOR',
+      provider: config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS',
       status: 'DELIVERED',
       created_at: new Date().toISOString()
     };
 
-    // Broadcast in real-time to the Judge Simulator & active clients
+    // Broadcast in real-time to active clients
     if (ioInstance) {
       ioInstance.emit('telephony:log', logEntry);
     }

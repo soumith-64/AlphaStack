@@ -14,7 +14,6 @@ import { startSmtpServer } from './smtp/smtpServer.js';
 import authRoutes from './routes/authRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
 import twilioRoutes from './routes/twilioRoutes.js';
-import simulatorRoutes from './routes/simulatorRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +39,13 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Root route: Automatically route to real Mobile or Desktop app based on client device
+app.get('/', (req, res) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  const isMobile = /mobile|iphone|android|ipad|phone/i.test(ua);
+  res.redirect(isMobile ? '/mobile/' : '/desktop/');
+});
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -47,7 +53,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api', emailRoutes);
 app.use('/api/twilio', twilioRoutes);
-app.use('/api/simulator', simulatorRoutes);
 
 // Socket.IO event handler
 io.on('connection', (socket) => {
@@ -85,14 +90,12 @@ if (typeof rawPort === 'string' && !/^\d+$/.test(rawPort)) {
   const numericPort = Number(rawPort) || 3000;
   server.listen(numericPort, config.host, () => {
     console.log(`\n======================================================`);
-    console.log(`🚀 PhoneMail Server is running!`);
-    console.log(`🌐 Bound to: http://${config.host}:${numericPort}`);
-    console.log(`📱 Mobile (WhatsApp + Spike): http://${config.host}:${numericPort}/mobile`);
-    console.log(`💻 Desktop (Gmail): http://${config.host}:${numericPort}/desktop`);
-    console.log(`📋 2-Field Portal: http://${config.host}:${numericPort}/portal`);
-    console.log(`🧪 Judge Testing Lab: http://${config.host}:${numericPort}/simulator`);
+    console.log(`🚀 PhoneMail Production Server is running!`);
+    console.log(`🌐 Live URL: http://${config.host}:${numericPort}`);
+    console.log(`💻 Desktop Webmail: http://${config.host}:${numericPort}/desktop/`);
+    console.log(`📱 Mobile Spike Webmail: http://${config.host}:${numericPort}/mobile/`);
     if (config.enableSmtp || !config.isProduction) {
-      console.log(`📧 Inbound SMTP Port: ${config.smtpPort}`);
+      console.log(`📧 Inbound SMTP Server: port ${config.smtpPort}`);
     }
     console.log(`======================================================\n`);
   });
