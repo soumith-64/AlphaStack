@@ -18,53 +18,148 @@
   <!-- Backdrop overlay for mobile drawer sidebar -->
   <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 
-  <!-- ==================== SIGN IN SCREEN ==================== -->
+  <!-- ==================== TELEGRAM-STYLE AUTH SCREEN ==================== -->
   <div id="desktop-auth-container" class="auth-wrapper">
-    <div class="auth-card">
+    
+    <!-- STEP 1: PHONE NUMBER INPUT -->
+    <div class="auth-card" id="desktop-card-phone">
       <div class="brand-badge">
         <span class="online-dot"></span> 🇮🇳 Bharat's Phone-Email Engine
       </div>
       <h1 class="auth-title">Welcome to <span class="saffron-text">Phone</span><span class="green-text">Mail</span></h1>
-      <p class="auth-subtitle">Sign in using your 10-digit mobile number to access your unified inbox.</p>
+      <p class="auth-subtitle">Sign in using your 10-digit mobile number to access or register your unified inbox.</p>
 
-      <form id="desktop-login-form">
-        <div class="form-group" id="desktop-phone-group">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <label for="desktop-phone-input" style="margin: 0;">INDIAN MOBILE NUMBER</label>
-            <span id="desktop-change-number" style="display: none; font-size: 11px; color: var(--saffron-main); font-weight: 700; cursor: pointer;" onclick="resetDesktopPhoneStep()">Change Number ✎</span>
-          </div>
+      <form id="desktop-phone-form" onsubmit="handleDesktopPhoneSubmit(event)">
+        <div class="form-group">
+          <label for="desktop-phone-input">INDIAN MOBILE NUMBER</label>
           <div class="input-box">
             <span class="input-addon flag-addon">🇮🇳 +91</span>
             <input type="tel" id="desktop-phone-input" placeholder="Enter 10-digit mobile number" maxlength="10" required autofocus autocomplete="tel-national">
           </div>
         </div>
 
-        <div class="form-group" id="desktop-otp-group" style="display: none; animation: fadeInDown 0.2s ease;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-            <label for="desktop-otp-input" style="margin: 0;">ENTER 6-DIGIT OTP</label>
-            <span id="desktop-resend-link" style="font-size: 11px; color: var(--green-main); font-weight: 700; cursor: pointer;" onclick="resendDesktopOTP()">Resend SMS 🔄</span>
-          </div>
-          <div class="input-box">
-            <span class="input-addon">🔑</span>
-            <input type="text" id="desktop-otp-input" placeholder="Enter 6-digit verification code" maxlength="6" autocomplete="one-time-code">
-          </div>
-          <div id="desktop-otp-status" style="margin-top: 8px; font-size: 12px; line-height: 1.4;"></div>
-        </div>
-
         <div class="terms-disclaimer">
-          By signing in, you agree to PhoneMail's <a href="#" onclick="alert('PhoneMail Terms & Privacy Policy'); return false;">Terms of Service</a>
+          By continuing, you agree to PhoneMail's <a href="#" onclick="alert('PhoneMail Terms & Privacy Policy'); return false;">Terms of Service</a> & real-time SMS delivery.
         </div>
 
-        <button type="submit" class="btn-primary full-width" id="btn-desktop-submit">
-          <span id="btn-desktop-label">Get Live OTP via SMS</span>
-          <span class="btn-arrow" id="btn-desktop-arrow">→</span>
+        <button type="submit" class="btn-primary full-width" id="btn-phone-submit">
+          <span id="btn-phone-label">Send Real-Time OTP</span>
+          <span class="btn-arrow">→</span>
         </button>
       </form>
 
       <div class="auth-footer-note">
-        ⚡ Self-hosted SMTP port 2525 • Pure Node.js & Hostinger Cloud Ready
+        ⚡ Twilio Live SMS & Voice IVR • Real-time Hostinger Engine
       </div>
     </div>
+
+    <!-- STEP 2: TELEGRAM REAL-TIME OTP VERIFICATION -->
+    <div class="auth-card" id="desktop-card-otp" style="display: none;">
+      <div class="telegram-card-header">
+        <div class="telegram-icon-badge">💬</div>
+        <h1 class="auth-title">Enter Verification Code</h1>
+        <div class="telegram-phone-display">
+          <span class="telegram-phone-number" id="tg-phone-display">+91 ••••••••••</span>
+          <button type="button" class="telegram-edit-btn" onclick="backToPhoneStep()" title="Change phone number">✎ Edit</button>
+        </div>
+        <p class="auth-subtitle" style="margin-bottom: 0;">We've sent a 6-digit confirmation code via SMS to your phone.</p>
+      </div>
+
+      <!-- 6-CELL TELEGRAM DIGIT GRID -->
+      <div class="telegram-otp-grid" id="desktop-otp-grid">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="0" autocomplete="off">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="1" autocomplete="off">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="2" autocomplete="off">
+        <span class="telegram-otp-divider">—</span>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="3" autocomplete="off">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="4" autocomplete="off">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="5" autocomplete="off">
+      </div>
+
+      <!-- Real-time Status / Error Banner -->
+      <div class="otp-status-banner" id="desktop-otp-status"></div>
+
+      <!-- Live Code Quick Pill (Instant Testing Fallback) -->
+      <div class="otp-live-hint-card" id="desktop-live-hint" style="display: none;">
+        <span>🔑 Live Twilio OTP: <strong id="desktop-live-code" style="font-family: monospace; font-size: 14px;">123456</strong></span>
+        <button type="button" class="otp-quick-fill-btn" onclick="quickFillLiveCode()">Autofill</button>
+      </div>
+
+      <!-- Countdown & Fallback Actions (SMS Resend & Voice Call) -->
+      <div class="telegram-countdown-row">
+        <div class="otp-timer-badge" id="otp-timer-wrap">
+          <span>⏳ Resend code in</span>
+          <strong id="otp-timer-seconds" style="color: var(--saffron-main);">0:45</strong>
+        </div>
+        <div class="otp-action-buttons">
+          <button type="button" class="otp-pill-action" id="btn-resend-sms" onclick="resendTelegramOTP()" disabled>
+            Resend SMS 🔄
+          </button>
+          <button type="button" class="otp-pill-action voice-call-btn" id="btn-call-otp" onclick="requestVoiceCallOTP()" disabled>
+            📞 Call me with code
+          </button>
+        </div>
+      </div>
+
+      <div class="auth-footer-note" style="margin-top: 18px;">
+        💡 Code auto-verifies immediately as soon as you type the 6th digit.
+      </div>
+    </div>
+
+    <!-- STEP 3: TELEGRAM PROFILE REGISTRATION (NEW USERS) -->
+    <div class="auth-card" id="desktop-card-profile" style="display: none;">
+      <div class="profile-card-header">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar-circle" id="profile-avatar-circle">P</div>
+          <span style="font-size: 12px; font-weight: 700; color: var(--green-main); margin-top: 4px;">✓ Number Verified</span>
+        </div>
+        <h1 class="auth-title">Complete Your Profile</h1>
+        <p class="auth-subtitle">Enter your name to activate your unified Phone-to-Email mailbox.</p>
+      </div>
+
+      <form id="desktop-profile-form" onsubmit="handleDesktopProfileSubmit(event)">
+        <div class="profile-name-row">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="profile-first-name">FIRST NAME *</label>
+            <div class="input-box">
+              <input type="text" id="profile-first-name" placeholder="First name" required autofocus oninput="updateProfileAvatarPreview()">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label for="profile-last-name">LAST NAME</label>
+            <div class="input-box">
+              <input type="text" id="profile-last-name" placeholder="Last name (optional)" oninput="updateProfileAvatarPreview()">
+            </div>
+          </div>
+        </div>
+
+        <div class="alias-tag-picker">
+          <label style="display: block; font-size: 11.5px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px;">
+            CHOOSE AN OPTIONAL SUB-NUMBER ALIAS TAG
+          </label>
+          <div style="font-size: 11px; color: var(--text-dim); margin-bottom: 6px;">
+            Emails sent to <code id="profile-email-preview">9876543210.tag@alphastack.wwisvnr.com</code> will land in your mailbox!
+          </div>
+          <div class="alias-chips">
+            <span class="alias-chip selected" onclick="selectSubTag(this, 'work')">.work</span>
+            <span class="alias-chip" onclick="selectSubTag(this, 'personal')">.personal</span>
+            <span class="alias-chip" onclick="selectSubTag(this, 'finance')">.finance</span>
+            <span class="alias-chip" onclick="selectSubTag(this, 'vip')">.vip</span>
+          </div>
+          <input type="hidden" id="profile-selected-subtag" value="work">
+        </div>
+
+        <button type="submit" class="btn-primary full-width" id="btn-profile-submit">
+          <span>Complete Registration & Enter Inbox</span>
+          <span class="btn-arrow">→</span>
+        </button>
+      </form>
+
+      <div class="auth-footer-note">
+        ⚡ Instant Phone-to-Email Provisioning • 100% Privacy Protected
+      </div>
+    </div>
+
   </div>
 
   <!-- ==================== MAIN WORKSPACE ==================== -->

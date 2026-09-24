@@ -15,6 +15,79 @@ function goToScreen(screenId) {
   if (target) target.classList.add('active');
 }
 
+let mobileCountdownTimer = null;
+let mobileCountdownSeconds = 45;
+let mobileLiveOtp = '';
+
+function initMobileOtpInputs() {
+  const cells = document.querySelectorAll('.otp-digit');
+  if (!cells || cells.length === 0) return;
+
+  cells.forEach((cell, idx) => {
+    cell.addEventListener('input', (e) => {
+      const val = cell.value.replace(/\D/g, '');
+      cell.value = val ? val.slice(-1) : '';
+
+      if (cell.value) {
+        cell.classList.add('filled');
+        cell.classList.remove('error');
+        if (idx < cells.length - 1) {
+          cells[idx + 1].focus();
+        }
+      } else {
+        cell.classList.remove('filled');
+      }
+
+      // Check full 6-digit OTP -> Auto submit
+      let fullOtp = '';
+      cells.forEach(c => { fullOtp += (c.value || '').trim(); });
+      if (fullOtp.length === 6) {
+        verifyOTP(fullOtp);
+      }
+    });
+
+    cell.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace') {
+        if (!cell.value && idx > 0) {
+          cells[idx - 1].focus();
+          cells[idx - 1].value = '';
+          cells[idx - 1].classList.remove('filled', 'error');
+          e.preventDefault();
+        } else {
+          cell.value = '';
+          cell.classList.remove('filled', 'error');
+        }
+      } else if (e.key === 'ArrowLeft' && idx > 0) {
+        cells[idx - 1].focus();
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight' && idx < cells.length - 1) {
+        cells[idx + 1].focus();
+        e.preventDefault();
+      }
+    });
+
+    cell.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteData = (e.clipboardData || window.clipboardData).getData('text') || '';
+      const digits = pasteData.replace(/\D/g, '').slice(0, 6);
+      if (!digits) return;
+
+      digits.split('').forEach((d, i) => {
+        if (cells[i]) {
+          cells[i].value = d;
+          cells[i].classList.add('filled');
+          cells[i].classList.remove('error');
+        }
+      });
+
+      if (digits.length === 6) {
+        cells[5].focus();
+        verifyOTP(digits);
+      }
+    });
+  });
+}
+
 async function requestOTP() {
   const phone = document.getElementById('mobile-phone-input').value.trim();
   if (!phone || phone.length < 10) {
@@ -23,7 +96,7 @@ async function requestOTP() {
   }
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
   pendingPhone = cleanPhone;
-  document.getElementById('verify-phone-label').innerText = `+91 ${cleanPhone}`;
+  document.getElementById('verify-phone-label').innerText = `+91 ${cleanPhone.slice(0,5)} ${cleanPhone.slice(5)}`;
 
   try {
     const res = await fetch('/api/auth/send-otp', {
@@ -33,17 +106,14 @@ async function requestOTP() {
     });
     const data = await res.json();
     if (res.ok && data.success) {
+      mobileLiveOtp = data.liveOtp || '123456';
       goToScreen('screen-otp');
       const hint = document.getElementById('mobile-otp-hint');
       if (hint && data.liveOtp) {
         hint.innerHTML = `Live Code: <strong style="color:var(--wa-green-btn); font-family:monospace; font-size:15px; text-decoration:underline; cursor:pointer;" onclick="autoFillRealOTP('${data.liveOtp}')">${data.liveOtp} (tap to autofill)</strong>`;
       }
-      // Clear inputs
-      document.querySelectorAll('.otp-digit').forEach(i => i.value = '');
-      setTimeout(() => {
-        const first = document.querySelector('.otp-digit');
-        if (first) first.focus();
-      }, 100);
+      clearMobileOtp();
+      startMobileTimer();
     } else {
       alert(data.error || 'Failed to dispatch verification code');
     }
@@ -52,28 +122,115 @@ async function requestOTP() {
   }
 }
 
+function clearMobileOtp() {
+  const cells = document.querySelectorAll('.otp-digit');
+  cells.forEach(c => {
+    c.value = '';
+    c.classList.remove('filled', 'error');
+  });
+  setTimeout(() => {
+    if (cells[0]) cells[0].focus();
+  }, 100);
+}
+
+function startMobileTimer() {
+  if (mobileCountdownTimer) clearInterval(mobileCountdownTimer);
+  mobileCountdownSeconds = 45;
+
+  const timerWrap = document.getElementById('mobile-timer-wrap');
+  const timerSecs = document.getElementById('mobile-timer-seconds');
+  const resendBtn = document.getElementById('btn-mobile-resend');
+  const callBtn = document.getElementById('btn-mobile-call');
+
+  if (timerWrap) timerWrap.style.display = 'block';
+  if (resendBtn) resendBtn.disabled = true;
+  if (callBtn) callBtn.disabled = true;
+
+  updateMobileTimerText();
+
+  mobileCountdownTimer = setInterval(() => {
+    mobileCountdownSeconds--;
+    updateMobileTimerText();
+    if (mobileCountdownSeconds <= 0) {
+      clearInterval(mobileCountdownTimer);
+      if (timerWrap) timerWrap.style.display = 'none';
+      if (resendBtn) resendBtn.disabled = false;
+      if (callBtn) callBtn.disabled = false;
+    }
+  }, 1000);
+}
+
+function updateMobileTimerText() {
+  const timerSecs = document.getElementById('mobile-timer-seconds');
+  if (!timerSecs) return;
+  const m = Math.floor(mobileCountdownSeconds / 60);
+  const s = mobileCountdownSeconds % 60;
+  timerSecs.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+async function resendMobileOTP() {
+  if (!pendingPhone) return;
+  const hint = document.getElementById('mobile-otp-hint');
+  if (hint) hint.innerText = 'Dispatching new SMS... ⏳';
+
+  try {
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: pendingPhone })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      mobileLiveOtp = data.liveOtp || '123456';
+      if (hint) {
+        hint.innerHTML = `Live Code: <strong style="color:var(--wa-green-btn); font-family:monospace; font-size:15px; text-decoration:underline; cursor:pointer;" onclick="autoFillRealOTP('${mobileLiveOtp}')">${mobileLiveOtp} (tap to autofill)</strong>`;
+      }
+      clearMobileOtp();
+      startMobileTimer();
+    }
+  } catch (err) {
+    if (hint) hint.innerText = 'Error resending: ' + err.message;
+  }
+}
+
+async function callMobileOTP() {
+  if (!pendingPhone) return;
+  const hint = document.getElementById('mobile-otp-hint');
+  if (hint) hint.innerText = '📞 Placing real-time voice call...';
+
+  try {
+    const res = await fetch('/api/auth/call-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: pendingPhone })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (data.liveOtp) mobileLiveOtp = data.liveOtp;
+      if (hint) hint.innerText = '📞 Calling now! Answer your phone for the code.';
+      clearMobileOtp();
+    }
+  } catch (err) {
+    if (hint) hint.innerText = 'Voice call error: ' + err.message;
+  }
+}
+
 function autoFillRealOTP(otp) {
   const digits = String(otp).split('');
   const inputs = document.querySelectorAll('.otp-digit');
-  inputs.forEach((input, i) => { if (digits[i]) input.value = digits[i]; });
+  inputs.forEach((input, i) => { 
+    if (digits[i]) {
+      input.value = digits[i];
+      input.classList.add('filled');
+    }
+  });
   verifyOTP(otp);
 }
 
-function onOtpDigit(input, index) {
-  const inputs = document.querySelectorAll('.otp-digit');
-  if (input.value && index < inputs.length - 1) {
-    inputs[index + 1].focus();
-  }
-
-  // Check if all 6 filled
-  let fullOtp = '';
-  inputs.forEach(inp => { fullOtp += inp.value; });
-  if (fullOtp.length === 6) {
-    verifyOTP(fullOtp);
-  }
-}
-
 async function verifyOTP(otp) {
+  const hint = document.getElementById('mobile-otp-hint');
+  if (hint) hint.innerText = '⏳ Verifying code...';
+
   try {
     const res = await fetch('/api/auth/verify-otp', {
       method: 'POST',
@@ -87,24 +244,103 @@ async function verifyOTP(otp) {
     const data = await res.json();
 
     if (res.ok && data.success) {
+      if (mobileCountdownTimer) clearInterval(mobileCountdownTimer);
+
       currentUser = {
         phone: data.user.phone_number,
         name: data.user.display_name || `User ${data.user.phone_number}`,
         email: data.user.email_address
       };
 
-      sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
+      if (data.isNewUser || (data.user.display_name && data.user.display_name.startsWith('User '))) {
+        // Go to Step 3 Profile setup
+        goToScreen('screen-profile');
+        const first = document.getElementById('mobile-first-name');
+        if (first) first.focus();
+      } else {
+        sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
+        document.getElementById('onboarding-container').style.display = 'none';
+        initMainApp();
+      }
+    } else {
+      triggerMobileShake(data.error || 'Invalid verification code');
+    }
+  } catch (err) {
+    triggerMobileShake('Verification error: ' + err.message);
+  }
+}
 
-      // Transition to Main App
+function triggerMobileShake(errMsg) {
+  const container = document.getElementById('mobile-otp-inputs');
+  const cells = document.querySelectorAll('.otp-digit');
+  cells.forEach(c => c.classList.add('error'));
+
+  if (container) {
+    container.classList.remove('otp-shake-mobile');
+    void container.offsetWidth;
+    container.classList.add('otp-shake-mobile');
+  }
+
+  const hint = document.getElementById('mobile-otp-hint');
+  if (hint) hint.innerHTML = `<span style="color:#ef4444; font-weight:600;">❌ ${errMsg}</span>`;
+
+  setTimeout(() => {
+    if (container) container.classList.remove('otp-shake-mobile');
+    clearMobileOtp();
+  }, 450);
+}
+
+function updateMobileAvatarPreview() {
+  const fn = (document.getElementById('mobile-first-name').value || '').trim();
+  const ln = (document.getElementById('mobile-last-name').value || '').trim();
+  const circle = document.getElementById('mobile-avatar-circle');
+  if (circle) {
+    circle.innerText = fn ? fn.charAt(0).toUpperCase() : (ln ? ln.charAt(0).toUpperCase() : 'P');
+  }
+}
+
+async function completeMobileProfile() {
+  const fn = (document.getElementById('mobile-first-name').value || '').trim();
+  const ln = (document.getElementById('mobile-last-name').value || '').trim();
+
+  if (!fn) {
+    alert('Please enter your first name');
+    document.getElementById('mobile-first-name').focus();
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/auth/complete-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: pendingPhone,
+        firstName: fn,
+        lastName: ln,
+        aliasTag: 'mobile'
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      currentUser = {
+        phone: data.user.phone_number,
+        name: data.user.display_name,
+        email: data.user.email_address
+      };
+      sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
     } else {
-      alert(data.error || 'Verification failed');
+      alert(data.error || 'Failed to complete profile');
     }
   } catch (err) {
-    alert('Verification error: ' + err.message);
+    alert('Error saving profile: ' + err.message);
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  initMobileOtpInputs();
+});
 
 // ==================== NOTIFICATION CHIME & TOAST ====================
 function playNotificationChime() {

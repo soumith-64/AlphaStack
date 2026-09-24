@@ -76,7 +76,7 @@ router.post('/send-otp', async (req, res) => {
 });
 
 /**
- * Verify OTP and authenticate/create user
+ * Verify OTP and authenticate/create user (Telegram-style isNewUser detection)
  */
 router.post('/verify-otp', async (req, res) => {
   try {
@@ -88,13 +88,15 @@ router.post('/verify-otp', async (req, res) => {
     const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
     const record = otpStore.get(cleanNumber);
 
-    // Accept demo OTP '123456' or valid memory OTP
+    // Accept real memory OTP or fallback demo code
     if (otp !== '123456' && (!record || record.otp !== otp)) {
-      return res.status(400).json({ error: 'Invalid or expired OTP' });
+      return res.status(400).json({ error: 'Invalid or expired OTP. Please enter the 6-digit code.' });
     }
 
-    // Lookup or create user
-    let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+    // Lookup existing user to determine if Registration or Login
+    let existingUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+    const isNewUser = !existingUser;
+    let user = existingUser;
     const isMobile = clientType === 'MOBILE_CLIENT' || clientType === 'MOBILE_APP';
 
     if (!user) {
@@ -115,9 +117,121 @@ router.post('/verify-otp', async (req, res) => {
 
     res.json({
       success: true,
+      isNewUser,
       user,
       token: `token_${user.id}_${Date.now()}`
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Request OTP via Outbound Phone Call (Voice Call IVR like Telegram)
+ */
+router.post('/call-otp', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
+    let otpRecord = otpStore.get(cleanNumber);
+    let otp;
+    if (otpRecord && Date.now() < otpRecord.expiresAt) {
+      otp = otpRecord.otp;
+    } else {
+      otp = Math.floor(100000 + Math.random() * 900000).toString();
+      otpStore.set(cleanNumber, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    }
+
+    const spacedDigits = otp.split('').join(' , ');
+    await dbOps.logTelephony(cleanNumber, 'INCOMING_CALL_IVR', `Voice OTP verification call: ${otp}`, config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS');
+
+    let callPlaced = false;
+    if (config.twilio.accountSid && config.twilio.authToken) {
+      try {
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Calls.json`;
+        const auth = Buffer.from(`${config.twilio.accountSid}:${config.twilio.authToken}`).toString('base64');
+        const formattedTo = cleanNumber.length === 10 ? `+91${cleanNumber}` : (cleanNumber.startsWith('+') ? cleanNumber : `+${cleanNumber}`);
+        const twiml = `<Response><Pause length="1"/><Say voice="Polly.Joanna">Hello! Your PhoneMail verification code is ${spacedDigits}. Once again, your code is ${spacedDigits}. Goodbye.</Say></Response>`;
+
+        const params = new URLSearchParams({
+          To: formattedTo,
+          From: config.twilio.phoneNumber,
+          Twiml: twiml
+        });
+
+        const twilioRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        });
+        const twilioData = await twilioRes.json();
+        if (twilioRes.ok && twilioData.sid) {
+          callPlaced = true;
+          console.log(`📞 [TWILIO VOICE OTP CALL PLACED] SID: ${twilioData.sid} to ${formattedTo}`);
+        } else {
+          console.warn(`Twilio voice call note:`, twilioData.message || twilioData);
+        }
+      } catch (err) {
+        console.warn('Twilio voice call exception:', err.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: callPlaced 
+        ? `PhoneMail is calling your phone now to speak the verification code!` 
+        : `Voice code generated.`,
+      callPlaced,
+      liveOtp: otp
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Complete Profile for New User Registration (Telegram-style Step 3)
+ */
+router.post('/complete-profile', async (req, res) => {
+  try {
+    const { phoneNumber, firstName, lastName, aliasTag } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
+    let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const fullName = `${firstName || ''} ${lastName || ''}`.trim() || `User ${cleanNumber}`;
+    await dbOps.execute('UPDATE users SET display_name = ? WHERE id = ?', [fullName, user.id]);
+    user.display_name = fullName;
+
+    // If custom alias tag provided, create it
+    if (aliasTag) {
+      const cleanTag = String(aliasTag).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      if (cleanTag) {
+        const fullAlias = `${cleanNumber}.${cleanTag}@${config.domainName}`;
+        const aliasId = 'alias_' + Date.now();
+        try {
+          await dbOps.execute(`INSERT INTO aliases (id, user_id, alias_email, label) VALUES (?, ?, ?, ?)`,
+            [aliasId, user.id, fullAlias, cleanTag]);
+        } catch (e) {
+          // ignore duplicate
+        }
+      }
+    }
+
+    res.json({ success: true, user });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

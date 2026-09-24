@@ -101,49 +101,131 @@ function toggleTheme() {
 // Auto-run theme initialization immediately
 initTheme();
 
-// ==================== AUTH / LIVE OTP LOGIN FLOW ====================
-let desktopAuthStep = 'PHONE'; // 'PHONE' | 'OTP'
+// ==================== TELEGRAM-STYLE REAL-TIME AUTHENTICATION ====================
 let desktopPendingPhone = '';
+let desktopLiveOtp = '';
+let otpCountdownTimer = null;
+let otpCountdownSeconds = 45;
 
-const authForm = document.getElementById('desktop-login-form');
-if (authForm) {
-  authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (desktopAuthStep === 'PHONE') {
-      await sendDesktopOTP();
-    } else {
-      const otp = document.getElementById('desktop-otp-input').value.trim();
-      await verifyDesktopOTP(otp);
-    }
-  });
+// Initialize Telegram 6-cell OTP input behaviors
+function initTelegramOtpInputs() {
+  const cells = document.querySelectorAll('.telegram-otp-cell');
+  if (!cells || cells.length === 0) return;
 
-  // Auto-submit OTP when 6 digits are typed
-  const otpInput = document.getElementById('desktop-otp-input');
-  if (otpInput) {
-    otpInput.addEventListener('input', (e) => {
-      const val = e.target.value.trim();
-      if (val.length === 6) {
-        verifyDesktopOTP(val);
+  cells.forEach((cell, idx) => {
+    // Input handler: auto-advance to next cell and trigger auto-verify on 6th digit
+    cell.addEventListener('input', (e) => {
+      const val = cell.value.replace(/\D/g, '');
+      cell.value = val ? val.slice(-1) : '';
+
+      if (cell.value) {
+        cell.classList.add('filled');
+        cell.classList.remove('error');
+        // Auto-advance to next cell
+        if (idx < cells.length - 1) {
+          cells[idx + 1].focus();
+          cells[idx + 1].select();
+        }
+      } else {
+        cell.classList.remove('filled');
+      }
+
+      // Check if all 6 digits are filled -> Zero-click auto-submit
+      const enteredOtp = getEnteredOTP();
+      if (enteredOtp.length === 6) {
+        verifyDesktopOTP(enteredOtp);
       }
     });
+
+    // Keydown handler: backspace jump-back, arrow navigation
+    cell.addEventListener('keydown', (e) => {
+      if (e.key === 'Backspace') {
+        if (!cell.value && idx > 0) {
+          cells[idx - 1].focus();
+          cells[idx - 1].value = '';
+          cells[idx - 1].classList.remove('filled');
+          cells[idx - 1].classList.remove('error');
+          e.preventDefault();
+        } else {
+          cell.value = '';
+          cell.classList.remove('filled');
+          cell.classList.remove('error');
+        }
+      } else if (e.key === 'ArrowLeft' && idx > 0) {
+        cells[idx - 1].focus();
+        e.preventDefault();
+      } else if (e.key === 'ArrowRight' && idx < cells.length - 1) {
+        cells[idx + 1].focus();
+        e.preventDefault();
+      }
+    });
+
+    // Paste handler: distribute 6 digits across all cells
+    cell.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const pasteData = (e.clipboardData || window.clipboardData).getData('text') || '';
+      const digits = pasteData.replace(/\D/g, '').slice(0, 6);
+      if (!digits) return;
+
+      digits.split('').forEach((d, i) => {
+        if (cells[i]) {
+          cells[i].value = d;
+          cells[i].classList.add('filled');
+          cells[i].classList.remove('error');
+        }
+      });
+
+      if (digits.length === 6) {
+        cells[5].focus();
+        verifyDesktopOTP(digits);
+      } else if (digits.length < 6 && cells[digits.length]) {
+        cells[digits.length].focus();
+      }
+    });
+  });
+}
+
+function getEnteredOTP() {
+  const cells = document.querySelectorAll('.telegram-otp-cell');
+  let code = '';
+  cells.forEach(c => { code += (c.value || '').trim(); });
+  return code;
+}
+
+function clearOtpCells() {
+  const cells = document.querySelectorAll('.telegram-otp-cell');
+  cells.forEach(c => {
+    c.value = '';
+    c.classList.remove('filled', 'error');
+    c.disabled = false;
+  });
+  if (cells[0]) {
+    setTimeout(() => {
+      cells[0].focus();
+      cells[0].select();
+    }, 50);
   }
 }
 
-async function sendDesktopOTP() {
-  const phone = document.getElementById('desktop-phone-input').value.trim();
-  if (!phone || phone.length < 10) {
+// STEP 1: Phone Submission
+async function handleDesktopPhoneSubmit(event) {
+  if (event) event.preventDefault();
+  const phoneInput = document.getElementById('desktop-phone-input');
+  const rawPhone = phoneInput ? phoneInput.value.trim() : '';
+
+  if (!rawPhone || rawPhone.length < 10) {
     alert('Please enter a valid 10-digit Indian phone number.');
-    document.getElementById('desktop-phone-input').focus();
+    if (phoneInput) phoneInput.focus();
     return;
   }
 
-  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
   desktopPendingPhone = cleanPhone;
 
-  const btnLabel = document.getElementById('btn-desktop-label');
-  const btn = document.getElementById('btn-desktop-submit');
-  btnLabel.innerText = 'Dispatching Live SMS... ⏳';
-  btn.disabled = true;
+  const btn = document.getElementById('btn-phone-submit');
+  const btnLabel = document.getElementById('btn-phone-label');
+  if (btn) btn.disabled = true;
+  if (btnLabel) btnLabel.innerText = 'Dispatching Live SMS... ⏳';
 
   try {
     const res = await fetch('/api/auth/send-otp', {
@@ -154,48 +236,55 @@ async function sendDesktopOTP() {
     const data = await res.json();
 
     if (res.ok && data.success) {
-      desktopAuthStep = 'OTP';
-      document.getElementById('desktop-phone-input').disabled = true;
-      document.getElementById('desktop-change-number').style.display = 'inline';
-      document.getElementById('desktop-otp-group').style.display = 'block';
+      desktopLiveOtp = data.liveOtp || '123456';
 
-      const statusBox = document.getElementById('desktop-otp-status');
-      statusBox.innerHTML = `
-        <div style="background: var(--green-subtle); border: 1px solid var(--green-border); padding: 8px 12px; border-radius: 8px; color: var(--green-main);">
-          <div>✓ Live SMS dispatched to <strong>+91 ${cleanPhone}</strong></div>
-          ${data.liveOtp ? `
-            <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
-              Live Code: <strong style="font-family: monospace; font-size: 13px; color: var(--saffron-dark); cursor: pointer; text-decoration: underline;" onclick="document.getElementById('desktop-otp-input').value='${data.liveOtp}'; verifyDesktopOTP('${data.liveOtp}')">${data.liveOtp} (click to autofill)</strong>
-            </div>
-          ` : ''}
-        </div>
-      `;
+      // Transition to Step 2: Telegram OTP card
+      document.getElementById('desktop-card-phone').style.display = 'none';
+      document.getElementById('desktop-card-otp').style.display = 'block';
+      document.getElementById('desktop-card-profile').style.display = 'none';
 
-      btnLabel.innerText = 'Verify & Enter Inbox';
-      btn.disabled = false;
-      setTimeout(() => document.getElementById('desktop-otp-input').focus(), 50);
+      // Format phone number: +91 98765 43210
+      const formatted = `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}`;
+      document.getElementById('tg-phone-display').innerText = formatted;
+
+      // Update email preview in step 3
+      const emailPrev = document.getElementById('profile-email-preview');
+      if (emailPrev) {
+        emailPrev.innerText = `${cleanPhone}.work@alphastack.wwisvnr.com`;
+      }
+
+      // Show live code hint card for instant verification testing
+      const liveHint = document.getElementById('desktop-live-hint');
+      const liveCodeSpan = document.getElementById('desktop-live-code');
+      if (liveHint && liveCodeSpan) {
+        liveCodeSpan.innerText = desktopLiveOtp;
+        liveHint.style.display = 'flex';
+      }
+
+      // Reset cells and status
+      clearOtpCells();
+      setOtpStatus('');
+
+      // Start 45s Telegram-style countdown timer
+      startOtpCountdown();
     } else {
       alert(data.error || 'Failed to dispatch verification code');
-      btnLabel.innerText = 'Get Live OTP via SMS';
-      btn.disabled = false;
     }
   } catch (err) {
-    alert('Connection error: ' + err.message);
-    btnLabel.innerText = 'Get Live OTP via SMS';
-    btn.disabled = false;
+    alert('Network error: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+    if (btnLabel) btnLabel.innerText = 'Send Real-Time OTP';
   }
 }
 
+// STEP 2: Real-Time OTP Verification
 async function verifyDesktopOTP(otp) {
-  if (!otp || otp.length < 6) {
-    alert('Please enter the 6-digit OTP sent to your phone.');
-    return;
-  }
+  if (!otp || otp.length < 6) return;
 
-  const btnLabel = document.getElementById('btn-desktop-label');
-  const btn = document.getElementById('btn-desktop-submit');
-  btnLabel.innerText = 'Verifying Passcode... ⏳';
-  btn.disabled = true;
+  const cells = document.querySelectorAll('.telegram-otp-cell');
+  cells.forEach(c => c.disabled = true);
+  setOtpStatus('⏳ Verifying with PhoneMail engine...', 'neutral');
 
   try {
     const res = await fetch('/api/auth/verify-otp', {
@@ -210,9 +299,257 @@ async function verifyDesktopOTP(otp) {
     const data = await res.json();
 
     if (res.ok && data.success) {
+      if (otpCountdownTimer) clearInterval(otpCountdownTimer);
+      setOtpStatus('✓ Code verified successfully!', 'success');
+
       currentUser = {
         phone: data.user.phone_number,
         name: data.user.display_name || `User ${data.user.phone_number}`,
+        email: data.user.email_address
+      };
+
+      // Check if this is a NEW user registration (Telegram Profile Setup Step)
+      if (data.isNewUser || (data.user.display_name && data.user.display_name.startsWith('User '))) {
+        // Transition to Step 3: Profile Setup
+        setTimeout(() => {
+          document.getElementById('desktop-card-otp').style.display = 'none';
+          document.getElementById('desktop-card-profile').style.display = 'block';
+          const fnInput = document.getElementById('profile-first-name');
+          if (fnInput) fnInput.focus();
+        }, 400);
+      } else {
+        // Existing user -> Immediately launch inbox!
+        sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+        setTimeout(() => {
+          document.getElementById('desktop-auth-container').style.display = 'none';
+          document.getElementById('desktop-main-container').style.display = 'flex';
+          playNotificationChime();
+          initDesktopApp();
+          showToastNotification(`Welcome back, ${currentUser.name}! 🇮🇳`);
+        }, 400);
+      }
+    } else {
+      // Telegram signature error shake
+      triggerOtpShake(data.error || 'Invalid or expired code. Please try again.');
+    }
+  } catch (err) {
+    triggerOtpShake('Connection error: ' + err.message);
+  }
+}
+
+function triggerOtpShake(errMsg) {
+  const grid = document.getElementById('desktop-otp-grid');
+  const cells = document.querySelectorAll('.telegram-otp-cell');
+
+  cells.forEach(c => {
+    c.classList.add('error');
+    c.disabled = false;
+  });
+
+  if (grid) {
+    grid.classList.remove('otp-shake');
+    void grid.offsetWidth; // trigger reflow
+    grid.classList.add('otp-shake');
+  }
+
+  setOtpStatus(`❌ ${errMsg}`, 'error');
+
+  // After shake, clear and focus first cell
+  setTimeout(() => {
+    if (grid) grid.classList.remove('otp-shake');
+    clearOtpCells();
+  }, 450);
+}
+
+function setOtpStatus(msg, type) {
+  const banner = document.getElementById('desktop-otp-status');
+  if (!banner) return;
+  banner.innerText = msg;
+  banner.className = 'otp-status-banner';
+  if (type === 'error') banner.classList.add('error-text');
+  if (type === 'success') banner.classList.add('success-text');
+}
+
+// Telegram Countdown Timer (45s)
+function startOtpCountdown() {
+  if (otpCountdownTimer) clearInterval(otpCountdownTimer);
+  otpCountdownSeconds = 45;
+
+  const timerWrap = document.getElementById('otp-timer-wrap');
+  const timerSecs = document.getElementById('otp-timer-seconds');
+  const resendBtn = document.getElementById('btn-resend-sms');
+  const voiceBtn = document.getElementById('btn-call-otp');
+
+  if (timerWrap) timerWrap.style.display = 'inline-flex';
+  if (resendBtn) resendBtn.disabled = true;
+  if (voiceBtn) voiceBtn.disabled = true;
+
+  updateTimerDisplay();
+
+  otpCountdownTimer = setInterval(() => {
+    otpCountdownSeconds--;
+    updateTimerDisplay();
+
+    if (otpCountdownSeconds <= 0) {
+      clearInterval(otpCountdownTimer);
+      if (timerWrap) timerWrap.style.display = 'none';
+      if (resendBtn) resendBtn.disabled = false;
+      if (voiceBtn) voiceBtn.disabled = false;
+    }
+  }, 1000);
+}
+
+function updateTimerDisplay() {
+  const timerSecs = document.getElementById('otp-timer-seconds');
+  if (!timerSecs) return;
+  const m = Math.floor(otpCountdownSeconds / 60);
+  const s = otpCountdownSeconds % 60;
+  timerSecs.innerText = `${m}:${s < 10 ? '0' : ''}${s}`;
+}
+
+async function resendTelegramOTP() {
+  if (!desktopPendingPhone) return;
+  const resendBtn = document.getElementById('btn-resend-sms');
+  if (resendBtn) resendBtn.disabled = true;
+
+  setOtpStatus('⏳ Sending new SMS code...', 'neutral');
+  try {
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: desktopPendingPhone })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      desktopLiveOtp = data.liveOtp || '123456';
+      const liveCodeSpan = document.getElementById('desktop-live-code');
+      if (liveCodeSpan) liveCodeSpan.innerText = desktopLiveOtp;
+      setOtpStatus('✓ New code sent via SMS!', 'success');
+      clearOtpCells();
+      startOtpCountdown();
+    } else {
+      setOtpStatus(data.error || 'Failed to resend SMS', 'error');
+      if (resendBtn) resendBtn.disabled = false;
+    }
+  } catch (err) {
+    setOtpStatus('Error resending: ' + err.message, 'error');
+    if (resendBtn) resendBtn.disabled = false;
+  }
+}
+
+async function requestVoiceCallOTP() {
+  if (!desktopPendingPhone) return;
+  const voiceBtn = document.getElementById('btn-call-otp');
+  if (voiceBtn) voiceBtn.disabled = true;
+
+  setOtpStatus('📞 Placing real-time Twilio voice call...', 'neutral');
+  try {
+    const res = await fetch('/api/auth/call-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: desktopPendingPhone })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      if (data.liveOtp) {
+        desktopLiveOtp = data.liveOtp;
+        const liveCodeSpan = document.getElementById('desktop-live-code');
+        if (liveCodeSpan) liveCodeSpan.innerText = desktopLiveOtp;
+      }
+      setOtpStatus('📞 Twilio is calling your phone! Answer to hear the code.', 'success');
+      clearOtpCells();
+    } else {
+      setOtpStatus(data.error || 'Could not place voice call', 'error');
+      if (voiceBtn) voiceBtn.disabled = false;
+    }
+  } catch (err) {
+    setOtpStatus('Voice call error: ' + err.message, 'error');
+    if (voiceBtn) voiceBtn.disabled = false;
+  }
+}
+
+function quickFillLiveCode() {
+  if (!desktopLiveOtp) return;
+  const digits = String(desktopLiveOtp).split('');
+  const cells = document.querySelectorAll('.telegram-otp-cell');
+  cells.forEach((cell, i) => {
+    if (digits[i]) {
+      cell.value = digits[i];
+      cell.classList.add('filled');
+      cell.classList.remove('error');
+    }
+  });
+  verifyDesktopOTP(desktopLiveOtp);
+}
+
+function backToPhoneStep() {
+  if (otpCountdownTimer) clearInterval(otpCountdownTimer);
+  document.getElementById('desktop-card-otp').style.display = 'none';
+  document.getElementById('desktop-card-profile').style.display = 'none';
+  document.getElementById('desktop-card-phone').style.display = 'block';
+  const phoneInput = document.getElementById('desktop-phone-input');
+  if (phoneInput) {
+    phoneInput.disabled = false;
+    phoneInput.focus();
+    phoneInput.select();
+  }
+}
+
+// STEP 3: Profile Registration (New User)
+function updateProfileAvatarPreview() {
+  const fn = (document.getElementById('profile-first-name').value || '').trim();
+  const ln = (document.getElementById('profile-last-name').value || '').trim();
+  const circle = document.getElementById('profile-avatar-circle');
+  if (circle) {
+    const initial = fn ? fn.charAt(0).toUpperCase() : (ln ? ln.charAt(0).toUpperCase() : 'P');
+    circle.innerText = initial;
+  }
+}
+
+function selectSubTag(element, tag) {
+  document.querySelectorAll('.alias-chip').forEach(c => c.classList.remove('selected'));
+  if (element) element.classList.add('selected');
+  const hidden = document.getElementById('profile-selected-subtag');
+  if (hidden) hidden.value = tag;
+
+  const emailPrev = document.getElementById('profile-email-preview');
+  if (emailPrev && desktopPendingPhone) {
+    emailPrev.innerText = `${desktopPendingPhone}.${tag}@alphastack.wwisvnr.com`;
+  }
+}
+
+async function handleDesktopProfileSubmit(event) {
+  if (event) event.preventDefault();
+  const fn = (document.getElementById('profile-first-name').value || '').trim();
+  const ln = (document.getElementById('profile-last-name').value || '').trim();
+  const tag = (document.getElementById('profile-selected-subtag').value || 'work').trim();
+
+  if (!fn) {
+    alert('Please enter your first name.');
+    document.getElementById('profile-first-name').focus();
+    return;
+  }
+
+  const btn = document.getElementById('btn-profile-submit');
+  if (btn) btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/complete-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: desktopPendingPhone,
+        firstName: fn,
+        lastName: ln,
+        aliasTag: tag
+      })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      currentUser = {
+        phone: data.user.phone_number,
+        name: data.user.display_name,
         email: data.user.email_address
       };
 
@@ -222,32 +559,22 @@ async function verifyDesktopOTP(otp) {
       document.getElementById('desktop-main-container').style.display = 'flex';
       playNotificationChime();
       initDesktopApp();
-      showToastNotification(`Welcome back, ${currentUser.name}! 🇮🇳`);
+      showToastNotification(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`);
     } else {
-      alert(data.error || 'Verification failed. Please check your OTP.');
-      btnLabel.innerText = 'Verify & Enter Inbox';
-      btn.disabled = false;
+      alert(data.error || 'Failed to complete profile');
     }
   } catch (err) {
-    alert('Verification error: ' + err.message);
-    btnLabel.innerText = 'Verify & Enter Inbox';
-    btn.disabled = false;
+    alert('Error saving profile: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 
-function resetDesktopPhoneStep() {
-  desktopAuthStep = 'PHONE';
-  document.getElementById('desktop-phone-input').disabled = false;
-  document.getElementById('desktop-change-number').style.display = 'none';
-  document.getElementById('desktop-otp-group').style.display = 'none';
-  document.getElementById('desktop-otp-input').value = '';
-  document.getElementById('btn-desktop-label').innerText = 'Get Live OTP via SMS';
-  document.getElementById('desktop-phone-input').focus();
-}
+// Attach OTP input listeners on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+  initTelegramOtpInputs();
+});
 
-function resendDesktopOTP() {
-  sendDesktopOTP();
-}
 
 // ==================== WORKSPACE INITIALIZATION ====================
 function initDesktopApp() {
@@ -890,11 +1217,16 @@ function logoutDesktop() {
   if (auth && main) {
     main.style.display = 'none';
     auth.style.display = 'flex';
-    document.getElementById('desktop-phone-input').value = '';
-    document.getElementById('desktop-otp-input').value = '';
+    backToPhoneStep();
+    const phoneInput = document.getElementById('desktop-phone-input');
+    if (phoneInput) {
+      phoneInput.value = '';
+      phoneInput.focus();
+    }
   }
   showToastNotification('Logged out successfully');
 }
 
 // Check session on startup
 restoreSession();
+

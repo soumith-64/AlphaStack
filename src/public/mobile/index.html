@@ -85,22 +85,52 @@
       </div>
     </div>
 
-    <!-- Screen 4: OTP Verification -->
+    <!-- Screen 4: Real-Time OTP Verification -->
     <div id="screen-otp" class="onboarding-screen">
       <div class="otp-header">
         <h3>Verifying your number</h3>
-        <p>Waiting to automatically detect an SMS sent to <strong id="verify-phone-label">your number</strong>. <a href="#" onclick="goToScreen('screen-phone')">Wrong number?</a></p>
+        <p>Enter the 6-digit code sent via SMS to <strong id="verify-phone-label">your number</strong>. <a href="#" onclick="goToScreen('screen-phone')">Wrong number?</a></p>
       </div>
 
-      <div class="otp-inputs">
-        <input type="text" class="otp-digit" maxlength="1" autofocus oninput="onOtpDigit(this, 0)">
-        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 1)">
-        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 2)">
-        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 3)">
-        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 4)">
-        <input type="text" class="otp-digit" maxlength="1" oninput="onOtpDigit(this, 5)">
+      <div class="otp-inputs" id="mobile-otp-inputs">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="0" autocomplete="off" autofocus>
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="1" autocomplete="off">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="2" autocomplete="off">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="3" autocomplete="off">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="4" autocomplete="off">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="5" autocomplete="off">
       </div>
-      <p class="otp-hint" id="mobile-otp-hint">Enter 6-digit code sent via SMS</p>
+
+      <p class="otp-hint" id="mobile-otp-hint" style="min-height: 20px;">Enter 6-digit code sent via SMS</p>
+
+      <div class="otp-timer-mobile" id="mobile-timer-wrap">
+        Resend code in <strong id="mobile-timer-seconds">0:45</strong>
+      </div>
+
+      <div class="otp-mobile-actions">
+        <button type="button" class="btn-mobile-secondary" id="btn-mobile-resend" onclick="resendMobileOTP()" disabled>
+          Resend SMS 🔄
+        </button>
+        <button type="button" class="btn-mobile-secondary voice-btn" id="btn-mobile-call" onclick="callMobileOTP()" disabled>
+          📞 Call me with code
+        </button>
+      </div>
+    </div>
+
+    <!-- Screen 5: Profile Info (New User Registration) -->
+    <div id="screen-profile" class="onboarding-screen">
+      <div class="profile-setup-screen">
+        <div class="profile-avatar-large" id="mobile-avatar-circle">P</div>
+        <h3>Profile info</h3>
+        <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Please provide your name to finish creating your PhoneMail account</p>
+        
+        <div class="profile-inputs-mobile">
+          <input type="text" id="mobile-first-name" class="profile-input-field" placeholder="Type your first name" autofocus oninput="updateMobileAvatarPreview()">
+          <input type="text" id="mobile-last-name" class="profile-input-field" placeholder="Last name (optional)" oninput="updateMobileAvatarPreview()">
+        </div>
+
+        <button class="btn-wa-green full-width" onclick="completeMobileProfile()">FINISH REGISTRATION ➔</button>
+      </div>
     </div>
 
   </div>

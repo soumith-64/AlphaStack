@@ -320,6 +320,333 @@ button {
   text-align: center;
 }
 
+/* ==================== TELEGRAM-STYLE REAL-TIME OTP VERIFICATION ==================== */
+.telegram-card-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.telegram-icon-badge {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(255, 103, 31, 0.15), rgba(4, 106, 56, 0.15));
+  border: 1.5px solid var(--saffron-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 16px -2px rgba(255, 103, 31, 0.2);
+}
+
+.telegram-phone-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  margin: 10px 0 14px;
+}
+
+.telegram-phone-number {
+  font-family: 'Outfit', monospace;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--text-main);
+  letter-spacing: 0.5px;
+}
+
+.telegram-edit-btn {
+  background: none;
+  border: none;
+  color: var(--saffron-main);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.15s ease;
+}
+
+.telegram-edit-btn:hover {
+  background: var(--saffron-subtle);
+}
+
+.telegram-otp-grid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 22px 0 16px;
+}
+
+.telegram-otp-cell {
+  width: 48px;
+  height: 58px;
+  border: 2px solid var(--border-light);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  font-size: 26px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--text-main);
+  font-family: 'Outfit', monospace;
+  outline: none;
+  transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-sm);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.telegram-otp-cell:focus {
+  border-color: var(--saffron-main);
+  box-shadow: 0 0 0 4px var(--saffron-subtle), 0 4px 12px rgba(255, 103, 31, 0.18);
+  transform: translateY(-2px);
+}
+
+.telegram-otp-cell.filled {
+  border-color: var(--green-vibrant);
+  background: var(--green-subtle);
+  color: var(--green-dark);
+}
+
+[data-theme="dark"] .telegram-otp-cell.filled {
+  color: var(--green-vibrant);
+}
+
+.telegram-otp-cell.error {
+  border-color: var(--accent-rose) !important;
+  background: var(--accent-rose-subtle) !important;
+  color: var(--accent-rose) !important;
+}
+
+.telegram-otp-divider {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-dim);
+  user-select: none;
+  padding: 0 2px;
+}
+
+/* Horizontal Shake on Invalid Code (Telegram Signature Error Animation) */
+@keyframes telegramShake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-8px); }
+  30% { transform: translateX(8px); }
+  45% { transform: translateX(-6px); }
+  60% { transform: translateX(6px); }
+  75% { transform: translateX(-3px); }
+  90% { transform: translateX(3px); }
+}
+
+.otp-shake {
+  animation: telegramShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.otp-status-banner {
+  min-height: 24px;
+  font-size: 12.5px;
+  text-align: center;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.otp-status-banner.error-text {
+  color: var(--accent-rose);
+  font-weight: 600;
+}
+
+.otp-status-banner.success-text {
+  color: var(--green-vibrant);
+  font-weight: 600;
+}
+
+.telegram-countdown-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-light);
+}
+
+.otp-timer-badge {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.otp-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.otp-pill-action {
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.otp-pill-action:hover {
+  border-color: var(--saffron-main);
+  color: var(--saffron-main);
+  transform: translateY(-1px);
+}
+
+.otp-pill-action.voice-call-btn {
+  border-color: var(--green-border);
+  background: var(--green-subtle);
+  color: var(--green-main);
+}
+
+.otp-pill-action.voice-call-btn:hover {
+  background: var(--green-main);
+  color: #fff;
+}
+
+.otp-pill-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.otp-live-hint-card {
+  margin-top: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--saffron-subtle);
+  border: 1px solid var(--saffron-border);
+  color: var(--saffron-dark);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+[data-theme="dark"] .otp-live-hint-card {
+  color: var(--saffron-main);
+}
+
+.otp-quick-fill-btn {
+  background: var(--saffron-main);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.otp-quick-fill-btn:hover {
+  background: var(--saffron-dark);
+}
+
+/* ==================== TELEGRAM STEP 3: PROFILE REGISTRATION ==================== */
+.profile-card-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.profile-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.profile-avatar-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--saffron-main), var(--green-main));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  box-shadow: 0 8px 24px -4px rgba(255, 103, 31, 0.35);
+  margin-bottom: 8px;
+  transition: transform 0.2s ease;
+}
+
+.profile-name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.alias-tag-picker {
+  margin-top: 14px;
+  margin-bottom: 20px;
+}
+
+.alias-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.alias-chip {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.alias-chip:hover {
+  border-color: var(--saffron-main);
+  color: var(--saffron-main);
+}
+
+.alias-chip.selected {
+  background: var(--saffron-subtle);
+  border-color: var(--saffron-main);
+  color: var(--saffron-dark);
+  font-weight: 700;
+}
+
+[data-theme="dark"] .alias-chip.selected {
+  color: var(--saffron-main);
+}
+
 /* ==================== TOP NAVIGATION BAR ==================== */
 .main-wrapper {
   width: 100%;
