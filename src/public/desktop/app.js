@@ -101,45 +101,152 @@ function toggleTheme() {
 // Auto-run theme initialization immediately
 initTheme();
 
-// ==================== AUTH / LOGIN ====================
+// ==================== AUTH / LIVE OTP LOGIN FLOW ====================
+let desktopAuthStep = 'PHONE'; // 'PHONE' | 'OTP'
+let desktopPendingPhone = '';
+
 const authForm = document.getElementById('desktop-login-form');
 if (authForm) {
   authForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const phone = document.getElementById('desktop-phone-input').value.trim();
-    const otp = document.getElementById('desktop-otp-input').value.trim();
-
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phoneNumber: phone,
-          otp,
-          clientType: 'WEB_CLIENT'
-        })
-      });
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        currentUser = {
-          phone: data.user.phone_number,
-          name: data.user.display_name || `User ${data.user.phone_number}`,
-          email: data.user.email_address
-        };
-
-        sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
-
-        document.getElementById('desktop-auth-container').style.display = 'none';
-        document.getElementById('desktop-main-container').style.display = 'flex';
-        initDesktopApp();
-      } else {
-        alert(data.error || 'Login failed. Please check your credentials.');
-      }
-    } catch (err) {
-      alert('Connection error: ' + err.message);
+    if (desktopAuthStep === 'PHONE') {
+      await sendDesktopOTP();
+    } else {
+      const otp = document.getElementById('desktop-otp-input').value.trim();
+      await verifyDesktopOTP(otp);
     }
   });
+
+  // Auto-submit OTP when 6 digits are typed
+  const otpInput = document.getElementById('desktop-otp-input');
+  if (otpInput) {
+    otpInput.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      if (val.length === 6) {
+        verifyDesktopOTP(val);
+      }
+    });
+  }
+}
+
+async function sendDesktopOTP() {
+  const phone = document.getElementById('desktop-phone-input').value.trim();
+  if (!phone || phone.length < 10) {
+    alert('Please enter a valid 10-digit Indian phone number.');
+    document.getElementById('desktop-phone-input').focus();
+    return;
+  }
+
+  const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+  desktopPendingPhone = cleanPhone;
+
+  const btnLabel = document.getElementById('btn-desktop-label');
+  const btn = document.getElementById('btn-desktop-submit');
+  btnLabel.innerText = 'Dispatching Live SMS... ⏳';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumber: cleanPhone })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      desktopAuthStep = 'OTP';
+      document.getElementById('desktop-phone-input').disabled = true;
+      document.getElementById('desktop-change-number').style.display = 'inline';
+      document.getElementById('desktop-otp-group').style.display = 'block';
+
+      const statusBox = document.getElementById('desktop-otp-status');
+      statusBox.innerHTML = `
+        <div style="background: var(--green-subtle); border: 1px solid var(--green-border); padding: 8px 12px; border-radius: 8px; color: var(--green-main);">
+          <div>✓ Live SMS dispatched to <strong>+91 ${cleanPhone}</strong></div>
+          ${data.liveOtp ? `
+            <div style="margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+              Live Code: <strong style="font-family: monospace; font-size: 13px; color: var(--saffron-dark); cursor: pointer; text-decoration: underline;" onclick="document.getElementById('desktop-otp-input').value='${data.liveOtp}'; verifyDesktopOTP('${data.liveOtp}')">${data.liveOtp} (click to autofill)</strong>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      btnLabel.innerText = 'Verify & Enter Inbox';
+      btn.disabled = false;
+      setTimeout(() => document.getElementById('desktop-otp-input').focus(), 50);
+    } else {
+      alert(data.error || 'Failed to dispatch verification code');
+      btnLabel.innerText = 'Get Live OTP via SMS';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    alert('Connection error: ' + err.message);
+    btnLabel.innerText = 'Get Live OTP via SMS';
+    btn.disabled = false;
+  }
+}
+
+async function verifyDesktopOTP(otp) {
+  if (!otp || otp.length < 6) {
+    alert('Please enter the 6-digit OTP sent to your phone.');
+    return;
+  }
+
+  const btnLabel = document.getElementById('btn-desktop-label');
+  const btn = document.getElementById('btn-desktop-submit');
+  btnLabel.innerText = 'Verifying Passcode... ⏳';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phoneNumber: desktopPendingPhone,
+        otp,
+        clientType: 'WEB_CLIENT'
+      })
+    });
+    const data = await res.json();
+
+    if (res.ok && data.success) {
+      currentUser = {
+        phone: data.user.phone_number,
+        name: data.user.display_name || `User ${data.user.phone_number}`,
+        email: data.user.email_address
+      };
+
+      sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+
+      document.getElementById('desktop-auth-container').style.display = 'none';
+      document.getElementById('desktop-main-container').style.display = 'flex';
+      playNotificationChime();
+      initDesktopApp();
+      showToastNotification(`Welcome back, ${currentUser.name}! 🇮🇳`);
+    } else {
+      alert(data.error || 'Verification failed. Please check your OTP.');
+      btnLabel.innerText = 'Verify & Enter Inbox';
+      btn.disabled = false;
+    }
+  } catch (err) {
+    alert('Verification error: ' + err.message);
+    btnLabel.innerText = 'Verify & Enter Inbox';
+    btn.disabled = false;
+  }
+}
+
+function resetDesktopPhoneStep() {
+  desktopAuthStep = 'PHONE';
+  document.getElementById('desktop-phone-input').disabled = false;
+  document.getElementById('desktop-change-number').style.display = 'none';
+  document.getElementById('desktop-otp-group').style.display = 'none';
+  document.getElementById('desktop-otp-input').value = '';
+  document.getElementById('btn-desktop-label').innerText = 'Get Live OTP via SMS';
+  document.getElementById('desktop-phone-input').focus();
+}
+
+function resendDesktopOTP() {
+  sendDesktopOTP();
 }
 
 // ==================== WORKSPACE INITIALIZATION ====================

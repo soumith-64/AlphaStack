@@ -28,29 +28,36 @@
       <p class="auth-subtitle">Sign in using your 10-digit mobile number to access your unified inbox.</p>
 
       <form id="desktop-login-form">
-        <div class="form-group">
-          <label for="desktop-phone-input">INDIAN MOBILE NUMBER</label>
+        <div class="form-group" id="desktop-phone-group">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label for="desktop-phone-input" style="margin: 0;">INDIAN MOBILE NUMBER</label>
+            <span id="desktop-change-number" style="display: none; font-size: 11px; color: var(--saffron-main); font-weight: 700; cursor: pointer;" onclick="resetDesktopPhoneStep()">Change Number ✎</span>
+          </div>
           <div class="input-box">
             <span class="input-addon flag-addon">🇮🇳 +91</span>
-            <input type="tel" id="desktop-phone-input" placeholder="Enter 10-digit mobile number" maxlength="10" required autofocus>
+            <input type="tel" id="desktop-phone-input" placeholder="Enter 10-digit mobile number" maxlength="10" required autofocus autocomplete="tel-national">
           </div>
         </div>
 
-        <div class="form-group" id="otp-group">
-          <label for="desktop-otp-input">ONE-TIME PASSCODE</label>
+        <div class="form-group" id="desktop-otp-group" style="display: none; animation: fadeInDown 0.2s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <label for="desktop-otp-input" style="margin: 0;">ENTER 6-DIGIT OTP</label>
+            <span id="desktop-resend-link" style="font-size: 11px; color: var(--green-main); font-weight: 700; cursor: pointer;" onclick="resendDesktopOTP()">Resend SMS 🔄</span>
+          </div>
           <div class="input-box">
             <span class="input-addon">🔑</span>
-            <input type="text" id="desktop-otp-input" placeholder="Enter 6-digit OTP" maxlength="6" required>
+            <input type="text" id="desktop-otp-input" placeholder="Enter 6-digit verification code" maxlength="6" autocomplete="one-time-code">
           </div>
+          <div id="desktop-otp-status" style="margin-top: 8px; font-size: 12px; line-height: 1.4;"></div>
         </div>
 
         <div class="terms-disclaimer">
-          By signing up, you agree to the <a href="#" onclick="alert('PhoneMail Terms of Service & Privacy Policy'); return false;">Terms of Service</a>
+          By signing in, you agree to PhoneMail's <a href="#" onclick="alert('PhoneMail Terms & Privacy Policy'); return false;">Terms of Service</a>
         </div>
 
-        <button type="submit" class="btn-primary full-width" id="btn-desktop-next">
-          <span>Enter PhoneMail Inbox</span>
-          <span class="btn-arrow">→</span>
+        <button type="submit" class="btn-primary full-width" id="btn-desktop-submit">
+          <span id="btn-desktop-label">Get Live OTP via SMS</span>
+          <span class="btn-arrow" id="btn-desktop-arrow">→</span>
         </button>
       </form>
 

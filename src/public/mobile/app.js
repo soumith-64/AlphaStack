@@ -18,7 +18,7 @@ function goToScreen(screenId) {
 async function requestOTP() {
   const phone = document.getElementById('mobile-phone-input').value.trim();
   if (!phone || phone.length < 10) {
-    alert('Please enter a valid 10-digit phone number');
+    alert('Please enter a valid 10-digit Indian phone number');
     return;
   }
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
@@ -32,17 +32,31 @@ async function requestOTP() {
       body: JSON.stringify({ phoneNumber: cleanPhone })
     });
     const data = await res.json();
-    goToScreen('screen-otp');
+    if (res.ok && data.success) {
+      goToScreen('screen-otp');
+      const hint = document.getElementById('mobile-otp-hint');
+      if (hint && data.liveOtp) {
+        hint.innerHTML = `Live Code: <strong style="color:var(--wa-green-btn); font-family:monospace; font-size:15px; text-decoration:underline; cursor:pointer;" onclick="autoFillRealOTP('${data.liveOtp}')">${data.liveOtp} (tap to autofill)</strong>`;
+      }
+      // Clear inputs
+      document.querySelectorAll('.otp-digit').forEach(i => i.value = '');
+      setTimeout(() => {
+        const first = document.querySelector('.otp-digit');
+        if (first) first.focus();
+      }, 100);
+    } else {
+      alert(data.error || 'Failed to dispatch verification code');
+    }
   } catch (err) {
     alert('Failed to request verification: ' + err.message);
   }
 }
 
-function autoFillOTP() {
-  const digits = ['1', '2', '3', '4', '5', '6'];
+function autoFillRealOTP(otp) {
+  const digits = String(otp).split('');
   const inputs = document.querySelectorAll('.otp-digit');
-  inputs.forEach((input, i) => { input.value = digits[i]; });
-  verifyOTP('123456');
+  inputs.forEach((input, i) => { if (digits[i]) input.value = digits[i]; });
+  verifyOTP(otp);
 }
 
 function onOtpDigit(input, index) {

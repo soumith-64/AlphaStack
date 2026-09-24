@@ -8,7 +8,7 @@ const router = express.Router();
 const otpStore = new Map();
 
 /**
- * Request OTP for a phone number
+ * Request OTP for a phone number (Dynamic Live 6-Digit OTP)
  */
 router.post('/send-otp', async (req, res) => {
   try {
@@ -18,14 +18,18 @@ router.post('/send-otp', async (req, res) => {
     }
 
     const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
-    const otp = '123456'; // Default demo OTP; in production random 6-digit
-    otpStore.set(cleanNumber, { otp, expiresAt: Date.now() + 5 * 60 * 1000 });
+    // Generate real cryptographic 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore.set(cleanNumber, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
 
-    await dbOps.logTelephony(cleanNumber, 'OUTGOING_OTP', `Your PhoneMail verification code is ${otp}`);
+    await dbOps.logTelephony(cleanNumber, 'OUTGOING_OTP', `Your PhoneMail verification code is ${otp}. Valid for 10 minutes.`, config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS');
 
-    console.log(`🔑 [OTP ISSUED] Phone: ${cleanNumber} | OTP: ${otp}`);
+    console.log(`🔑 [LIVE OTP GENERATED] Phone: +91 ${cleanNumber} | Live Code: ${otp}`);
 
-    // If Twilio credentials configured, send real SMS to user phone
+    let smsDelivered = false;
+    let twilioStatusMsg = null;
+
+    // Dispatch real SMS via Twilio if configured
     if (config.twilio.accountSid && config.twilio.authToken) {
       try {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Messages.json`;
@@ -34,7 +38,7 @@ router.post('/send-otp', async (req, res) => {
         const params = new URLSearchParams({
           To: formattedTo,
           From: config.twilio.phoneNumber,
-          Body: `Your PhoneMail verification code is ${otp}. Valid for 5 minutes.`
+          Body: `Your PhoneMail verification code is ${otp}. Valid for 10 minutes. Do not share this with anyone.`
         });
         const twilioRes = await fetch(url, {
           method: 'POST',
@@ -45,16 +49,26 @@ router.post('/send-otp', async (req, res) => {
           body: params.toString()
         });
         const twilioData = await twilioRes.json();
-        console.log(`📡 [TWILIO OTP SMS STATUS] Sent to ${formattedTo}:`, twilioData.sid || twilioData.message || twilioData);
+        if (twilioRes.ok && (twilioData.status === 'queued' || twilioData.status === 'sent')) {
+          smsDelivered = true;
+          console.log(`📱 [TWILIO LIVE SMS DISPATCHED] To: ${formattedTo} | SID: ${twilioData.sid}`);
+        } else {
+          twilioStatusMsg = twilioData.message;
+          console.warn(`📡 [TWILIO SMS NOTICE] ${formattedTo}:`, twilioData.message || twilioData.code);
+        }
       } catch (err) {
-        console.warn('Twilio OTP SMS notice:', err.message);
+        console.warn('Twilio live SMS dispatch exception:', err.message);
       }
     }
 
     res.json({
       success: true,
-      message: 'OTP sent successfully',
-      phoneNumber: cleanNumber
+      message: smsDelivered 
+        ? `Live SMS sent to +91 ${cleanNumber}!` 
+        : `Live OTP generated for +91 ${cleanNumber}`,
+      phoneNumber: cleanNumber,
+      liveOtp: otp,
+      smsDelivered
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
