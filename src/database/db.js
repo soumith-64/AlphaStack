@@ -30,13 +30,14 @@ if (useMysql) {
   }
 }
 
-// Fallback SQLite (WebAssembly) initialization - only run if MySQL is not active
+// Fallback SQLite (WebAssembly) lazy initialization - ZERO top-level await for LiteSpeed lsnode.js
 let db = null;
+let SQL = null;
 const dbPath = path.resolve(config.dbPath.endsWith('.db') ? config.dbPath.replace('.db', '.sqlite') : config.dbPath);
 const dbDir = path.dirname(dbPath);
 
 function saveToDisk() {
-  if (useMysql || !db) return;
+  if (mysqlPool || !db) return;
   try {
     const data = db.export();
     const buffer = Buffer.from(data);
@@ -46,7 +47,8 @@ function saveToDisk() {
   }
 }
 
-if (!useMysql) {
+async function getSqliteDb() {
+  if (db) return db;
   try {
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
@@ -56,7 +58,9 @@ if (!useMysql) {
   }
 
   try {
-    const SQL = await initSqlJs();
+    if (!SQL) {
+      SQL = await initSqlJs();
+    }
     if (fs.existsSync(dbPath)) {
       const fileBuffer = fs.readFileSync(dbPath);
       db = new SQL.Database(fileBuffer);
@@ -69,6 +73,7 @@ if (!useMysql) {
   } catch (err) {
     console.warn('Notice: SQLite initialization warning:', err.message);
   }
+  return db;
 }
 
 // Database abstraction layer (supports both MySQL and SQLite seamlessly)
@@ -83,7 +88,9 @@ export const dbOps = {
         throw err;
       }
     }
-    const stmt = db.prepare(sql);
+    const sqliteDb = await getSqliteDb();
+    if (!sqliteDb) return [];
+    const stmt = sqliteDb.prepare(sql);
     stmt.bind(params);
     const results = [];
     while (stmt.step()) {
@@ -108,8 +115,11 @@ export const dbOps = {
         throw err;
       }
     }
-    db.run(sql, params);
-    saveToDisk();
+    const sqliteDb = await getSqliteDb();
+    if (sqliteDb) {
+      sqliteDb.run(sql, params);
+      saveToDisk();
+    }
     return { changes: 1 };
   },
 
