@@ -1,6 +1,7 @@
 import express from 'express';
 import { dbOps } from '../database/db.js';
 import { emailService } from '../services/emailService.js';
+import { imapSyncService } from '../services/imapSyncService.js';
 import { config } from '../config.js';
 
 const router = express.Router();
@@ -200,6 +201,18 @@ router.post('/email/inbound', async (req, res) => {
     });
 
     res.json({ success: true, email });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Trigger immediate sync from Hostinger IMAP mailbox
+ */
+router.post('/emails/sync', async (req, res) => {
+  try {
+    const result = await imapSyncService.syncHostingerMailbox();
+    res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

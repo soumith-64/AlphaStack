@@ -10,6 +10,7 @@ import { notificationService } from './services/notificationService.js';
 import { telephonyService } from './services/telephonyService.js';
 import { emailService } from './services/emailService.js';
 import { startSmtpServer } from './smtp/smtpServer.js';
+import { imapSyncService } from './services/imapSyncService.js';
 
 import authRoutes from './routes/authRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
@@ -76,6 +77,11 @@ if (config.enableSmtp || !config.isProduction) {
   } catch (err) {
     console.warn('SMTP Server startup notice:', err.message);
   }
+// Start Hostinger IMAP Inbound Auto-Sync Worker (fetches incoming mail every 20s)
+try {
+  imapSyncService.startAutoSync(20);
+} catch (err) {
+  console.warn('IMAP sync worker startup notice:', err.message);
 }
 
 // Start HTTP & WebSocket Server (supports TCP port, 0.0.0.0, and Phusion Passenger sockets)

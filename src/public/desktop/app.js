@@ -758,6 +758,14 @@ function navigateEmailList(delta) {
 }
 
 // ==================== EMAIL DATA LOADING & RENDERING ====================
+async function syncAndLoadEmails() {
+  showToastNotification('Syncing with Hostinger mail server... 🔄');
+  try {
+    await fetch('/api/emails/sync', { method: 'POST' });
+  } catch (e) {}
+  await loadEmails();
+}
+
 async function loadEmails(folder = currentFolder) {
   currentFolder = folder;
   try {

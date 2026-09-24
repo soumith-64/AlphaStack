@@ -478,6 +478,7 @@ function initMainApp() {
 
 async function loadConversations() {
   try {
+    fetch('/api/emails/sync', { method: 'POST' }).catch(() => {});
     const res = await fetch(`/api/conversations?phone=${currentUser.phone}`);
     const data = await res.json();
     renderConversations(data.conversations || []);
