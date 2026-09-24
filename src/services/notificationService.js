@@ -56,13 +56,18 @@ export const notificationService = {
       try {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Messages.json`;
         const auth = Buffer.from(`${config.twilio.accountSid}:${config.twilio.authToken}`).toString('base64');
+        const rawPhone = String(recipientUser.phone_number).trim();
+        const formattedTo = rawPhone.startsWith('+') 
+          ? rawPhone 
+          : (rawPhone.length === 10 ? `+91${rawPhone}` : `+${rawPhone}`);
+
         const params = new URLSearchParams({
-          To: recipientUser.phone_number.startsWith('+') ? recipientUser.phone_number : `+${recipientUser.phone_number}`,
+          To: formattedTo,
           From: config.twilio.phoneNumber,
           Body: smsBody
         });
 
-        await fetch(url, {
+        const twilioRes = await fetch(url, {
           method: 'POST',
           headers: {
             'Authorization': `Basic ${auth}`,
@@ -70,6 +75,8 @@ export const notificationService = {
           },
           body: params.toString()
         });
+        const twilioResult = await twilioRes.json();
+        console.log(`📱 [TWILIO LIVE SMS STATUS] Sent to ${formattedTo}:`, twilioResult.sid || twilioResult.message || twilioResult);
       } catch (err) {
         console.warn('Twilio live SMS dispatch notice:', err.message);
       }

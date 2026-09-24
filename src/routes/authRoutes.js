@@ -24,6 +24,33 @@ router.post('/send-otp', async (req, res) => {
     await dbOps.logTelephony(cleanNumber, 'OUTGOING_OTP', `Your PhoneMail verification code is ${otp}`);
 
     console.log(`🔑 [OTP ISSUED] Phone: ${cleanNumber} | OTP: ${otp}`);
+
+    // If Twilio credentials configured, send real SMS to user phone
+    if (config.twilio.accountSid && config.twilio.authToken) {
+      try {
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Messages.json`;
+        const auth = Buffer.from(`${config.twilio.accountSid}:${config.twilio.authToken}`).toString('base64');
+        const formattedTo = cleanNumber.length === 10 ? `+91${cleanNumber}` : (cleanNumber.startsWith('+') ? cleanNumber : `+${cleanNumber}`);
+        const params = new URLSearchParams({
+          To: formattedTo,
+          From: config.twilio.phoneNumber,
+          Body: `Your PhoneMail verification code is ${otp}. Valid for 5 minutes.`
+        });
+        const twilioRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        });
+        const twilioData = await twilioRes.json();
+        console.log(`📡 [TWILIO OTP SMS STATUS] Sent to ${formattedTo}:`, twilioData.sid || twilioData.message || twilioData);
+      } catch (err) {
+        console.warn('Twilio OTP SMS notice:', err.message);
+      }
+    }
+
     res.json({
       success: true,
       message: 'OTP sent successfully',
