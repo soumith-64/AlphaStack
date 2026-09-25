@@ -85,8 +85,42 @@ export const emailService = {
   async processInboundEmail({ from, to, subject, text, html, attachments = [] }) {
     console.log(`📬 [INBOUND EMAIL] From: ${from} | To: ${to} | Subject: ${subject}`);
 
-    const recipientParsed = this.parseAddress(to);
-    const recipientPhone = recipientParsed.phone;
+    // Extract actual email addresses cleanly
+    const fromMatch = String(from || '').match(/<([^>]+)>/);
+    const cleanSender = (fromMatch ? fromMatch[1] : String(from || '')).toLowerCase().trim();
+
+    const toMatch = String(to || '').match(/<([^>]+)>/);
+    const cleanTo = (toMatch ? toMatch[1] : String(to || '')).toLowerCase().trim();
+
+    const recipientParsed = this.parseAddress(cleanTo || to);
+    let recipientPhone = recipientParsed.phone;
+
+    if (!recipientPhone) {
+      // 1. Check if recipient local part matches an alias in aliases table
+      const localPart = String(cleanTo || to || '').split('@')[0].trim().toLowerCase();
+      if (localPart) {
+        const aliasRecord = await dbOps.queryOne(`
+          SELECT u.phone_number 
+          FROM aliases a 
+          JOIN users u ON a.user_id = u.id 
+          WHERE LOWER(a.alias_name) = ? OR LOWER(a.alias_email) LIKE ?
+          LIMIT 1
+        `, [localPart, `%${localPart}%`]);
+        if (aliasRecord && aliasRecord.phone_number) {
+          recipientPhone = aliasRecord.phone_number;
+          console.log(`ℹ️ [INBOUND EMAIL] Resolved alias "${localPart}" to phone: ${recipientPhone}`);
+        }
+      }
+
+      // 2. Fallback for admin or catch-all mailbox (e.g. admin@alphastack.wwisvnr.com)
+      if (!recipientPhone) {
+        const primaryUser = await dbOps.queryOne('SELECT phone_number FROM users ORDER BY created_at ASC LIMIT 1');
+        if (primaryUser && primaryUser.phone_number) {
+          recipientPhone = primaryUser.phone_number;
+          console.log(`ℹ️ [INBOUND EMAIL] Catch-all routing: directed email for "${to}" to primary user ${recipientPhone}`);
+        }
+      }
+    }
 
     if (!recipientPhone) {
       console.warn(`Could not resolve valid phone number for recipient: ${to}`);
@@ -106,7 +140,6 @@ export const emailService = {
     }
 
     // Find or create conversation for this sender and recipient
-    const cleanSender = String(from).toLowerCase().trim();
     let conversation = await dbOps.queryOne(`
       SELECT c.* FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
@@ -138,27 +171,40 @@ export const emailService = {
     // Deduplication check: prevent identical emails from being re-inserted
     const duplicate = await dbOps.queryOne(`
       SELECT id FROM emails 
-      WHERE sender_email = ? 
+      WHERE (sender_email = ? OR sender_email LIKE ?) 
         AND subject = ? 
         AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
       LIMIT 1
-    `, [cleanSender, cleanSubject, cleanText, textSnippet, `${textSnippet}%`]);
+    `, [cleanSender, `%${cleanSender}%`, cleanSubject, cleanText, textSnippet, `${textSnippet}%`]);
 
     if (duplicate) {
       console.log(`⚠️ [INBOUND DEDUPLICATION] Email already exists in DB (${duplicate.id}). Skipping re-insertion.`);
       return duplicate;
     }
 
+    const recipientEmailsList = [
+      `${recipientPhone}@${config.domainName}`
+    ];
+    if (recipientParsed.full && !recipientEmailsList.includes(recipientParsed.full)) {
+      recipientEmailsList.push(recipientParsed.full);
+    }
+    if (cleanTo && !recipientEmailsList.includes(cleanTo)) {
+      recipientEmailsList.push(cleanTo);
+    }
+    if (to && !recipientEmailsList.includes(to)) {
+      recipientEmailsList.push(to);
+    }
+
     // Insert email
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     await dbOps.execute(`
-      INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, is_read, folder)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'INBOX')
+      INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, is_read, folder, is_important, is_starred)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'INBOX', 0, 0)
     `, [
       emailId,
       conversationId,
       cleanSender,
-      JSON.stringify([recipientParsed.full]),
+      JSON.stringify(recipientEmailsList),
       cleanSubject,
       cleanText,
       html || cleanText || ''

@@ -138,9 +138,11 @@ export const imapSyncService = {
             if (processedMessageIds.has(msgId)) return;
             processedMessageIds.add(msgId);
 
-            const toAddress = parsed.to ? (Array.isArray(parsed.to) ? parsed.to[0].text : parsed.to.text) : '';
-            const fromAddress = parsed.from ? (Array.isArray(parsed.from) ? parsed.from[0].text : parsed.from.text) : '';
-            const cleanFrom = (fromAddress || '').toLowerCase().trim();
+            const toAddress = (parsed.to && (parsed.to.text || (parsed.to.value && parsed.to.value[0]?.address))) || '';
+            const fromAddress = (parsed.from && (parsed.from.text || (parsed.from.value && parsed.from.value[0]?.address))) || '';
+            
+            const fromMatch = String(fromAddress || '').match(/<([^>]+)>/);
+            const cleanFrom = (fromMatch ? fromMatch[1] : String(fromAddress || '')).toLowerCase().trim();
             const cleanSub = (parsed.subject || '(No Subject)').trim();
             const cleanText = (parsed.text || '').trim();
             const textSnippet = cleanText.substring(0, 50);
@@ -148,11 +150,11 @@ export const imapSyncService = {
             // Robust database check: does this email already exist?
             const existing = await dbOps.queryOne(`
               SELECT id FROM emails 
-              WHERE sender_email LIKE ? 
+              WHERE (sender_email = ? OR sender_email LIKE ?) 
                 AND subject = ? 
                 AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
               LIMIT 1
-            `, [`%${cleanFrom.slice(-15)}%`, cleanSub, cleanText, textSnippet, `${textSnippet}%`]);
+            `, [cleanFrom, `%${cleanFrom}%`, cleanSub, cleanText, textSnippet, `${textSnippet}%`]);
 
             if (existing) {
               return;

@@ -24,6 +24,29 @@ if (useMysql) {
       queueLimit: 0
     });
     console.log(`🔌 [MySQL] Connection pool created for database: ${config.db.name}`);
+
+    // Auto-run schema migrations on MySQL
+    (async () => {
+      const migrations = [
+        'ALTER TABLE emails ADD COLUMN is_important INT DEFAULT 0',
+        "ALTER TABLE emails ADD COLUMN folder VARCHAR(50) DEFAULT 'INBOX'",
+        'ALTER TABLE emails ADD COLUMN is_starred INT DEFAULT 0',
+        'ALTER TABLE emails ADD COLUMN has_replied INT DEFAULT 0',
+        'ALTER TABLE emails ADD COLUMN reply_to_id VARCHAR(64)',
+        'ALTER TABLE users ADD COLUMN language VARCHAR(10) DEFAULT "en"',
+        'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)',
+        'ALTER TABLE conversation_participants MODIFY COLUMN phone_number VARCHAR(191)',
+        'ALTER TABLE conversations MODIFY COLUMN participant_phone VARCHAR(191)'
+      ];
+      for (const m of migrations) {
+        try {
+          await mysqlPool.execute(m);
+          console.log(`✅ [MySQL Migration] Executed: ${m}`);
+        } catch (e) {
+          // ignore ER_DUP_FIELDNAME (1060) or existing columns
+        }
+      }
+    })().catch(e => console.warn('MySQL schema check notice:', e.message));
   } catch (err) {
     console.error('❌ [MySQL Pool Creation Error]:', err.message);
     mysqlPool = null;
@@ -72,6 +95,12 @@ async function getSqliteDb() {
     try {
       db.run('ALTER TABLE emails ADD COLUMN is_important INT DEFAULT 0;');
     } catch (e) {}
+    try {
+      db.run("ALTER TABLE emails ADD COLUMN folder VARCHAR(50) DEFAULT 'INBOX';");
+    } catch (e) {}
+    try {
+      db.run('ALTER TABLE emails ADD COLUMN is_starred INT DEFAULT 0;');
+    } catch (e) {}
     saveToDisk();
   } catch (err) {
     console.warn('Notice: SQLite initialization warning:', err.message);
@@ -87,8 +116,37 @@ export const dbOps = {
         const [rows] = await mysqlPool.execute(sql, params);
         return rows;
       } catch (err) {
-        console.warn('Notice: MySQL query failed, falling back to local SQLite:', err.message);
-        mysqlPool = null;
+        console.warn('Notice: MySQL query warning:', err.message);
+        const colMatch = (err.message || '').match(/Unknown column '([^']+)'/i);
+        if (colMatch && colMatch[1]) {
+          const col = colMatch[1];
+          try {
+            let typeDef = 'INT DEFAULT 0';
+            if (col === 'folder') typeDef = "VARCHAR(50) DEFAULT 'INBOX'";
+            if (col === 'reply_to_id') typeDef = 'VARCHAR(64) DEFAULT NULL';
+            if (col === 'avatar_url') typeDef = 'VARCHAR(255) DEFAULT NULL';
+            if (col === 'language') typeDef = "VARCHAR(10) DEFAULT 'en'";
+            await mysqlPool.execute(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
+            console.log(`✅ [MySQL Auto-Heal] Added missing column \`${col}\` to emails table`);
+            const [retryRows] = await mysqlPool.execute(sql, params);
+            return retryRows;
+          } catch (mErr) {
+            if (col === 'is_important') {
+              try {
+                const fallbackSql = sql.replace(/is_important DESC,\s*/gi, '').replace(/\s*AND\s+is_important\s*=\s*\d+/gi, '');
+                const [fallbackRows] = await mysqlPool.execute(fallbackSql, params);
+                return fallbackRows;
+              } catch (fErr) {}
+            }
+          }
+        }
+        if (err.code === 'ECONNREFUSED' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ETIMEDOUT') {
+          console.warn('⚠️ [MySQL] Connection lost, switching to local SQLite');
+          mysqlPool = null;
+        } else {
+          // Keep using MySQL pool - do NOT fall back to empty SQLite on SQL errors
+          return [];
+        }
       }
     }
     const sqliteDb = await getSqliteDb();
@@ -114,8 +172,26 @@ export const dbOps = {
         const [result] = await mysqlPool.execute(sql, params);
         return { changes: result.affectedRows };
       } catch (err) {
-        console.warn('Notice: MySQL execute failed, falling back to local SQLite:', err.message);
-        mysqlPool = null;
+        console.warn('Notice: MySQL execute warning:', err.message);
+        const colMatch = (err.message || '').match(/Unknown column '([^']+)'/i);
+        if (colMatch && colMatch[1]) {
+          const col = colMatch[1];
+          try {
+            let typeDef = 'INT DEFAULT 0';
+            if (col === 'folder') typeDef = "VARCHAR(50) DEFAULT 'INBOX'";
+            if (col === 'reply_to_id') typeDef = 'VARCHAR(64) DEFAULT NULL';
+            await mysqlPool.execute(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
+            console.log(`✅ [MySQL Auto-Heal] Added missing column \`${col}\` to emails table`);
+            const [retryResult] = await mysqlPool.execute(sql, params);
+            return { changes: retryResult.affectedRows };
+          } catch (mErr) {}
+        }
+        if (err.code === 'ECONNREFUSED' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ETIMEDOUT') {
+          console.warn('⚠️ [MySQL] Connection lost, switching to local SQLite');
+          mysqlPool = null;
+        } else {
+          return { changes: 0, error: err.message };
+        }
       }
     }
     const sqliteDb = await getSqliteDb();

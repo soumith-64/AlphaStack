@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   id VARCHAR(64) PRIMARY KEY,
   is_group INT DEFAULT 0,
   subject VARCHAR(255),
-  participant_phone VARCHAR(32),
+  participant_phone VARCHAR(191),
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 CREATE TABLE IF NOT EXISTS conversation_participants (
   conversation_id VARCHAR(64) NOT NULL,
   user_id VARCHAR(64),
-  phone_number VARCHAR(32) NOT NULL,
+  phone_number VARCHAR(191) NOT NULL,
   PRIMARY KEY (conversation_id, phone_number),
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
 );
