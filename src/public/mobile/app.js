@@ -32,11 +32,12 @@ function escapeHtml(str) {
 
 function getInitials(name) {
   if (!name) return 'U';
-  const parts = String(name).trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase();
-  }
-  return parts[0].substring(0, 2).toUpperCase();
+  const clean = String(name).replace(/^[^a-zA-Z0-9]+/, '').trim();
+  const letterMatch = clean.match(/[a-zA-Z]/);
+  if (letterMatch) return letterMatch[0].toUpperCase();
+  const numMatch = clean.match(/\d/);
+  if (numMatch) return numMatch[0];
+  return 'U';
 }
 
 function formatPhoneDisplay(digits, tag = '') {
@@ -77,39 +78,75 @@ function isPhoneMailSender(rawSender) {
   return true;
 }
 
-function formatSenderDisplay(rawSender, includeAddress = false) {
+function lookupContactName(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '').slice(-10);
+  if (!digits || digits.length !== 10) return '';
+  let cachedDeviceContacts = [];
+  try {
+    const raw = localStorage.getItem('phonemail_cached_device_contacts');
+    if (raw) cachedDeviceContacts = JSON.parse(raw);
+  } catch (e) {}
+  const all = [...(cachedContacts || []), ...(cachedDeviceContacts || [])];
+  const found = all.find(c => {
+    const cP = String(c.phone || c.phone_number || '').replace(/\D/g, '').slice(-10);
+    return cP === digits;
+  });
+  if (found) {
+    if (found.name && !/^User\s*\d+/i.test(found.name)) return found.name.trim();
+    if (found.display_name && !/^User\s*\d+/i.test(found.display_name)) return found.display_name.trim();
+  }
+  return '';
+}
+
+/**
+ * Cleanly format sender:
+ * - If from INAI (PhoneMail user): Show Name and Phone number in brackets:
+ *   e.g. "John Doe (+91 79047 75295)" or "User (+91 79047 75295)"
+ * - If from external (Gmail, Rediff, etc.): Show Name and Gmail address:
+ *   e.g. "John Doe (johndoe@gmail.com)" or "johndoe@gmail.com"
+ */
+function formatSenderDisplay(rawSender, includeAddress = false, fallbackName = '') {
   if (!rawSender) return 'Unknown';
   let str = String(rawSender).trim();
-  let name = '';
+  let name = fallbackName || '';
   let email = str;
   const match = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
   if (match) {
-    name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    if (!name) name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
     email = (match[2] || '').trim();
   } else {
     email = str.replace(/^[<"']+|[>"']+$/g, '').trim();
   }
 
+  const isFromInai = isPhoneMailSender(email);
   const phoneAliasMatch = email.match(/^(\d{10})(?:\.([a-zA-Z0-9_-]+))?@(alphastack\.wwisvnr\.com|phonemail\.com)/i);
   const plainPhoneMatch = email.match(/^(\d{10})@/);
-  const rawDigitMatch = /^\d{10}$/.test(email);
+  const digitsOnly = email.replace(/\D/g, '').slice(-10);
+  const has10Digits = digitsOnly && digitsOnly.length === 10;
 
-  if (phoneAliasMatch || plainPhoneMatch || rawDigitMatch) {
-    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : email);
+  if (isFromInai && (phoneAliasMatch || plainPhoneMatch || has10Digits)) {
+    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : digitsOnly);
     const tag = phoneAliasMatch && phoneAliasMatch[2] ? phoneAliasMatch[2] : '';
     const phoneFormatted = formatPhoneDisplay(phone, tag);
 
     if (!name || /^User\s*\d+/i.test(name) || name.replace(/\D/g, '') === phone) {
-      return phoneFormatted;
+      const contactName = lookupContactName(phone);
+      if (contactName) {
+        name = contactName;
+      }
     }
-    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    return `${name} (${phoneFormatted})`;
+
+    if (name && !/^User\s*\d+/i.test(name) && name.replace(/\D/g, '') !== phone) {
+      name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      return `${name} (${phoneFormatted})`;
+    }
+    return `User (${phoneFormatted})`;
   }
 
-  if (name) {
+  if (name && name.toLowerCase() !== email.toLowerCase()) {
     name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    if (includeAddress) return `${name} <${email}>`;
-    return name;
+    return `${name} (${email})`;
   }
 
   return email;
@@ -877,7 +914,7 @@ function createMobileEmailCard(email) {
     ? `<span class="badge-source-tag badge-phonemail-pill">⚡ INAI</span>`
     : `<span class="badge-source-tag badge-external-pill">🌐 External</span>`;
 
-  const formattedSender = formatSenderDisplay(email.sender_email);
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
   const displaySender = (isSentFolder || isSentByMe) 
     ? `To: ${recipientsDisplay || 'Recipient'}` 
@@ -909,7 +946,7 @@ function createMobileEmailCard(email) {
       </div>
     </div>
 
-    <!-- Row Controls: Checkbox, Flag, Star -->
+    <!-- Row Controls: Checkbox and Single Star -->
     <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
       <label class="custom-checkbox" onclick="event.stopPropagation()">
         <input type="checkbox" class="row-checkbox" id="mob-check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
@@ -917,15 +954,15 @@ function createMobileEmailCard(email) {
       </label>
     </div>
 
-    <span class="item-important-icon ${isImportant ? 'important' : ''}" onclick="toggleImportant('${email.id}', event)">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </span>
 
     <div class="item-avatar-circle">${avatarInitial}</div>
 
     <div class="item-content-preview">
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-        <span style="font-size: 13px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
+        <span style="font-size: 13px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68vw;">
           ${escapeHtml(displaySender)}
         </span>
         <span class="item-date-col">${timeDisplay}</span>
@@ -1003,8 +1040,8 @@ function openEmailDetails(email) {
   const pane = document.getElementById('reading-pane');
   if (!pane) return;
 
-  const senderFull = formatSenderDisplay(email.sender_email, true);
-  const senderShort = formatSenderDisplay(email.sender_email);
+  const senderFull = formatSenderDisplay(email.sender_email, true, email.sender_name);
+  const senderShort = formatSenderDisplay(email.sender_email, false, email.sender_name);
 
   document.getElementById('mob-read-sender').innerText = senderShort;
   document.getElementById('mob-read-sender-full').innerText = senderFull;

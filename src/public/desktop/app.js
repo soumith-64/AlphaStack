@@ -139,49 +139,80 @@ function formatPhoneDisplay(digits, tag = '') {
  * - If from another PhoneMail user: HIDE @alphastack.wwisvnr.com and just show the phone number (+91 93815 64959)
  * - If from external (Gmail, Rediff, etc.): show display name and external email.
  */
-function formatSenderDisplay(rawSender, includeAddress = false) {
+function lookupContactName(phone) {
+  if (!phone) return '';
+  const digits = String(phone).replace(/\D/g, '').slice(-10);
+  if (!digits || digits.length !== 10) return '';
+  const all = [...(cachedContacts || []), ...(cachedDeviceContacts || [])];
+  const found = all.find(c => {
+    const cP = String(c.phone || c.phone_number || '').replace(/\D/g, '').slice(-10);
+    return cP === digits;
+  });
+  if (found) {
+    if (found.name && !/^User\s*\d+/i.test(found.name)) return found.name.trim();
+    if (found.display_name && !/^User\s*\d+/i.test(found.display_name)) return found.display_name.trim();
+  }
+  return '';
+}
+
+/**
+ * Cleanly format sender:
+ * - If from INAI (PhoneMail user): Show Name and Phone number in brackets:
+ *   e.g. "John Doe (+91 79047 75295)" or "User (+91 79047 75295)"
+ * - If from external (Gmail, Rediff, etc.): Show Name and Gmail address:
+ *   e.g. "John Doe (johndoe@gmail.com)" or "johndoe@gmail.com"
+ */
+function formatSenderDisplay(rawSender, includeAddress = false, fallbackName = '') {
   if (!rawSender) return 'Unknown';
   let str = String(rawSender).trim();
 
-  let name = '';
+  let name = fallbackName || '';
   let email = str;
   const angleMatch = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
   if (angleMatch) {
-    name = (angleMatch[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    if (!name) name = (angleMatch[1] || '').trim().replace(/^["']+|["']+$/g, '');
     email = (angleMatch[2] || '').trim();
   } else {
     email = str.replace(/^[<"']+|[>"']+$/g, '').trim();
   }
 
-  // Check for internal PhoneMail pattern (e.g. 9381564959@alphastack.wwisvnr.com or 9381564959.work@...)
+  // Check for internal PhoneMail / INAI pattern (e.g. 7904775295@alphastack.wwisvnr.com or 7904775295)
+  const isFromInai = isPhoneMailSender(email);
   const phoneAliasMatch = email.match(/^(\d{10})(?:\.([a-zA-Z0-9_-]+))?@(alphastack\.wwisvnr\.com|phonemail\.com)/i);
   const plainPhoneMatch = email.match(/^(\d{10})@/);
-  const rawDigitMatch = /^\d{10}$/.test(email);
+  const digitsOnly = email.replace(/\D/g, '').slice(-10);
+  const has10Digits = digitsOnly && digitsOnly.length === 10;
 
-  if (phoneAliasMatch || plainPhoneMatch || rawDigitMatch) {
-    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : email);
+  if (isFromInai && (phoneAliasMatch || plainPhoneMatch || has10Digits)) {
+    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : digitsOnly);
     const tag = phoneAliasMatch && phoneAliasMatch[2] ? phoneAliasMatch[2] : '';
     const phoneFormatted = formatPhoneDisplay(phone, tag);
 
-    // If name is "User 9381564959" or empty or matches digits, just show the clean phone number
+    // Try contact lookup if name is not set or generic
     if (!name || /^User\s*\d+/i.test(name) || name.replace(/\D/g, '') === phone) {
-      return phoneFormatted;
+      const contactName = lookupContactName(phone);
+      if (contactName) {
+        name = contactName;
+      }
     }
 
-    // Personalized user name
-    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    return `${name} (${phoneFormatted})`;
-  }
-
-  // External email (Gmail, Rediff, etc.)
-  if (name) {
-    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-    if (includeAddress) {
-      return `${name} <${email}>`;
+    // If we have a real name (e.g. "Soumith", "Rahul", etc.)
+    if (name && !/^User\s*\d+/i.test(name) && name.replace(/\D/g, '') !== phone) {
+      name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      return `${name} (${phoneFormatted})`;
     }
-    return name;
+
+    // Default for INAI user: always show Name and Phone number in bracket
+    return `User (${phoneFormatted})`;
   }
 
+  // External email (e.g. Gmail, Yahoo, Rediff, Hostinger)
+  if (name && name.toLowerCase() !== email.toLowerCase()) {
+    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return `${name} (${email})`;
+  }
+
+  // Just email address (e.g. johndoe@gmail.com)
   return email;
 }
 
@@ -203,10 +234,17 @@ function cleanRecipientAddress(addr) {
 }
 
 function getInitials(nameOrEmail) {
-  if (!nameOrEmail) return 'P';
+  if (!nameOrEmail) return 'I';
   const display = formatSenderDisplay(nameOrEmail);
-  const clean = display.replace(/[^a-zA-Z0-9]/g, '').trim();
-  return clean.charAt(0).toUpperCase() || 'P';
+  const letterMatch = display.match(/[a-zA-Z]/);
+  if (letterMatch) {
+    return letterMatch[0].toUpperCase();
+  }
+  const numMatch = display.match(/\d/);
+  if (numMatch) {
+    return numMatch[0];
+  }
+  return 'I';
 }
 
 function getRecipientsDisplay(email) {
@@ -1697,7 +1735,7 @@ function createEmailRowElement(email) {
     ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent from INAI user">⚡ INAI</span>`
     : `<span class="badge-source-tag badge-external-pill" title="Sent from external mail service">🌐 External</span>`;
 
-  const formattedSender = formatSenderDisplay(email.sender_email);
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
   const displaySender = (isSentFolder || isSentByMe) 
     ? `To: ${recipientsDisplay || 'Recipient'}` 
@@ -1729,7 +1767,7 @@ function createEmailRowElement(email) {
       </div>
     </div>
 
-    <!-- Row Controls: Checkbox, Important Flag, Star -->
+    <!-- Row Controls: Checkbox and Star -->
     <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
       <label class="custom-checkbox" onclick="event.stopPropagation()">
         <input type="checkbox" class="row-checkbox" id="check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
@@ -1737,12 +1775,8 @@ function createEmailRowElement(email) {
       </label>
     </div>
 
-    <span class="item-important-icon ${isImportant ? 'important' : ''}" onclick="toggleImportant('${email.id}', event)" title="${isImportant ? 'Mark not important' : 'Mark important'}">
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    </span>
-
     <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </span>
 
     <div class="item-avatar-circle">${avatarInitial}</div>
@@ -1859,8 +1893,8 @@ function openEmailDetails(email) {
   const isFromPhoneMail = isPhoneMailSender(email.sender_email);
   
   const formattedSenderClean = isFromPhoneMail 
-    ? formatSenderDisplay(email.sender_email) 
-    : formatSenderDisplay(email.sender_email, true);
+    ? formatSenderDisplay(email.sender_email, false, email.sender_name) 
+    : formatSenderDisplay(email.sender_email, true, email.sender_name);
 
   originalMessageSubject = email.subject || '(No Subject)';
   originalMessageBody = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
@@ -1871,7 +1905,7 @@ function openEmailDetails(email) {
   const senderEl = document.getElementById('full-sender');
   if (senderEl) {
     senderEl.innerText = isSentByMe 
-      ? (currentUser.name ? `${currentUser.name} (+91 ${currentUser.phone})` : `+91 ${currentUser.phone}`) 
+      ? (currentUser.name ? `${currentUser.name} (+91 ${currentUser.phone})` : `User (+91 ${currentUser.phone})`) 
       : formattedSenderClean;
   }
 

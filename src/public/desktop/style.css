@@ -1587,7 +1587,9 @@ button {
 }
 
 .item-sender-col {
-  width: 170px;
+  width: 220px;
+  min-width: 180px;
+  max-width: 240px;
   font-size: 13.5px;
   font-weight: 700;
   color: var(--text-main);
@@ -1595,6 +1597,7 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   margin-right: 14px;
+  flex-shrink: 0;
 }
 
 .item-content-preview {

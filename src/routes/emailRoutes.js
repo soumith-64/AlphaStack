@@ -39,6 +39,23 @@ router.get('/conversations', async (req, res) => {
       ORDER BY c.updated_at DESC
     `, [`%${cleanPhone}%`, `%${cleanPhone}%`, cleanPhone, `%${cleanPhone}%`]);
 
+    // Enrich conversations with registered participant display names
+    try {
+      const userRows = await dbOps.queryAll('SELECT phone_number, display_name FROM users');
+      const userMap = {};
+      for (const u of (userRows || [])) {
+        if (u.phone_number && u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
+          userMap[u.phone_number] = u.display_name;
+        }
+      }
+      for (const c of conversations) {
+        const digits = (c.participant_phone || '').replace(/\D/g, '').slice(-10);
+        if (digits && userMap[digits]) {
+          c.participant_name = userMap[digits];
+        }
+      }
+    } catch (uErr) {}
+
     res.json({ conversations });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -77,6 +94,27 @@ router.get('/conversations/:id', async (req, res) => {
 
     // Mark unread messages in this conversation as read
     await dbOps.execute(`UPDATE emails SET is_read = 1 WHERE conversation_id = ?`, [id]);
+
+    // Enrich messages and conversation with display names
+    try {
+      const userRows = await dbOps.queryAll('SELECT phone_number, display_name FROM users');
+      const userMap = {};
+      for (const u of (userRows || [])) {
+        if (u.phone_number && u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
+          userMap[u.phone_number] = u.display_name;
+        }
+      }
+      for (const m of messages) {
+        const digits = (m.sender_email || '').replace(/\D/g, '').slice(-10);
+        if (digits && userMap[digits]) {
+          m.sender_name = userMap[digits];
+        }
+      }
+      const convDigits = (conversation.participant_phone || '').replace(/\D/g, '').slice(-10);
+      if (convDigits && userMap[convDigits]) {
+        conversation.participant_name = userMap[convDigits];
+      }
+    } catch (uErr) {}
 
     res.json({ conversation, messages });
   } catch (err) {
@@ -166,6 +204,23 @@ router.get('/emails', async (req, res) => {
            ORDER BY is_important DESC, created_at DESC`;
       emails = await dbOps.queryAll(sql, [`%${cleanPhone}%`]);
     }
+
+    // Enrich emails with registered sender display names
+    try {
+      const userRows = await dbOps.queryAll('SELECT phone_number, display_name FROM users');
+      const userMap = {};
+      for (const u of (userRows || [])) {
+        if (u.phone_number && u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
+          userMap[u.phone_number] = u.display_name;
+        }
+      }
+      for (const e of emails) {
+        const digits = (e.sender_email || '').replace(/\D/g, '').slice(-10);
+        if (digits && userMap[digits]) {
+          e.sender_name = userMap[digits];
+        }
+      }
+    } catch (uErr) {}
 
     res.json({ emails });
   } catch (err) {
