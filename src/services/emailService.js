@@ -23,6 +23,11 @@ export const emailService = {
     ioInstance = io;
   },
 
+  normalizeSubject(sub) {
+    if (!sub) return '';
+    return String(sub).replace(/^(\s*(re|fwd|fw|aw|sv)\s*:\s*)+/i, '').trim().toLowerCase();
+  },
+
   /**
    * Normalizes an email address or raw phone number into a 10-digit phone and optional alias,
    * while preserving standard external email addresses (e.g. name@gmail.com) completely intact.
@@ -103,7 +108,7 @@ export const emailService = {
           SELECT u.phone_number 
           FROM aliases a 
           JOIN users u ON a.user_id = u.id 
-          WHERE LOWER(a.alias_name) = ? OR LOWER(a.alias_email) LIKE ?
+          WHERE LOWER(a.label) = ? OR LOWER(a.alias_email) LIKE ?
           LIMIT 1
         `, [localPart, `%${localPart}%`]);
         if (aliasRecord && aliasRecord.phone_number) {
@@ -139,23 +144,41 @@ export const emailService = {
       user = await dbOps.queryOne('SELECT * FROM users WHERE id = ?', [newUserId]);
     }
 
-    // Find or create conversation for this sender and recipient
-    let conversation = await dbOps.queryOne(`
-      SELECT c.* FROM conversations c
-      JOIN conversation_participants cp ON c.id = cp.conversation_id
-      WHERE cp.phone_number = ? AND c.is_group = 0
-    `, [cleanSender]);
+    const cleanSubject = String(subject || '(No Subject)').trim();
+    const cleanText = String(text || '').trim();
+    const textSnippet = cleanText.substring(0, 50);
+
+    const normSub = this.normalizeSubject(cleanSubject);
+
+    // Find or create conversation for this sender and recipient with proper thread matching
+    let conversation = null;
+    if (normSub) {
+      const candidateConvs = await dbOps.queryAll(`
+        SELECT c.* FROM conversations c
+        JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+        JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+        WHERE cp1.phone_number = ? AND cp2.phone_number = ? AND c.is_group = 0
+        ORDER BY c.updated_at DESC
+      `, [cleanSender, recipientPhone]);
+
+      for (const cand of candidateConvs) {
+        if (this.normalizeSubject(cand.subject) === normSub) {
+          conversation = cand;
+          break;
+        }
+      }
+    }
 
     let conversationId;
     if (conversation) {
       conversationId = conversation.id;
-      await dbOps.execute(`UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [conversationId]);
+      await dbOps.execute(`UPDATE conversations SET updated_at = CURRENT_TIMESTAMP, subject = ? WHERE id = ?`, [cleanSubject, conversationId]);
     } else {
       conversationId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
       await dbOps.execute(`
         INSERT INTO conversations (id, is_group, subject, participant_phone, updated_at)
         VALUES (?, 0, ?, ?, CURRENT_TIMESTAMP)
-      `, [conversationId, subject || 'New Conversation', cleanSender]);
+      `, [conversationId, cleanSubject || 'New Conversation', cleanSender]);
 
       // Add participants
       await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
@@ -163,10 +186,6 @@ export const emailService = {
       await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
         [conversationId, user.id, recipientPhone]);
     }
-
-    const cleanSubject = String(subject || '(No Subject)').trim();
-    const cleanText = String(text || '').trim();
-    const textSnippet = cleanText.substring(0, 50);
 
     // Deduplication check: prevent identical emails from being re-inserted
     const duplicate = await dbOps.queryOne(`
@@ -285,23 +304,51 @@ export const emailService = {
     // If new conversation, determine if 1-to-1 or Group Chat
     if (!targetConvId) {
       const isGroup = normalizedRecipients.length >= 2;
-      targetConvId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
-      
-      await dbOps.execute(`
-        INSERT INTO conversations (id, is_group, subject, participant_phone, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-      `, [targetConvId, isGroup ? 1 : 0, subject || 'Conversation', normalizedRecipients[0]]);
+      const cleanSub = String(subject || '').trim();
+      const normSub = this.normalizeSubject(cleanSub);
 
-      // Add sender
-      await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
-        [targetConvId, sender ? sender.id : null, cleanSenderPhone]);
-      
-      // Add each recipient
-      for (const rec of rawRecipientsList) {
-        const parsed = this.parseAddress(rec);
-        const pPhone = parsed.phone || rec;
+      // If 1-to-1 and has topic, search for an existing 1-to-1 conversation with matching normalized subject
+      if (!isGroup && normSub && normalizedRecipients[0]) {
+        const otherPhone = this.parseAddress(normalizedRecipients[0]).phone || normalizedRecipients[0];
+        const candidateConvs = await dbOps.queryAll(`
+          SELECT c.* FROM conversations c
+          JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+          JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+          WHERE (cp1.phone_number = ? OR cp1.phone_number LIKE ?) 
+            AND (cp2.phone_number = ? OR cp2.phone_number LIKE ?) 
+            AND c.is_group = 0
+          ORDER BY c.updated_at DESC
+        `, [cleanSenderPhone, `%${cleanSenderPhone}%`, otherPhone, `%${otherPhone}%`]);
+
+        for (const cand of candidateConvs) {
+          if (this.normalizeSubject(cand.subject) === normSub) {
+            targetConvId = cand.id;
+            break;
+          }
+        }
+      }
+
+      if (!targetConvId) {
+        targetConvId = 'conv_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+        
+        await dbOps.execute(`
+          INSERT INTO conversations (id, is_group, subject, participant_phone, updated_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `, [targetConvId, isGroup ? 1 : 0, cleanSub || 'Conversation', normalizedRecipients[0]]);
+
+        // Add sender
         await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
-          [targetConvId, null, pPhone]);
+          [targetConvId, sender ? sender.id : null, cleanSenderPhone]);
+        
+        // Add each recipient
+        for (const rec of rawRecipientsList) {
+          const parsed = this.parseAddress(rec);
+          const pPhone = parsed.phone || rec;
+          await dbOps.execute(`INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)`,
+            [targetConvId, null, pPhone]);
+        }
+      } else {
+        await dbOps.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP, subject = ? WHERE id = ?', [cleanSub || 'Conversation', targetConvId]);
       }
     } else {
       await dbOps.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [targetConvId]);

@@ -200,6 +200,27 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </span>
         <input type="text" id="chat-search" placeholder="Search phone numbers, contacts, subjects..." oninput="onSearchInput(this.value)">
+        <button type="button" class="search-clear-btn" id="mob-search-clear" onclick="clearSearchInput()" style="display: none;">✕</button>
+      </div>
+
+      <!-- Quick Filter Pills: All | Unread | Attachments | Favorites -->
+      <div class="mobile-quick-filter-pills" id="mob-quick-filter-pills">
+        <button type="button" class="quick-pill active" id="pill-filter-all" onclick="setMobileQuickFilter('all')">
+          <span>All</span>
+        </button>
+        <button type="button" class="quick-pill" id="pill-filter-unread" onclick="setMobileQuickFilter('unread')">
+          <span class="unread-dot-mini"></span>
+          <span>Unread</span>
+          <span class="pill-badge" id="badge-unread-count">0</span>
+        </button>
+        <button type="button" class="quick-pill" id="pill-filter-attachments" onclick="setMobileQuickFilter('attachments')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <span>Attachments</span>
+        </button>
+        <button type="button" class="quick-pill" id="pill-filter-favorites" onclick="setMobileQuickFilter('favorites')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Favorites</span>
+        </button>
       </div>
 
       <!-- Current Folder Heading & Floating Bulk Actions -->
@@ -211,7 +232,7 @@
           </label>
           <h2 class="mobile-folder-title" id="mob-folder-title">All Mail</h2>
         </div>
-        <span class="mob-message-counter" id="mob-count-indicator">0 messages</span>
+        <span class="mob-message-counter" id="mob-count-indicator">0 conversations</span>
       </div>
 
       <!-- FLOATING BULK ACTIONS TOOLBAR ON MOBILE -->
@@ -256,69 +277,121 @@
 
   </div>
 
-  <!-- ==================== MOBILE READING PANE VIEW ==================== -->
-  <div id="reading-pane" class="chat-view-wrapper" style="display: none;">
-    <div class="chat-header">
-      <button class="icon-btn back-btn" onclick="closeReadingPane()" aria-label="Back">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-      </button>
-      <div class="chat-contact-info">
-        <div class="contact-name" id="mob-read-sender">+91 98765 43210</div>
-        <div class="contact-status" id="mob-read-status">⚡ INAI Verified</div>
-      </div>
-      <div class="chat-header-actions">
-        <!-- AI Real-Time Translation -->
-        <button class="icon-btn" onclick="toggleMessageTranslation()" title="AI Real-Time Translation">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+  <!-- ==================== MOBILE CONVERSATION SCREEN (WHATSAPP-GRADE CHAT VIEW) ==================== -->
+  <div id="reading-pane" class="chat-view-wrapper whatsapp-chat-screen" style="display: none;">
+    <!-- WhatsApp Top App Bar -->
+    <div class="whatsapp-top-bar">
+      <div class="top-bar-left">
+        <button class="whatsapp-back-btn" onclick="closeReadingPane()" aria-label="Back">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
         </button>
-        <!-- Mark as Important -->
-        <button class="icon-btn" id="mob-pane-important-btn" onclick="toggleCurrentImportant()" title="Mark Important">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <div class="whatsapp-contact-chip" onclick="openActiveContactInfoModal()" title="View Contact & ID Card">
+          <div class="whatsapp-header-avatar" id="mob-conv-avatar">U</div>
+          <div class="whatsapp-header-meta">
+            <div class="whatsapp-header-title" id="mob-conv-title">+91 98765 43210</div>
+            <div class="whatsapp-header-subtitle" id="mob-conv-subtitle">⚡ INAI Verified</div>
+          </div>
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <!-- View Contact ID Card & Info -->
+        <button class="icon-btn" onclick="openActiveContactInfoModal()" title="Contact Info & Digital ID Card" aria-label="Digital ID">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="17" y1="7" x2="17.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/><line x1="17" y1="17" x2="17.01" y2="17"/></svg>
+        </button>
+        <!-- Traditional Email View Toggle -->
+        <button class="icon-btn" onclick="openTraditionalViewFromChat()" title="View as Traditional Email" aria-label="Traditional Email">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         </button>
         <!-- Star Toggle -->
-        <button class="icon-btn" id="mob-pane-star-btn" onclick="toggleCurrentStar()" title="Star">
+        <button class="icon-btn" id="mob-pane-star-btn" onclick="toggleCurrentStar()" title="Star Conversation">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </button>
-        <!-- Delete -->
+        <!-- Delete Conversation -->
         <button class="icon-btn danger" onclick="deleteCurrentEmail()" title="Move to Trash">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- Subject Banner -->
-    <div class="chat-subject-bar">
-      <span>Subject:</span> <strong id="mob-read-subject">Message Subject</strong>
+    <!-- WhatsApp Chat Message Timeline -->
+    <div class="whatsapp-timeline-container" id="mob-chat-timeline">
+      <!-- Dynamic WhatsApp Chat Bubbles render here chronologically -->
     </div>
 
-    <!-- Reading Content Area -->
-    <div class="mobile-reading-card" id="mob-read-body-container">
-      <div class="reading-meta-row">
-        <div class="reading-avatar-pill" id="mob-read-avatar">U</div>
-        <div class="reading-meta-text">
-          <div class="reading-sender-name" id="mob-read-sender-full">Sender</div>
-          <div class="reading-date-line" id="mob-read-date">Today at 12:30 PM</div>
+    <!-- WhatsApp Bottom Reply & Input Dock -->
+    <div class="whatsapp-bottom-dock">
+      <!-- Floating Quoted Reply Banner (active when replying to a message) -->
+      <div class="whatsapp-quote-banner" id="mob-quote-reply-bar" style="display: none;">
+        <div class="quote-bar-accent"></div>
+        <div class="quote-bar-content">
+          <div class="quote-bar-sender" id="mob-quote-sender">Replying to Soumith</div>
+          <div class="quote-bar-snippet" id="mob-quote-snippet">Original message preview...</div>
+        </div>
+        <button type="button" class="quote-bar-close" onclick="cancelQuotedReply()" title="Cancel Reply">✕</button>
+      </div>
+
+      <!-- Input Bar Controls -->
+      <div class="whatsapp-input-row">
+        <button type="button" class="whatsapp-tool-btn" onclick="insertEmojiQuick('😊')" title="Emoji">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+        </button>
+
+        <textarea id="mob-chat-input" class="whatsapp-textarea" rows="1" placeholder="Type an email message..." onkeydown="handleChatInputKey(event)" oninput="autoExpandChatInput(this)"></textarea>
+
+        <button type="button" class="whatsapp-tool-btn" onclick="openAttachmentPickerModal()" title="Attach File">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+
+        <button type="button" class="whatsapp-send-btn" id="mob-chat-send-btn" onclick="submitChatMessage()" title="Send">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== TRADITIONAL EMAIL VIEW MODAL (MOBILE) ==================== -->
+  <div id="traditional-view-modal" class="modal-wrapper" style="display: none;">
+    <div class="modal-card traditional-email-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="tiranga-tag-mini">EMAIL VIEW</span>
+          <h3 id="trad-view-modal-title">Traditional Email</h3>
+        </div>
+        <button class="close-modal-btn" onclick="closeTraditionalViewModal()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div class="trad-meta-box">
+          <div class="trad-meta-row">
+            <span class="trad-meta-label">FROM:</span>
+            <span class="trad-meta-val" id="trad-view-from">sender@domain.com</span>
+          </div>
+          <div class="trad-meta-row">
+            <span class="trad-meta-label">TO:</span>
+            <div style="display: flex; align-items: center; gap: 6px; flex: 1;">
+              <input type="text" class="trad-meta-input locked" id="trad-view-to" readonly title="Recipients locked in conversation">
+              <span class="locked-chip">🔒 Locked</span>
+            </div>
+          </div>
+          <div class="trad-meta-row">
+            <span class="trad-meta-label">SUBJECT:</span>
+            <span class="trad-meta-val bold" id="trad-view-subject">Subject</span>
+          </div>
+          <div class="trad-meta-row">
+            <span class="trad-meta-label">DATE:</span>
+            <span class="trad-meta-val" id="trad-view-date">Date</span>
+          </div>
+        </div>
+        <div class="trad-body-viewport" id="trad-view-body">
+          Email content...
         </div>
       </div>
-      <div class="mobile-body-content" id="mob-read-body">
-        Email contents will be displayed here...
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeTraditionalViewModal()">Close</button>
+        <button class="btn-primary-mobile" onclick="replyFromTraditionalView()">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+          <span>Reply in Conversation</span>
+        </button>
       </div>
-    </div>
-
-    <!-- Quick Action Dock (Reply / Forward) -->
-    <div class="chat-input-bar">
-      <button type="button" class="btn-dock-mob" onclick="openReplyCompose()">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
-        <span>Reply</span>
-      </button>
-      <button type="button" class="btn-dock-mob" onclick="openReplyCompose(true)">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
-        <span>Forward</span>
-      </button>
-      <button type="button" class="btn-dock-mob" onclick="archiveCurrentEmail()">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-        <span>Archive</span>
-      </button>
     </div>
   </div>
 
@@ -363,33 +436,14 @@
       <div class="drawer-items">
         <div class="drawer-section-title" data-i18n="mailboxes">MAILBOXES</div>
         
+        <!-- Home (Unified Inbox + Sent) -->
         <div class="drawer-item active" onclick="switchMobileFolder('ALL', this)" id="mob-nav-all">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-          <span data-i18n="all_mail">All Mail</span>
-        </div>
-        <div class="drawer-item" onclick="switchMobileFolder('INBOX', this)" id="mob-nav-inbox">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-          <span data-i18n="inbox">Inbox</span>
-        </div>
-        <div class="drawer-item" onclick="switchMobileFolder('IMPORTANT', this)" id="mob-nav-important">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span data-i18n="important" style="color: #b45309; font-weight: 700;">Important</span>
-        </div>
-        <div class="drawer-item" onclick="switchMobileFolder('STARRED', this)" id="mob-nav-starred">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span data-i18n="starred">Starred</span>
-        </div>
-        <div class="drawer-item" onclick="switchMobileFolder('SENT', this)" id="mob-nav-sent">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-          <span data-i18n="sent">Sent</span>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span style="font-weight: 700;">Home (Unified All Mail)</span>
         </div>
         <div class="drawer-item" onclick="switchMobileFolder('DRAFTS', this)" id="mob-nav-drafts">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
           <span data-i18n="drafts">Drafts</span>
-        </div>
-        <div class="drawer-item" onclick="switchMobileFolder('ARCHIVE', this)" id="mob-nav-archive">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          <span data-i18n="archive">Archive</span>
         </div>
         <div class="drawer-item" onclick="switchMobileFolder('SPAM', this)" id="mob-nav-spam">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -401,11 +455,27 @@
         </div>
 
         <div class="drawer-divider"></div>
-        <div class="drawer-section-title">ACCOUNT & TOOLS</div>
+        <div class="drawer-section-title">QUICK FILTERS</div>
+
+        <div class="drawer-item" onclick="switchMobileFolder('IMPORTANT', this)" id="mob-nav-important">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span data-i18n="important" style="color: #b45309; font-weight: 700;">Important</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('STARRED', this)" id="mob-nav-starred">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span data-i18n="starred">Starred</span>
+        </div>
+
+        <div class="drawer-divider"></div>
+        <div class="drawer-section-title">ACCOUNT & SETTINGS</div>
 
         <div class="drawer-item" onclick="openDigitalIdModal(); toggleDrawer();">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           <span>Digital ID Card & QR</span>
+        </div>
+        <div class="drawer-item" onclick="openMobileProfileSettings(); toggleDrawer();">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Profile & Sub-Number Settings</span>
         </div>
         <a href="/desktop/" class="drawer-item" style="text-decoration: none; color: inherit;">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
@@ -419,56 +489,219 @@
     </div>
   </div>
 
-  <!-- ==================== DIGITAL ID CARD & DYNAMIC QR MODAL ==================== -->
+  <!-- ==================== DIGITAL ID CARD & CONTACT INFO MODAL ==================== -->
   <div id="digital-id-modal" class="id-card-modal-overlay" style="display: none;" onclick="closeDigitalIdModal(event)">
     <div class="id-card-dialog" onclick="event.stopPropagation()">
       <div class="id-card-top-bar">
         <div class="id-card-header-badge">
           <span class="online-dot"></span>
-          <span>OFFICIAL INAI DIGITAL MAIL ID</span>
+          <span id="id-modal-top-title">OFFICIAL INAI DIGITAL MAIL ID</span>
         </div>
         <button class="close-modal-btn" onclick="closeDigitalIdModal()">✕</button>
       </div>
 
-      <!-- Luxury Smart Mail Card -->
-      <div class="smart-mail-card" id="smart-mail-card">
-        <div class="smart-card-shimmer"></div>
-        <div class="smart-card-top">
-          <div class="chip-hologram">
-            <div class="chip-line"></div>
-          </div>
-          <div class="smart-card-brand">
-            <span class="saffron-text">IN</span><span class="green-text">AI</span>
-            <span class="country-tag">🇮🇳 BHARAT</span>
+      <!-- Segmented Switcher: [Digital ID Card] vs [Edit Person Info] -->
+      <div class="id-card-tab-bar">
+        <button type="button" class="id-tab-btn active" id="btn-id-tab-card" onclick="switchIdCardTab('card')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Digital ID Card</span>
+        </button>
+        <button type="button" class="id-tab-btn" id="btn-id-tab-edit" onclick="switchIdCardTab('edit')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span>Edit Person Info</span>
+        </button>
+      </div>
+
+      <!-- VIEW 1: 3D DIGITAL ID CARD VIEW -->
+      <div id="id-card-view-panel" class="id-panel-view active">
+        <!-- 3D Flippable Smart Mail Card -->
+        <div class="smart-mail-card-wrapper" onclick="flipSmartCard()">
+          <div class="smart-mail-card" id="smart-mail-card">
+            <!-- Front of Card -->
+            <div class="card-side card-front">
+              <div class="smart-card-shimmer"></div>
+              <div class="smart-card-top">
+                <div class="chip-hologram">
+                  <div class="chip-line"></div>
+                </div>
+                <div class="smart-card-brand">
+                  <span class="saffron-text">IN</span><span class="green-text">AI</span>
+                  <span class="country-tag">🇮🇳 BHARAT</span>
+                </div>
+              </div>
+
+              <div class="smart-card-middle">
+                <div class="smart-card-avatar-box">
+                  <div class="smart-card-avatar" id="id-card-avatar-img">S</div>
+                </div>
+                <div class="smart-card-meta">
+                  <div class="card-holder-name" id="id-card-name">Soumith</div>
+                  <div class="card-holder-phone" id="id-card-phone">+91 93815 64959</div>
+                  <div class="card-holder-email" id="id-card-email">9381564959@alphastack.wwisvnr.com</div>
+                  <div class="card-holder-tag" id="id-card-alias-tag">Sub-ID: .primary</div>
+                </div>
+                <div class="smart-card-qr-box">
+                  <img id="id-card-qr-img" src="" alt="Scan to send email" width="85" height="85">
+                </div>
+              </div>
+
+              <div class="smart-card-bottom">
+                <div class="card-protocol-text">SECURE PHONE-POWERED PROTOCOL</div>
+                <div class="card-status-verified">⚡ 100% VERIFIED IDENTITY</div>
+              </div>
+            </div>
+
+            <!-- Back of Card (Revealed on 3D Flip) -->
+            <div class="card-side card-back">
+              <div class="card-back-magstripe"></div>
+              <div class="card-back-body">
+                <div class="card-back-text">This digital identity card authorizes real-time, spam-free message transmission over the INAI Bharat Mail phone-to-email gateway.</div>
+                <div class="card-back-meta-row">
+                  <div>
+                    <span class="back-label">ISSUED:</span>
+                    <strong class="back-val" id="id-card-issue-date">2026-09-25</strong>
+                  </div>
+                  <div>
+                    <span class="back-label">SECURITY:</span>
+                    <strong class="back-val">SHA-256 E2E</strong>
+                  </div>
+                </div>
+                <div class="card-back-barcode">
+                  <span>||| | | || ||| || ||| | ||| |||| | | ||</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="smart-card-middle">
-          <div class="smart-card-meta">
-            <div class="card-holder-name" id="id-card-name">Soumith</div>
-            <div class="card-holder-phone" id="id-card-phone">+91 93815 64959</div>
-            <div class="card-holder-email" id="id-card-email">9381564959@alphastack.wwisvnr.com</div>
-          </div>
-          <div class="smart-card-qr-box">
-            <img id="id-card-qr-img" src="" alt="Scan to send email" width="95" height="95">
-          </div>
+        <div style="text-align: center; margin: 6px 0; font-size: 11px; color: var(--text-dim);">
+          <span>Tap card to flip 3D view 🔄</span>
         </div>
 
-        <div class="smart-card-bottom">
-          <div class="card-protocol-text">SECURE PHONE-POWERED PROTOCOL</div>
-          <div class="card-status-verified">⚡ 100% VERIFIED IDENTITY</div>
+        <div class="id-card-actions-row">
+          <button type="button" class="btn-primary-mobile full-width" onclick="copyIdCardEmail()" id="btn-copy-id">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="btn-copy-id-text">Copy Mail ID</span>
+          </button>
+          <button type="button" class="btn-dock-mob share-btn" onclick="shareDigitalIdCard()" id="btn-share-id" title="Share your INAI Card">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span>Share</span>
+          </button>
         </div>
       </div>
 
-      <div class="id-card-actions-row">
-        <button type="button" class="btn-primary-mobile full-width" onclick="copyIdCardEmail()" id="btn-copy-id">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          <span id="btn-copy-id-text">Copy Mail ID</span>
-        </button>
-        <button type="button" class="btn-dock-mob share-btn" onclick="shareDigitalIdCard()" id="btn-share-id" title="Share your INAI Card">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          <span>Share</span>
-        </button>
+      <!-- VIEW 2: EDIT PERSON INFO FORM -->
+      <div id="id-card-edit-panel" class="id-panel-view" style="display: none;">
+        <form class="person-info-form" onsubmit="savePersonInfoSubmit(event)">
+          <div class="person-avatar-picker-cluster">
+            <div class="person-avatar-preview" id="edit-person-avatar-preview">U</div>
+            <div class="person-avatar-palette">
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="selectPersonAvatarGradient('emerald')"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="selectPersonAvatarGradient('ocean')"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);" onclick="selectPersonAvatarGradient('purple')"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="selectPersonAvatarGradient('amber')"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #ec4899, #be185d);" onclick="selectPersonAvatarGradient('rose')"></span>
+            </div>
+          </div>
+
+          <div class="form-group-mob">
+            <label for="edit-person-name">NAME / DISPLAY NAME</label>
+            <input type="text" id="edit-person-name" class="profile-input-field" placeholder="Full Name" required>
+          </div>
+
+          <div class="form-group-mob">
+            <label for="edit-person-phone">PHONE NUMBER</label>
+            <input type="text" id="edit-person-phone" class="profile-input-field" placeholder="+91 9876543210" readonly style="background: var(--bg-hover);">
+          </div>
+
+          <div class="form-group-mob">
+            <label for="edit-person-email">EMAIL ADDRESS</label>
+            <input type="email" id="edit-person-email" class="profile-input-field" placeholder="user@alphastack.wwisvnr.com">
+          </div>
+
+          <div class="form-group-mob">
+            <label for="edit-person-alias">OPTIONAL SUB-NUMBER ALIAS</label>
+            <input type="text" id="edit-person-alias" class="profile-input-field" placeholder="e.g. work, personal, vip">
+          </div>
+
+          <div class="form-group-mob">
+            <label for="edit-person-bio">NOTES / BIO</label>
+            <textarea id="edit-person-bio" class="profile-input-field" rows="2" placeholder="Add personal note or contact description..."></textarea>
+          </div>
+
+          <div class="edit-person-actions">
+            <button type="button" class="btn-secondary" onclick="switchIdCardTab('card')">Cancel</button>
+            <button type="submit" class="btn-primary-mobile">Save Changes ✓</button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ==================== MOBILE PROFILE & SETTINGS MODAL ==================== -->
+  <div id="mobile-settings-modal" class="modal-wrapper" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="tiranga-tag-mini">SETTINGS</span>
+          <h3>Profile & Settings</h3>
+        </div>
+        <button class="close-modal-btn" onclick="closeMobileProfileSettings()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div class="settings-section">
+          <div class="settings-avatar-row">
+            <div class="settings-avatar-big" id="mob-settings-avatar">S</div>
+            <div>
+              <div style="font-weight: 800; font-size: 15px;" id="mob-settings-name">Soumith</div>
+              <div style="font-size: 12.5px; color: var(--text-muted);" id="mob-settings-phone">+91 98765 43210</div>
+              <div style="font-size: 11.5px; color: var(--green-main); font-weight: 700;">⚡ INAI Verified Mailbox</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <label>PHONE NUMBER (IDENTITY)</label>
+          <input type="text" id="mob-settings-phone-input" class="profile-input-field" readonly style="background: var(--bg-hover);">
+        </div>
+
+        <div class="settings-field">
+          <label>DISPLAY NAME</label>
+          <input type="text" id="mob-settings-name-input" class="profile-input-field" placeholder="Your Name">
+        </div>
+
+        <div class="settings-field">
+          <label>PRIMARY EMAIL ADDRESS</label>
+          <input type="text" id="mob-settings-email-input" class="profile-input-field" readonly style="background: var(--bg-hover);">
+        </div>
+
+        <div class="settings-field">
+          <label>LANGUAGE & TRANSLATION</label>
+          <select id="mob-settings-lang" class="profile-input-field" onchange="setInaiLanguage(this.value)">
+            <option value="en">🇬🇧 English</option>
+            <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+            <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+            <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+            <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+            <option value="bn">🇮🇳 বাংলা (Bengali)</option>
+            <option value="es">🇪🇸 Español</option>
+          </select>
+        </div>
+
+        <div class="settings-field">
+          <label>ACTIVE SUB-NUMBER ALIASES</label>
+          <div class="alias-chips" style="margin-top: 6px;">
+            <span class="alias-chip selected">.primary</span>
+            <span class="alias-chip">.work</span>
+            <span class="alias-chip">.personal</span>
+            <span class="alias-chip">.finance</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeMobileProfileSettings()">Close</button>
+        <button class="btn-primary-mobile" onclick="saveMobileSettings()">Save Profile</button>
       </div>
     </div>
   </div>

@@ -36,7 +36,8 @@ if (useMysql) {
         'ALTER TABLE users ADD COLUMN language VARCHAR(10) DEFAULT "en"',
         'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)',
         'ALTER TABLE conversation_participants MODIFY COLUMN phone_number VARCHAR(191)',
-        'ALTER TABLE conversations MODIFY COLUMN participant_phone VARCHAR(191)'
+        'ALTER TABLE conversations MODIFY COLUMN participant_phone VARCHAR(191)',
+        'ALTER TABLE users ADD COLUMN bio TEXT'
       ];
       for (const m of migrations) {
         try {
@@ -100,6 +101,9 @@ async function getSqliteDb() {
     } catch (e) {}
     try {
       db.run('ALTER TABLE emails ADD COLUMN is_starred INT DEFAULT 0;');
+    } catch (e) {}
+    try {
+      db.run('ALTER TABLE users ADD COLUMN bio TEXT;');
     } catch (e) {}
     saveToDisk();
   } catch (err) {
@@ -237,6 +241,43 @@ export const dbOps = {
     } catch (err) {
       console.warn('Notice: Duplicate email pruning exception:', err.message);
       return 0;
+    }
+  },
+
+  async consolidateConversations() {
+    try {
+      function norm(s) {
+        return String(s || '').replace(/^(\s*(re|fwd|fw|aw|sv)\s*:\s*)+/i, '').trim().toLowerCase();
+      }
+      function extractClean(str) {
+        if (!str) return '';
+        const match = str.match(/<([^>]+)>/);
+        if (match) return match[1].toLowerCase().trim();
+        const digits = str.replace(/\D/g, '').slice(-10);
+        if (digits && digits.length === 10) return digits;
+        return str.toLowerCase().trim();
+      }
+
+      const convs = await this.queryAll('SELECT * FROM conversations ORDER BY created_at ASC');
+      const convMap = new Map();
+      for (const c of convs) {
+        const p = extractClean(c.participant_phone);
+        const s = norm(c.subject);
+        const key = c.is_group ? 'group_' + c.id : p + '___' + s;
+        if (!convMap.has(key)) {
+          convMap.set(key, c);
+        } else {
+          const master = convMap.get(key);
+          await this.execute('UPDATE emails SET conversation_id = ? WHERE conversation_id = ?', [master.id, c.id]);
+          await this.execute('DELETE FROM conversation_participants WHERE conversation_id = ?', [c.id]);
+          await this.execute('DELETE FROM conversations WHERE id = ?', [c.id]);
+          if (c.subject && (c.subject.toLowerCase().startsWith('re:') || c.subject.toLowerCase().startsWith('fwd:'))) {
+            await this.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP, subject = ? WHERE id = ?', [c.subject, master.id]);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Notice: Conversation consolidation exception:', err.message);
     }
   }
 };

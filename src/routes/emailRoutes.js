@@ -30,28 +30,41 @@ router.get('/conversations', async (req, res) => {
         ) as participant_phone,
         (SELECT body_text FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT sender_email FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_sender,
+        (SELECT subject FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_subject,
         (SELECT created_at FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_time,
         (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id AND is_read = 0 AND sender_email NOT LIKE ?) as unread_count,
-        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id) as message_count
+        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id) as message_count,
+        (SELECT MAX(is_starred) FROM emails WHERE conversation_id = c.id) as is_starred,
+        (SELECT MAX(is_important) FROM emails WHERE conversation_id = c.id) as is_important,
+        (SELECT folder FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as folder
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
       WHERE ${whereClause}
       ORDER BY c.updated_at DESC
     `, [`%${cleanPhone}%`, `%${cleanPhone}%`, cleanPhone, `%${cleanPhone}%`]);
 
-    // Enrich conversations with registered participant display names
+    // Enrich conversations with registered participant display names and avatars
     try {
-      const userRows = await dbOps.queryAll('SELECT phone_number, display_name FROM users');
+      const userRows = await dbOps.queryAll('SELECT phone_number, display_name, avatar_url FROM users');
       const userMap = {};
+      const avatarMap = {};
       for (const u of (userRows || [])) {
-        if (u.phone_number && u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
-          userMap[u.phone_number] = u.display_name;
+        if (u.phone_number) {
+          if (u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
+            userMap[u.phone_number] = u.display_name;
+          }
+          if (u.avatar_url) {
+            avatarMap[u.phone_number] = u.avatar_url;
+          }
         }
       }
       for (const c of conversations) {
         const digits = (c.participant_phone || '').replace(/\D/g, '').slice(-10);
         if (digits && userMap[digits]) {
           c.participant_name = userMap[digits];
+        }
+        if (digits && avatarMap[digits]) {
+          c.participant_avatar = avatarMap[digits];
         }
       }
     } catch (uErr) {}
@@ -95,24 +108,52 @@ router.get('/conversations/:id', async (req, res) => {
     // Mark unread messages in this conversation as read
     await dbOps.execute(`UPDATE emails SET is_read = 1 WHERE conversation_id = ?`, [id]);
 
-    // Enrich messages and conversation with display names
+    // Enrich messages and conversation with display names, avatars, and quoted reply details
     try {
-      const userRows = await dbOps.queryAll('SELECT phone_number, display_name FROM users');
+      const userRows = await dbOps.queryAll('SELECT phone_number, display_name, avatar_url FROM users');
       const userMap = {};
+      const avatarMap = {};
       for (const u of (userRows || [])) {
-        if (u.phone_number && u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
-          userMap[u.phone_number] = u.display_name;
+        if (u.phone_number) {
+          if (u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
+            userMap[u.phone_number] = u.display_name;
+          }
+          if (u.avatar_url) {
+            avatarMap[u.phone_number] = u.avatar_url;
+          }
         }
       }
+
+      const msgMap = {};
       for (const m of messages) {
+        msgMap[m.id] = m;
         const digits = (m.sender_email || '').replace(/\D/g, '').slice(-10);
         if (digits && userMap[digits]) {
           m.sender_name = userMap[digits];
         }
+        if (digits && avatarMap[digits]) {
+          m.sender_avatar = avatarMap[digits];
+        }
       }
+
+      // Quoted reply enrichment
+      for (const m of messages) {
+        if (m.reply_to_id) {
+          const parent = msgMap[m.reply_to_id];
+          if (parent) {
+            m.quoted_sender = parent.sender_name || parent.sender_email;
+            m.quoted_text = (parent.body_text || '').substring(0, 120);
+            m.quoted_subject = parent.subject || '';
+          }
+        }
+      }
+
       const convDigits = (conversation.participant_phone || '').replace(/\D/g, '').slice(-10);
       if (convDigits && userMap[convDigits]) {
         conversation.participant_name = userMap[convDigits];
+      }
+      if (convDigits && avatarMap[convDigits]) {
+        conversation.participant_avatar = avatarMap[convDigits];
       }
     } catch (uErr) {}
 
@@ -233,14 +274,20 @@ router.get('/emails', async (req, res) => {
  */
 router.post('/emails/send', async (req, res) => {
   try {
-    const { senderPhone, toRecipients, subject, bodyText, replyToId, conversationId } = req.body;
-    if (!senderPhone || !toRecipients || !bodyText) {
+    const rawSender = req.body.senderPhone || req.body.sender_phone;
+    const rawRecipients = req.body.toRecipients || req.body.to || req.body.recipients;
+    const subject = req.body.subject || '';
+    const bodyText = req.body.bodyText || req.body.body || req.body.message || '';
+    const replyToId = req.body.replyToId || req.body.reply_to_id || null;
+    const conversationId = req.body.conversationId || req.body.conversation_id || null;
+
+    if (!rawSender || !rawRecipients || !bodyText) {
       return res.status(400).json({ error: 'Sender phone, recipient(s), and message body are required' });
     }
 
     const email = await emailService.sendOutboundEmail({
-      senderPhone: String(senderPhone).replace(/\D/g, '').slice(-10),
-      toRecipients,
+      senderPhone: String(rawSender).replace(/\D/g, '').slice(-10),
+      toRecipients: rawRecipients,
       subject,
       bodyText,
       replyToId: replyToId || null,
@@ -250,6 +297,99 @@ router.post('/emails/send', async (req, res) => {
     res.json({ success: true, email });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * Update or save person/contact info (name, email, avatar, bio, sub-number alias)
+ */
+router.post('/contacts/update', async (req, res) => {
+  try {
+    const { phone, name, email, bio, avatar_url, alias_tag } = req.body;
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
+    let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    
+    if (user) {
+      await dbOps.execute(`
+        UPDATE users 
+        SET display_name = COALESCE(?, display_name),
+            email_address = COALESCE(?, email_address),
+            bio = COALESCE(?, bio),
+            avatar_url = COALESCE(?, avatar_url)
+        WHERE phone_number = ?
+      `, [name || null, email || null, bio || null, avatar_url || null, cleanPhone]);
+    } else {
+      const newId = 'user_' + Date.now();
+      const defaultEmail = email || `${cleanPhone}@${config.domainName}`;
+      await dbOps.execute(`
+        INSERT INTO users (id, phone_number, email_address, display_name, bio, avatar_url, registration_channel, has_mobile_app)
+        VALUES (?, ?, ?, ?, ?, ?, 'WEB_CLIENT', 0)
+      `, [newId, cleanPhone, defaultEmail, name || `User ${cleanPhone}`, bio || '', avatar_url || '']);
+    }
+
+    if (alias_tag) {
+      const cleanTag = alias_tag.replace(/^\.+/, '').trim().toLowerCase();
+      if (cleanTag) {
+        const u = await dbOps.queryOne('SELECT id FROM users WHERE phone_number = ?', [cleanPhone]);
+        if (u) {
+          const aliasEmail = `${cleanPhone}.${cleanTag}@${config.domainName}`;
+          const existingAlias = await dbOps.queryOne('SELECT id FROM aliases WHERE alias_email = ?', [aliasEmail]);
+          if (!existingAlias) {
+            await dbOps.execute(`
+              INSERT INTO aliases (id, user_id, alias_email, label, is_active)
+              VALUES (?, ?, ?, ?, 1)
+            `, ['alias_' + Date.now(), u.id, aliasEmail, cleanTag]);
+          }
+        }
+      }
+    }
+
+    const updatedUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    res.json({ success: true, contact: updatedUser });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Get contact profile and ID card details
+ */
+router.get('/contacts/detail/:phone', async (req, res) => {
+  try {
+    const rawPhone = req.params.phone;
+    const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+    const user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    
+    // Check aliases
+    let aliases = [];
+    if (user) {
+      aliases = await dbOps.queryAll('SELECT * FROM aliases WHERE user_id = ? AND is_active = 1', [user.id]);
+    }
+
+    // Message stats
+    const stats = await dbOps.queryOne(`
+      SELECT COUNT(*) as total_messages 
+      FROM emails 
+      WHERE sender_email LIKE ? OR recipient_emails LIKE ?
+    `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+
+    res.json({
+      success: true,
+      contact: user || {
+        phone_number: cleanPhone,
+        display_name: `User ${cleanPhone}`,
+        email_address: `${cleanPhone}@${config.domainName}`,
+        avatar_url: '',
+        bio: ''
+      },
+      aliases: aliases || [],
+      total_messages: stats ? stats.total_messages : 0
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

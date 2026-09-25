@@ -16,8 +16,15 @@ let originalMessageSubject = '';
 let originalMessageBody = '';
 let socket = null;
 let activeSourceFilter = 'all'; // 'all' | 'phonemail' | 'external'
+let activeQuickFilter = 'all'; // 'all' | 'unread' | 'attachments' | 'favorites'
 let searchTerm = '';
 let cachedContacts = [];
+let allConversations = [];
+let activeConversation = null;
+let activeConversationId = null;
+let activeReplyingMessage = null;
+let activeContactForModal = null;
+let activeTradEmail = null;
 
 // ==================== PERSISTENCE & FORMATTING HELPERS ====================
 function escapeHtml(str) {
@@ -38,6 +45,46 @@ function getInitials(name) {
   const numMatch = clean.match(/\d/);
   if (numMatch) return numMatch[0];
   return 'U';
+}
+
+/**
+ * Dynamic deterministic default profile picture generator
+ * Generates vibrant SVG avatar with gradient background and crisp monogram
+ */
+function generateDefaultAvatar(seed, displayName = '') {
+  const str = String(seed || displayName || 'User').trim();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const gradients = [
+    ['#046A38', '#10B981'], // Bharat Green
+    ['#FF671F', '#F59E0B'], // Kesari Saffron
+    ['#2563EB', '#38BDF8'], // Ocean Blue
+    ['#7C3AED', '#C084FC'], // Royal Purple
+    ['#DB2777', '#F472B6'], // Rose Pink
+    ['#0D9488', '#2DD4BF'], // Teal Aurora
+    ['#DC2626', '#F87171'], // Crimson Flame
+    ['#4F46E5', '#818CF8']  // Indigo Deep
+  ];
+  
+  const pair = gradients[Math.abs(hash) % gradients.length];
+  const initial = getInitials(displayName || str);
+  
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+    <defs>
+      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${pair[0]}"/>
+        <stop offset="100%" stop-color="${pair[1]}"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="50" fill="url(#g_${Math.abs(hash)})"/>
+    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+    <text x="50" y="61" font-family="-apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', Roboto, sans-serif" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
+  </svg>`;
+
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
 }
 
 function formatPhoneDisplay(digits, tag = '') {
@@ -811,144 +858,314 @@ async function toggleStar(id, e) {
   } catch (err) {}
 }
 
-// ==================== EMAIL LIST RENDERING (GROUPED & SWIPEABLE) ====================
+// ==================== CONVERSATION THREADING & UTILITIES ====================
+function normalizeSubject(sub) {
+  if (!sub) return '(no subject)';
+  let s = String(sub).trim();
+  // Strip repeated Re:, Fwd:, Fw:, Sv:, Aw:, etc.
+  s = s.replace(/^(\s*(re|fw|fwd|sv|aw|antw)\s*:\s*)+/i, '').trim();
+  return s.toLowerCase() || '(no subject)';
+}
+
+function extractCleanParticipant(str) {
+  if (!str) return '';
+  const s = String(str).trim();
+  const angleMatch = s.match(/<([^>]+)>/);
+  if (angleMatch) return angleMatch[1].trim().toLowerCase();
+  return s.replace(/^["']|["']$/g, '').trim().toLowerCase();
+}
+
+function getConversationKey(email, myPhone) {
+  // If email already has a server-assigned conversation_id, use it
+  if (email.conversation_id) {
+    return email.conversation_id;
+  }
+
+  const sender = extractCleanParticipant(email.sender_email);
+  const myClean = (myPhone || (currentUser && currentUser.phone) || '').replace(/\D/g, '');
+  
+  // Parse recipients
+  let recipients = [];
+  if (email.recipient_phone) {
+    recipients = email.recipient_phone.split(/[,;]/).map(r => extractCleanParticipant(r)).filter(Boolean);
+  }
+
+  // Determine counterpart(s)
+  const isSenderMe = sender.includes(myClean) || (currentUser && sender.includes(currentUser.phone));
+  let counterparts = [];
+
+  if (isSenderMe) {
+    counterparts = recipients.filter(r => !r.includes(myClean));
+  } else {
+    counterparts = [sender, ...recipients.filter(r => !r.includes(myClean) && r !== sender)];
+  }
+
+  const normSub = normalizeSubject(email.subject);
+
+  // Group Conversation: 2 or more external counterparts
+  if (counterparts.length >= 2) {
+    const sorted = [...new Set(counterparts)].sort();
+    return `group_${sorted.join('__')}_${normSub}`;
+  }
+
+  // 1-on-1 Conversation
+  const otherParty = counterparts[0] || sender || 'unknown';
+  return `direct_${otherParty}_${normSub}`;
+}
+
+function groupEmailsIntoConversations(emails) {
+  const myPhone = currentUser ? currentUser.phone : '';
+  const convMap = new Map();
+
+  emails.forEach(email => {
+    const key = getConversationKey(email, myPhone);
+    if (!convMap.has(key)) {
+      convMap.set(key, {
+        id: email.conversation_id || key,
+        key: key,
+        messages: [],
+        subject: email.subject || '(No Subject)',
+        is_starred: 0,
+        is_important: 0,
+        folder: email.folder || 'INBOX',
+        has_attachments: false,
+        created_at: email.created_at
+      });
+    }
+
+    const conv = convMap.get(key);
+    conv.messages.push(email);
+
+    if (email.is_starred === 1) conv.is_starred = 1;
+    if (email.is_important === 1) conv.is_important = 1;
+    if (email.has_attachments || (email.attachments && email.attachments.length > 0)) {
+      conv.has_attachments = true;
+    }
+    // Update to most recent timestamp
+    if (new Date(email.created_at) > new Date(conv.created_at)) {
+      conv.created_at = email.created_at;
+      conv.subject = email.subject || conv.subject;
+    }
+  });
+
+  const convList = [];
+  convMap.forEach(conv => {
+    // Sort chronological: oldest first for chat timeline
+    conv.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const latest = conv.messages[conv.messages.length - 1];
+    conv.latestMessage = latest;
+    conv.latest_subject = latest.subject || conv.subject || '(No Subject)';
+    conv.latest_snippet = (latest.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
+    conv.message_count = conv.messages.length;
+    conv.is_read = conv.messages.every(m => m.is_read === 1) ? 1 : 0;
+    conv.unread_count = conv.messages.filter(m => m.is_read === 0).length;
+
+    // Detect if group or 1-on-1
+    const isGroup = conv.key.startsWith('group_');
+    conv.is_group = isGroup;
+
+    // Identify primary participant (counterpart)
+    const myClean = (myPhone || '').replace(/\D/g, '');
+    let counterpart = '';
+    let senderName = '';
+
+    for (let i = conv.messages.length - 1; i >= 0; i--) {
+      const m = conv.messages[i];
+      const s = extractCleanParticipant(m.sender_email);
+      if (!s.includes(myClean)) {
+        counterpart = s;
+        senderName = m.sender_name || '';
+        break;
+      }
+    }
+    if (!counterpart) {
+      counterpart = extractCleanParticipant(latest.recipient_phone || latest.sender_email);
+      senderName = latest.sender_name || '';
+    }
+
+    conv.participant_raw = counterpart;
+    conv.sender_name = senderName;
+
+    const isPhoneMail = isPhoneMailSender(counterpart);
+    conv.is_phonemail = isPhoneMail;
+
+    // Format display title
+    if (isGroup) {
+      conv.display_title = `Group (${conv.message_count} msgs)`;
+      conv.display_subtitle = '👥 Group Conversation';
+    } else {
+      const formatted = formatSenderDisplay(counterpart, false, senderName);
+      conv.display_title = formatted;
+      conv.display_subtitle = isPhoneMail ? '⚡ INAI Verified' : '🌐 External Mail';
+    }
+
+    // Avatar
+    const seed = conv.display_title || counterpart;
+    conv.avatar_url = latest.participant_avatar || generateDefaultAvatar(seed, conv.display_title);
+
+    convList.push(conv);
+  });
+
+  // Sort conversations descending by latest message
+  convList.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return convList;
+}
+
+// ==================== QUICK FILTERS (ALL / UNREAD / ATTACHMENTS / FAVORITES) ====================
+function setMobileQuickFilter(filter) {
+  activeQuickFilter = filter;
+  ['all', 'unread', 'attachments', 'favorites'].forEach(f => {
+    const pill = document.getElementById(`quick-pill-${f}`);
+    if (pill) {
+      if (f === filter) pill.classList.add('active');
+      else pill.classList.remove('active');
+    }
+  });
+  renderEmailList(allEmails);
+}
+
+function clearSearchInput() {
+  const input = document.getElementById('mob-search-input');
+  const clearBtn = document.getElementById('search-clear-btn');
+  if (input) {
+    input.value = '';
+    searchTerm = '';
+  }
+  if (clearBtn) clearBtn.style.display = 'none';
+  renderEmailList(allEmails);
+}
+
+// ==================== MOBILE CONVERSATION LIST RENDERING ====================
 function renderEmailList(emails) {
   const container = document.getElementById('conversations-list');
   if (!container) return;
   container.innerHTML = '';
 
-  let listToRender = emails || [];
+  const rawList = emails || [];
+  allConversations = groupEmailsIntoConversations(rawList);
 
-  // Filter 1: Source classification tab
+  // Update quick filter pill counts
+  const totalCount = allConversations.length;
+  const unreadCount = allConversations.filter(c => c.unread_count > 0).length;
+  const attachCount = allConversations.filter(c => c.has_attachments).length;
+  const favCount = allConversations.filter(c => c.is_starred === 1 || c.is_important === 1).length;
+
+  const pillAll = document.getElementById('mob-pill-all');
+  if (pillAll) pillAll.innerText = totalCount;
+  const pillUnread = document.getElementById('mob-pill-unread');
+  if (pillUnread) pillUnread.innerText = unreadCount;
+  const pillAttach = document.getElementById('mob-pill-attachments');
+  if (pillAttach) pillAttach.innerText = attachCount;
+  const pillFav = document.getElementById('mob-pill-favorites');
+  if (pillFav) pillFav.innerText = favCount;
+
+  let filtered = [...allConversations];
+
+  // 1. Source Filter (All / INAI Network / External)
   if (activeSourceFilter === 'phonemail') {
-    listToRender = listToRender.filter(e => isPhoneMailSender(e.sender_email));
+    filtered = filtered.filter(c => c.is_phonemail);
   } else if (activeSourceFilter === 'external') {
-    listToRender = listToRender.filter(e => !isPhoneMailSender(e.sender_email));
+    filtered = filtered.filter(c => !c.is_phonemail);
   }
 
-  // Filter 2: Search term
+  // 2. Quick Filter Pill
+  if (activeQuickFilter === 'unread') {
+    filtered = filtered.filter(c => c.unread_count > 0);
+  } else if (activeQuickFilter === 'attachments') {
+    filtered = filtered.filter(c => c.has_attachments);
+  } else if (activeQuickFilter === 'favorites') {
+    filtered = filtered.filter(c => c.is_starred === 1 || c.is_important === 1);
+  }
+
+  // 3. Search query
   if (searchTerm) {
-    listToRender = listToRender.filter(e => {
-      const txt = `${e.sender_email || ''} ${e.subject || ''} ${e.body_text || ''}`.toLowerCase();
-      return txt.includes(searchTerm);
+    filtered = filtered.filter(c => {
+      const matchSub = (c.latest_subject || '').toLowerCase().includes(searchTerm);
+      const matchPart = (c.display_title || '').toLowerCase().includes(searchTerm);
+      const matchBody = (c.latest_snippet || '').toLowerCase().includes(searchTerm);
+      const matchMsgs = c.messages.some(m => 
+        (m.subject || '').toLowerCase().includes(searchTerm) || 
+        (m.body_text || '').toLowerCase().includes(searchTerm)
+      );
+      return matchSub || matchPart || matchBody || matchMsgs;
     });
   }
 
-  if (listToRender.length === 0) {
-    let emptyMsg = `No messages found in ${getFolderFriendlyName(currentFolder)}.`;
-    if (activeSourceFilter === 'phonemail') {
-      emptyMsg = `No INAI network messages in ${getFolderFriendlyName(currentFolder)}.`;
-    } else if (activeSourceFilter === 'external') {
-      emptyMsg = `No external (Gmail, Rediff, etc.) messages in ${getFolderFriendlyName(currentFolder)}.`;
-    }
+  if (filtered.length === 0) {
+    let emptyMsg = `No conversations in ${getFolderFriendlyName(currentFolder)}.`;
+    if (activeQuickFilter === 'unread') emptyMsg = 'No unread conversations.';
+    else if (activeQuickFilter === 'attachments') emptyMsg = 'No conversations with attachments.';
+    else if (activeQuickFilter === 'favorites') emptyMsg = 'No starred or favorite conversations.';
+
     container.innerHTML = `
-      <div style="text-align: center; color: var(--text-dim); padding: 60px 20px;">
+      <div style="text-align: center; color: var(--text-dim); padding: 50px 20px;">
         <div style="margin-bottom: 12px;">
-          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </div>
-        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Messages</h3>
+        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Conversations Found</h3>
         <p style="font-size: 12.5px;">${emptyMsg}</p>
       </div>
     `;
     return;
   }
 
-  // Date Categorization (Today, Yesterday, This Week, Older)
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterdayStart = todayStart - 86400000;
-  const weekStart = todayStart - 6 * 86400000;
-
-  const groups = [
-    { key: 'today', title: 'Today', items: [] },
-    { key: 'yesterday', title: 'Yesterday', items: [] },
-    { key: 'this_week', title: 'This Week', items: [] },
-    { key: 'older', title: 'Older', items: [] }
-  ];
-
-  listToRender.forEach(email => {
-    const t = new Date(email.created_at).getTime();
-    if (t >= todayStart) groups[0].items.push(email);
-    else if (t >= yesterdayStart) groups[1].items.push(email);
-    else if (t >= weekStart) groups[2].items.push(email);
-    else groups[3].items.push(email);
-  });
-
-  groups.forEach(grp => {
-    if (grp.items.length === 0) return;
-
-    // Group Header
-    const grpHeader = document.createElement('div');
-    grpHeader.className = 'email-group-header';
-    grpHeader.innerHTML = `
-      <span class="email-group-title">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>${grp.title}</span>
-      </span>
-      <span class="email-group-count">${grp.items.length}</span>
-    `;
-    container.appendChild(grpHeader);
-
-    grp.items.forEach(email => {
-      const card = createMobileEmailCard(email);
-      container.appendChild(card);
-    });
+  // Render conversation cards
+  filtered.forEach(conv => {
+    const card = createMobileConversationCard(conv);
+    container.appendChild(card);
   });
 
   updateBulkToolbar();
 }
 
-function createMobileEmailCard(email) {
+function createMobileConversationCard(conv) {
   const cardWrapper = document.createElement('div');
-  const isSelected = selectedEmailIds.has(email.id);
-  const isStarred = email.is_starred === 1;
-  const isImportant = email.is_important === 1;
+  const isSelected = selectedEmailIds.has(conv.id);
+  const isStarred = conv.is_starred === 1;
+  const isImportant = conv.is_important === 1;
 
-  cardWrapper.id = `mob-row-${email.id}`;
-  cardWrapper.dataset.id = email.id;
-  cardWrapper.className = `email-card-wrapper`;
+  cardWrapper.id = `mob-conv-${conv.id}`;
+  cardWrapper.dataset.id = conv.id;
+  cardWrapper.className = `email-card-wrapper conversation-thread-wrapper`;
 
-  const dateObj = new Date(email.created_at);
+  const dateObj = new Date(conv.created_at);
   const isToday = new Date().toDateString() === dateObj.toDateString();
   const timeDisplay = isToday 
     ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-  const isSentFolder = currentFolder.toUpperCase() === 'SENT';
-  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
-  const recipientsDisplay = getRecipientsDisplay(email);
-
-  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
-  const sourceBadgeHtml = isFromPhoneMail
+  const sourceBadgeHtml = conv.is_phonemail
     ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
     : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
-  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
-  const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
-  const displaySender = (isSentFolder || isSentByMe) 
-    ? `To: ${recipientsDisplay || 'Recipient'}` 
-    : formattedSender;
-  const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 80);
+  const msgCountBadge = conv.message_count > 1 
+    ? `<span class="conv-count-chip">${conv.message_count} msgs</span>` 
+    : '';
+
+  const unreadPill = conv.unread_count > 0 
+    ? `<span class="conv-unread-dot" title="${conv.unread_count} unread">${conv.unread_count}</span>` 
+    : '';
 
   cardWrapper.innerHTML = `
-    <!-- Underlay Swipe Actions (revealed when surface slides) -->
+    <!-- Underlay Swipe Actions -->
     <div class="swipe-actions-underlay">
       <div class="swipe-right-actions">
-        <button type="button" class="swipe-btn star" onclick="toggleStar('${email.id}', event); snapClosed();" title="Star">
+        <button type="button" class="swipe-btn star" onclick="toggleStar('${conv.latestMessage.id}', event); snapClosed();" title="Star">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           <span>${isStarred ? 'Unstar' : 'Star'}</span>
         </button>
-        <button type="button" class="swipe-btn important" onclick="toggleImportant('${email.id}', event); snapClosed();" title="Priority">
+        <button type="button" class="swipe-btn important" onclick="toggleImportant('${conv.latestMessage.id}', event); snapClosed();" title="Priority">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           <span>Priority</span>
         </button>
       </div>
       <div class="swipe-left-actions">
-        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnSingle('${email.id}', 'archive'); event.stopPropagation();" title="Archive">
+        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'archive'); event.stopPropagation();" title="Archive">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
           <span>Archive</span>
         </button>
-        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnSingle('${email.id}', 'delete'); event.stopPropagation();" title="Delete">
+        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'delete'); event.stopPropagation();" title="Delete">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           <span>Delete</span>
         </button>
@@ -956,33 +1173,39 @@ function createMobileEmailCard(email) {
     </div>
 
     <!-- Foreground Card Surface -->
-    <div class="email-card-surface ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}">
-      <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
+    <div class="email-card-surface ${conv.unread_count > 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''}">
+      <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${conv.latestMessage.id}', event)">
         <label class="custom-checkbox" onclick="event.stopPropagation()">
-          <input type="checkbox" class="row-checkbox" id="mob-check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
+          <input type="checkbox" class="row-checkbox" id="mob-check-${conv.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${conv.latestMessage.id}', event)">
           <span class="checkmark"></span>
         </label>
       </div>
 
-      <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+      <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${conv.latestMessage.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </span>
 
-      <div class="item-avatar-circle">${avatarInitial}</div>
+      <div class="item-avatar-circle" style="background-image: url('${conv.avatar_url}'); background-size: cover; background-position: center;">
+        ${!conv.avatar_url ? getInitials(conv.display_title) : ''}
+      </div>
 
       <div class="item-content-preview">
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-          <span style="font-size: 13.5px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65vw;">
-            ${escapeHtml(displaySender)}
+          <span style="font-size: 14px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;">
+            ${escapeHtml(conv.display_title)}
           </span>
-          <span class="item-date-col">${timeDisplay}</span>
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span class="item-date-col">${timeDisplay}</span>
+            ${unreadPill}
+          </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
           ${sourceBadgeHtml}
-          ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1.5px 6px; border-radius: 4px; margin-left: 2px;">PRIORITY</span>' : ''}
+          ${msgCountBadge}
+          ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1.5px 6px; border-radius: 4px;">PRIORITY</span>' : ''}
         </div>
-        <div class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</div>
-        <div class="item-body-snippet">${escapeHtml(cleanBodySnippet)}</div>
+        <div class="item-subject-title">${escapeHtml(conv.latest_subject)}</div>
+        <div class="item-body-snippet">${escapeHtml(conv.latest_snippet)}</div>
       </div>
     </div>
   `;
@@ -1000,7 +1223,6 @@ function createMobileEmailCard(email) {
     surface.style.transform = 'translateX(0px)';
   }
 
-  // Attach snapClosed to cardWrapper so child actions can invoke it
   cardWrapper.snapClosed = snapClosed;
 
   surface.addEventListener('touchstart', (e) => {
@@ -1049,9 +1271,7 @@ function createMobileEmailCard(email) {
         surface.style.transform = 'translateX(0px)';
       }
     } else {
-      if (currentTx !== 0) {
-        snapClosed();
-      }
+      if (currentTx !== 0) snapClosed();
     }
   }, { passive: true });
 
@@ -1068,87 +1288,761 @@ function createMobileEmailCard(email) {
       snapClosed();
       return;
     }
-    openEmailDetails(email);
+    openConversation(conv.id);
   });
 
   return cardWrapper;
 }
 
-// ==================== READING PANE VIEW ====================
-function openEmailDetails(email) {
-  activeEmail = email;
-  isMessageTranslated = false;
-  originalMessageSubject = email.subject || '(No Subject)';
-  originalMessageBody = (email.body_html || email.body_text || '').replace(/\n/g, '<br>');
+// ==================== WHATSAPP-GRADE MOBILE CONVERSATION SCREEN ====================
+async function openConversation(convId) {
+  const conv = allConversations.find(c => c.id === convId || c.key === convId);
+  if (!conv) return;
 
-  // Mark as read locally and backend
-  if (email.is_read === 0) {
-    email.is_read = 1;
-    fetch(`/api/emails/${email.id}/read`, { method: 'POST' }).catch(() => {});
-    const row = document.getElementById(`mob-row-${email.id}`);
-    if (row) row.classList.remove('unread');
+  activeConversation = conv;
+  activeConversationId = conv.id;
+  activeEmail = conv.latestMessage;
+  activeTradEmail = conv.latestMessage;
+
+  // Mark all messages in conversation as read
+  conv.messages.forEach(m => {
+    if (m.is_read === 0) {
+      m.is_read = 1;
+      fetch(`/api/emails/${m.id}/read`, { method: 'POST' }).catch(() => {});
+    }
+  });
+  conv.is_read = 1;
+  conv.unread_count = 0;
+
+  // Header configuration
+  const avatarEl = document.getElementById('mob-conv-avatar');
+  if (avatarEl) {
+    avatarEl.innerHTML = '';
+    avatarEl.style.backgroundImage = `url('${conv.avatar_url}')`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.style.backgroundPosition = 'center';
   }
 
-  const pane = document.getElementById('reading-pane');
-  if (!pane) return;
+  const titleEl = document.getElementById('mob-conv-title');
+  if (titleEl) titleEl.innerText = conv.display_title;
 
-  const senderFull = formatSenderDisplay(email.sender_email, true, email.sender_name);
-  const senderShort = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  const subEl = document.getElementById('mob-conv-subtitle');
+  if (subEl) subEl.innerText = conv.display_subtitle;
 
-  document.getElementById('mob-read-sender').innerText = senderShort;
-  document.getElementById('mob-read-sender-full').innerText = senderFull;
-  document.getElementById('mob-read-subject').innerText = originalMessageSubject;
-  document.getElementById('mob-read-avatar').innerText = getInitials(senderShort);
-  document.getElementById('mob-read-date').innerText = new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-  document.getElementById('mob-read-body').innerHTML = originalMessageBody;
-
-  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
-  const statusEl = document.getElementById('mob-read-status');
-  if (statusEl) {
-    statusEl.innerHTML = isFromPhoneMail 
-      ? '<span style="color: #046A38; font-weight: 800; font-size: 11px;">⚡ INAI Verified</span>' 
-      : '<span style="color: #2563eb; font-weight: 800; font-size: 11px;">🌐 External Mail</span>';
-  }
-
-  // Action button colors
-  const impBtn = document.getElementById('mob-pane-important-btn');
-  if (impBtn) {
-    impBtn.style.color = email.is_important === 1 ? '#eab308' : 'var(--text-dim)';
-  }
+  // Star status
   const starBtn = document.getElementById('mob-pane-star-btn');
   if (starBtn) {
-    starBtn.style.color = email.is_starred === 1 ? '#f59e0b' : 'var(--text-dim)';
+    starBtn.style.color = conv.is_starred === 1 ? '#f59e0b' : 'var(--text-dim)';
   }
 
-  pane.style.display = 'flex';
+  // Populate chronological chat timeline
+  renderChatTimeline(conv);
+
+  // Reset quote banner and input
+  cancelQuotedReply();
+  const input = document.getElementById('mob-chat-input');
+  if (input) {
+    input.value = '';
+    input.style.height = 'auto';
+  }
+
+  // Show WhatsApp chat pane
+  const pane = document.getElementById('reading-pane');
+  if (pane) pane.style.display = 'flex';
+
+  // Scroll timeline to bottom
+  const timeline = document.getElementById('mob-chat-timeline');
+  if (timeline) {
+    setTimeout(() => {
+      timeline.scrollTop = timeline.scrollHeight;
+    }, 60);
+  }
+}
+
+function renderChatTimeline(conv) {
+  const timeline = document.getElementById('mob-chat-timeline');
+  if (!timeline) return;
+  timeline.innerHTML = '';
+
+  const myPhone = currentUser ? currentUser.phone : '';
+  const myClean = (myPhone || '').replace(/\D/g, '');
+
+  let lastDateStr = '';
+
+  conv.messages.forEach((msg, idx) => {
+    // 1. Date Divider
+    const msgDate = new Date(msg.created_at);
+    const dateStr = msgDate.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    if (dateStr !== lastDateStr) {
+      lastDateStr = dateStr;
+      const divider = document.createElement('div');
+      divider.className = 'chat-date-divider';
+      const isToday = new Date().toDateString() === msgDate.toDateString();
+      divider.innerHTML = `<span>${isToday ? 'Today' : dateStr}</span>`;
+      timeline.appendChild(divider);
+    }
+
+    // 2. Sender Identification
+    const cleanSender = extractCleanParticipant(msg.sender_email);
+    const isOutgoing = cleanSender.includes(myClean) || (currentUser && cleanSender.includes(currentUser.phone));
+
+    const timeDisplay = msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Single-reply constraint
+    const hasReplied = msg.has_replied === 1;
+
+    // Body formatting: Check if long email
+    const rawBody = (msg.body_text || msg.body_html || '').trim();
+    const isLongEmail = rawBody.length > 280;
+    const previewBody = isLongEmail ? rawBody.substring(0, 250) + '...' : rawBody;
+
+    // First email in thread shows Subject; replies hide Subject
+    const isFirstMessage = idx === 0;
+    const showSubject = isFirstMessage && msg.subject && msg.subject !== '(No Subject)';
+
+    // Bubble element
+    const bubbleWrapper = document.createElement('div');
+    bubbleWrapper.className = `chat-bubble-row ${isOutgoing ? 'outgoing' : 'incoming'}`;
+    bubbleWrapper.id = `chat-msg-${msg.id}`;
+
+    // Quoted reply content if this message was a reply
+    let quotedReplyHtml = '';
+    if (msg.quoted_text || msg.reply_to_id) {
+      const qSender = msg.quoted_sender || 'Original Message';
+      const qText = (msg.quoted_text || 'Referenced message').substring(0, 90);
+      quotedReplyHtml = `
+        <div class="chat-quoted-box">
+          <div class="quoted-bar"></div>
+          <div class="quoted-text-wrap">
+            <span class="quoted-sender">${escapeHtml(qSender)}</span>
+            <span class="quoted-snippet">${escapeHtml(qText)}</span>
+          </div>
+        </div>
+      `;
+    }
+
+    // Subject badge for first message
+    const subjectHtml = showSubject ? `
+      <div class="chat-subject-badge">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>${escapeHtml(msg.subject)}</span>
+      </div>
+    ` : '';
+
+    // Sender name badge (for incoming in group, or external)
+    const senderBadgeHtml = (!isOutgoing && conv.is_group) ? `
+      <div class="chat-sender-label">${escapeHtml(formatSenderDisplay(msg.sender_email, false, msg.sender_name))}</div>
+    ` : '';
+
+    // Body display
+    const bodyContentHtml = `
+      <div class="chat-message-text" id="body-text-${msg.id}">
+        ${escapeHtml(previewBody).replace(/\n/g, '<br>')}
+      </div>
+      ${isLongEmail ? `
+        <div class="chat-long-email-actions">
+          <button type="button" class="btn-chat-link" onclick="toggleExpandMessage('${msg.id}', ${JSON.stringify(rawBody)})">
+            Read full email ▾
+          </button>
+          <button type="button" class="btn-chat-link trad-link" onclick="openTraditionalViewFromChat('${msg.id}')">
+            Traditional View ↗
+          </button>
+        </div>
+      ` : ''}
+    `;
+
+    // Reply button fallback & Single-Reply indicator
+    let replyActionHtml = '';
+    if (hasReplied) {
+      replyActionHtml = `<span class="replied-status-badge">Replied ✓</span>`;
+    } else {
+      replyActionHtml = `
+        <button type="button" class="bubble-reply-btn" onclick="triggerReplyToMessage('${msg.id}', event)" title="Reply to this message">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+          <span>Reply</span>
+        </button>
+      `;
+    }
+
+    bubbleWrapper.innerHTML = `
+      <div class="chat-bubble ${isOutgoing ? 'outgoing' : 'incoming'}">
+        ${senderBadgeHtml}
+        ${subjectHtml}
+        ${quotedReplyHtml}
+        ${bodyContentHtml}
+        <div class="chat-bubble-footer">
+          <div class="bubble-footer-left">
+            ${replyActionHtml}
+          </div>
+          <div class="bubble-footer-right">
+            <span class="chat-timestamp">${timeDisplay}</span>
+            ${isOutgoing ? '<span class="chat-checks" title="Delivered">✓✓</span>' : ''}
+          </div>
+        </div>
+      </div>
+    `;
+
+    // Swipe-right-to-reply touch gesture on bubble
+    const bubbleEl = bubbleWrapper.querySelector('.chat-bubble');
+    let touchStartX = 0;
+    bubbleEl.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    bubbleEl.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      if (touchEndX - touchStartX > 65) {
+        // Swiped right! Trigger reply
+        triggerReplyToMessage(msg.id, e);
+      }
+    }, { passive: true });
+
+    timeline.appendChild(bubbleWrapper);
+  });
+}
+
+function toggleExpandMessage(msgId, fullBody) {
+  const el = document.getElementById(`body-text-${msgId}`);
+  if (!el) return;
+  el.innerHTML = escapeHtml(fullBody).replace(/\n/g, '<br>');
+  const actions = el.parentElement.querySelector('.chat-long-email-actions');
+  if (actions) {
+    actions.innerHTML = `
+      <button type="button" class="btn-chat-link trad-link" onclick="openTraditionalViewFromChat('${msgId}')">
+        Traditional View ↗
+      </button>
+    `;
+  }
 }
 
 function closeReadingPane() {
   const pane = document.getElementById('reading-pane');
   if (pane) pane.style.display = 'none';
-  activeEmail = null;
+  activeConversation = null;
+  activeConversationId = null;
+  activeReplyingMessage = null;
+}
+
+// ==================== REPLY BEHAVIOR & CONSTRAINTS ====================
+function triggerReplyToMessage(msgId, e) {
+  if (e) e.stopPropagation();
+
+  if (!activeConversation) return;
+  const msg = activeConversation.messages.find(m => m.id === msgId);
+  if (!msg) return;
+
+  // Single-reply check
+  if (msg.has_replied === 1) {
+    showToastNotification('This message has already been replied to once.', 'info');
+    return;
+  }
+
+  activeReplyingMessage = msg;
+
+  const quoteBar = document.getElementById('mob-quote-reply-bar');
+  const quoteSender = document.getElementById('mob-quote-sender');
+  const quoteSnippet = document.getElementById('mob-quote-snippet');
+
+  if (quoteBar && quoteSender && quoteSnippet) {
+    const senderDisplay = formatSenderDisplay(msg.sender_email, false, msg.sender_name);
+    quoteSender.innerText = `Replying to ${senderDisplay}`;
+    quoteSnippet.innerText = (msg.body_text || msg.body_html || '').replace(/\s+/g, ' ').trim().substring(0, 80);
+    quoteBar.style.display = 'flex';
+  }
+
+  const input = document.getElementById('mob-chat-input');
+  if (input) {
+    input.focus();
+    input.placeholder = 'Type your reply...';
+  }
+}
+
+function cancelQuotedReply() {
+  activeReplyingMessage = null;
+  const quoteBar = document.getElementById('mob-quote-reply-bar');
+  if (quoteBar) quoteBar.style.display = 'none';
+  const input = document.getElementById('mob-chat-input');
+  if (input) input.placeholder = 'Type an email message...';
+}
+
+function autoExpandChatInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleChatInputKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    submitChatMessage();
+  }
+}
+
+async function submitChatMessage() {
+  const input = document.getElementById('mob-chat-input');
+  if (!input) return;
+  const body = input.value.trim();
+  if (!body) return;
+
+  if (!activeConversation) {
+    showToastNotification('No active conversation', 'error');
+    return;
+  }
+
+  // Recipient lock: Send to counterpart or group participants
+  const to = activeConversation.participant_raw || activeConversation.latestMessage.sender_email;
+  const cleanSubject = activeConversation.latest_subject.replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
+  const subject = `Re: ${cleanSubject}`;
+
+  const sendBtn = document.getElementById('mob-chat-send-btn');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const payload = {
+      sender_phone: currentUser.phone,
+      to: to,
+      subject: subject,
+      body: body,
+      reply_to_id: activeReplyingMessage ? activeReplyingMessage.id : null,
+      conversation_id: activeConversation.id
+    };
+
+    const res = await fetch('/api/emails/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      input.value = '';
+      input.style.height = 'auto';
+
+      if (activeReplyingMessage) {
+        activeReplyingMessage.has_replied = 1;
+      }
+      cancelQuotedReply();
+
+      // Append temporary outgoing message to timeline
+      const now = new Date();
+      const newMsg = {
+        id: data.email ? data.email.id : `tmp_${Date.now()}`,
+        sender_email: `${currentUser.phone}@alphastack.wwisvnr.com`,
+        sender_name: currentUser.display_name || currentUser.phone,
+        subject: subject,
+        body_text: body,
+        created_at: now.toISOString(),
+        is_read: 1,
+        has_replied: 0,
+        quoted_sender: activeReplyingMessage ? formatSenderDisplay(activeReplyingMessage.sender_email, false, activeReplyingMessage.sender_name) : null,
+        quoted_text: activeReplyingMessage ? (activeReplyingMessage.body_text || '').substring(0, 90) : null
+      };
+
+      activeConversation.messages.push(newMsg);
+      activeConversation.latestMessage = newMsg;
+      activeConversation.latest_snippet = body.substring(0, 90);
+      activeConversation.created_at = newMsg.created_at;
+
+      renderChatTimeline(activeConversation);
+
+      const timeline = document.getElementById('mob-chat-timeline');
+      if (timeline) {
+        timeline.scrollTop = timeline.scrollHeight;
+      }
+
+      showToastNotification('Reply sent ✓', 'success');
+      // Invalidate memory cache to keep in sync
+      emailFolderCache = {};
+    } else {
+      showToastNotification(data.error || 'Failed to send reply', 'error');
+    }
+  } catch (err) {
+    showToastNotification('Network error sending reply', 'error');
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
+  }
+}
+
+// ==================== TRADITIONAL EMAIL VIEW ON MOBILE ====================
+function openTraditionalViewFromChat(emailId) {
+  if (!activeConversation) return;
+
+  let email = null;
+  if (emailId) {
+    email = activeConversation.messages.find(m => m.id === emailId);
+  }
+  if (!email) {
+    email = activeConversation.latestMessage;
+  }
+  activeTradEmail = email;
+
+  const modal = document.getElementById('traditional-view-modal');
+  if (!modal) return;
+
+  document.getElementById('trad-view-from').innerText = formatSenderDisplay(email.sender_email, true, email.sender_name);
+  
+  // To field is prefilled & LOCKED
+  const toInput = document.getElementById('trad-view-to');
+  if (toInput) {
+    toInput.value = email.recipient_phone || (currentUser ? currentUser.phone : '');
+    toInput.readOnly = true;
+  }
+
+  document.getElementById('trad-view-subject').innerText = email.subject || '(No Subject)';
+  document.getElementById('trad-view-date').innerText = new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  
+  const bodyViewport = document.getElementById('trad-view-body');
+  if (bodyViewport) {
+    const rawContent = email.body_html || email.body_text || '';
+    bodyViewport.innerHTML = rawContent.includes('<') ? rawContent : escapeHtml(rawContent).replace(/\n/g, '<br>');
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeTraditionalViewModal() {
+  const modal = document.getElementById('traditional-view-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function replyFromTraditionalView() {
+  closeTraditionalViewModal();
+  if (activeTradEmail) {
+    triggerReplyToMessage(activeTradEmail.id);
+  }
+}
+
+// ==================== DIGITAL ID CARD & PERSON INFO MODAL ====================
+function openDigitalIdModal() {
+  openContactInfoModal(currentUser ? currentUser.phone : null);
+}
+
+function openActiveContactInfoModal() {
+  if (!activeConversation) return;
+  openContactInfoModal(activeConversation.participant_raw);
+}
+
+async function openContactInfoModal(phoneOrEmail) {
+  const target = phoneOrEmail || (activeConversation && activeConversation.participant_raw) || (currentUser && currentUser.phone);
+  if (!target) return;
+
+  activeContactForModal = target;
+  const modal = document.getElementById('digital-id-modal');
+  if (!modal) return;
+
+  // Set default view to Digital ID Card
+  switchIdCardTab('card');
+
+  // Fill placeholder data
+  const isPM = isPhoneMailSender(target);
+  const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
+  const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : target;
+
+  const nameEl = document.getElementById('id-card-name');
+  const phoneEl = document.getElementById('id-card-phone');
+  const emailEl = document.getElementById('id-card-email');
+  const aliasTagEl = document.getElementById('id-card-alias-tag');
+  const avatarEl = document.getElementById('id-card-avatar-img');
+  const qrEl = document.getElementById('id-card-qr-img');
+  const dateEl = document.getElementById('id-card-issue-date');
+
+  const defaultEmail = isPM ? `${cleanPhone}@alphastack.wwisvnr.com` : target;
+  const displayName = (activeConversation && activeConversation.sender_name) || (isPM ? `User ${cleanPhone.slice(-4)}` : target.split('@')[0]);
+
+  if (nameEl) nameEl.innerText = displayName;
+  if (phoneEl) phoneEl.innerText = formattedPhone;
+  if (emailEl) emailEl.innerText = defaultEmail;
+  if (aliasTagEl) aliasTagEl.innerText = 'Sub-ID: .primary';
+  if (dateEl) dateEl.innerText = new Date().toISOString().split('T')[0];
+
+  const avatarSvg = generateDefaultAvatar(target, displayName);
+  if (avatarEl) {
+    avatarEl.style.backgroundImage = `url('${avatarSvg}')`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.innerText = '';
+  }
+
+  // Real dynamic QR code
+  if (qrEl) {
+    const qrData = encodeURIComponent(`mailto:${defaultEmail}?subject=INAI%20Contact`);
+    qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+  }
+
+  // Pre-fill edit form inputs
+  const editName = document.getElementById('edit-person-name');
+  const editPhone = document.getElementById('edit-person-phone');
+  const editEmail = document.getElementById('edit-person-email');
+  const editAlias = document.getElementById('edit-person-alias');
+  const editBio = document.getElementById('edit-person-bio');
+  const editAvatarPrev = document.getElementById('edit-person-avatar-preview');
+
+  if (editName) editName.value = displayName;
+  if (editPhone) editPhone.value = formattedPhone;
+  if (editEmail) editEmail.value = defaultEmail;
+  if (editAlias) editAlias.value = 'primary';
+  if (editBio) editBio.value = '';
+  if (editAvatarPrev) {
+    editAvatarPrev.style.backgroundImage = `url('${avatarSvg}')`;
+    editAvatarPrev.style.backgroundSize = 'cover';
+    editAvatarPrev.innerText = '';
+  }
+
+  // Fetch from server /api/contacts/detail/:phone
+  try {
+    const fetchPhone = cleanPhone || target;
+    const res = await fetch(`/api/contacts/detail/${encodeURIComponent(fetchPhone)}`);
+    const data = await res.json();
+    if (data.contact) {
+      const c = data.contact;
+      if (c.display_name && nameEl) nameEl.innerText = c.display_name;
+      if (c.email && emailEl) emailEl.innerText = c.email;
+      if (c.bio && editBio) editBio.value = c.bio;
+      if (editName && c.display_name) editName.value = c.display_name;
+      if (editEmail && c.email) editEmail.value = c.email;
+    }
+  } catch (err) {}
+
+  modal.style.display = 'flex';
+}
+
+function closeDigitalIdModal(e) {
+  if (e && e.target && e.target.id !== 'digital-id-modal' && !e.target.classList.contains('close-modal-btn')) return;
+  const modal = document.getElementById('digital-id-modal');
+  if (modal) modal.style.display = 'none';
+  const card = document.getElementById('smart-mail-card');
+  if (card) card.classList.remove('flipped');
+}
+
+function switchIdCardTab(tab) {
+  const btnCard = document.getElementById('btn-id-tab-card');
+  const btnEdit = document.getElementById('btn-id-tab-edit');
+  const panelCard = document.getElementById('id-card-view-panel');
+  const panelEdit = document.getElementById('id-card-edit-panel');
+
+  if (tab === 'card') {
+    if (btnCard) btnCard.classList.add('active');
+    if (btnEdit) btnEdit.classList.remove('active');
+    if (panelCard) panelCard.style.display = 'block';
+    if (panelEdit) panelEdit.style.display = 'none';
+  } else {
+    if (btnCard) btnCard.classList.remove('active');
+    if (btnEdit) btnEdit.classList.add('active');
+    if (panelCard) panelCard.style.display = 'none';
+    if (panelEdit) panelEdit.style.display = 'block';
+  }
+}
+
+function flipSmartCard() {
+  const card = document.getElementById('smart-mail-card');
+  if (card) card.classList.toggle('flipped');
+}
+
+function selectPersonAvatarGradient(palette) {
+  const target = activeContactForModal || (currentUser && currentUser.phone) || 'User';
+  const preview = document.getElementById('edit-person-avatar-preview');
+  const cardAvatar = document.getElementById('id-card-avatar-img');
+  const newSvg = generateDefaultAvatar(`${target}_${palette}`, target);
+  
+  if (preview) {
+    preview.style.backgroundImage = `url('${newSvg}')`;
+    preview.style.backgroundSize = 'cover';
+  }
+  if (cardAvatar) {
+    cardAvatar.style.backgroundImage = `url('${newSvg}')`;
+    cardAvatar.style.backgroundSize = 'cover';
+  }
+}
+
+async function savePersonInfoSubmit(e) {
+  e.preventDefault();
+  const phone = (document.getElementById('edit-person-phone').value || '').trim();
+  const displayName = (document.getElementById('edit-person-name').value || '').trim();
+  const email = (document.getElementById('edit-person-email').value || '').trim();
+  const subAlias = (document.getElementById('edit-person-alias').value || '').trim();
+  const bio = (document.getElementById('edit-person-bio').value || '').trim();
+
+  try {
+    const res = await fetch('/api/contacts/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: phone.replace(/\D/g, '').slice(-10),
+        display_name: displayName,
+        email: email,
+        sub_alias: subAlias,
+        bio: bio
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToastNotification('Contact info updated successfully! ✓', 'success');
+      // Update ID card front text
+      const nameEl = document.getElementById('id-card-name');
+      if (nameEl) nameEl.innerText = displayName;
+      const emailEl = document.getElementById('id-card-email');
+      if (emailEl) emailEl.innerText = email;
+      const aliasTag = document.getElementById('id-card-alias-tag');
+      if (aliasTag && subAlias) aliasTag.innerText = `Sub-ID: .${subAlias}`;
+
+      // Update active conversation title if same contact
+      if (activeConversation) {
+        activeConversation.display_title = displayName;
+        const topTitle = document.getElementById('mob-conv-title');
+        if (topTitle) topTitle.innerText = displayName;
+      }
+      switchIdCardTab('card');
+    } else {
+      showToastNotification(data.error || 'Failed to update contact', 'error');
+    }
+  } catch (err) {
+    showToastNotification('Network error saving contact info', 'error');
+  }
+}
+
+function copyIdCardEmail() {
+  const emailEl = document.getElementById('id-card-email');
+  if (!emailEl) return;
+  const email = emailEl.innerText.trim();
+  navigator.clipboard.writeText(email).then(() => {
+    const btnText = document.getElementById('btn-copy-id-text');
+    if (btnText) {
+      btnText.innerText = 'Copied to Clipboard! ✓';
+      setTimeout(() => { btnText.innerText = 'Copy Mail ID'; }, 2000);
+    }
+    showToastNotification('Mail ID copied to clipboard! 📋', 'success');
+  }).catch(() => {
+    showToastNotification(`Mail ID: ${email}`);
+  });
+}
+
+function shareDigitalIdCard() {
+  const emailEl = document.getElementById('id-card-email');
+  const nameEl = document.getElementById('id-card-name');
+  const email = emailEl ? emailEl.innerText.trim() : '';
+  const name = nameEl ? nameEl.innerText.trim() : 'INAI User';
+
+  if (navigator.share) {
+    navigator.share({
+      title: `${name}'s Official INAI Mail ID`,
+      text: `Connect with ${name} on INAI Bharat Mail at: ${email}`,
+      url: window.location.origin
+    }).catch(() => {});
+  } else {
+    copyIdCardEmail();
+  }
+}
+
+// ==================== MOBILE PROFILE & SETTINGS ====================
+function openMobileProfileSettings() {
+  if (!currentUser) return;
+  const modal = document.getElementById('mobile-settings-modal');
+  if (!modal) return;
+
+  const phoneInput = document.getElementById('mob-settings-phone-input');
+  const nameInput = document.getElementById('mob-settings-name-input');
+  const emailInput = document.getElementById('mob-settings-email-input');
+  const langSelect = document.getElementById('mob-settings-lang');
+
+  const avatarEl = document.getElementById('mob-settings-avatar');
+  const nameLabel = document.getElementById('mob-settings-name');
+  const phoneLabel = document.getElementById('mob-settings-phone');
+
+  const formattedPhone = formatPhoneDisplay(currentUser.phone);
+  const myEmail = `${currentUser.phone}@alphastack.wwisvnr.com`;
+
+  if (phoneInput) phoneInput.value = formattedPhone;
+  if (nameInput) nameInput.value = currentUser.display_name || '';
+  if (emailInput) emailInput.value = myEmail;
+  if (nameLabel) nameLabel.innerText = currentUser.display_name || 'INAI User';
+  if (phoneLabel) phoneLabel.innerText = formattedPhone;
+
+  const mySvg = generateDefaultAvatar(currentUser.phone, currentUser.display_name);
+  if (avatarEl) {
+    avatarEl.style.backgroundImage = `url('${mySvg}')`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.innerText = '';
+  }
+
+  if (langSelect) langSelect.value = currentLanguage;
+
+  modal.style.display = 'flex';
+}
+
+function closeMobileProfileSettings() {
+  const modal = document.getElementById('mobile-settings-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function saveMobileSettings() {
+  const nameInput = document.getElementById('mob-settings-name-input');
+  const langSelect = document.getElementById('mob-settings-lang');
+
+  const newName = nameInput ? nameInput.value.trim() : '';
+  const newLang = langSelect ? langSelect.value : 'en';
+
+  try {
+    await fetch('/api/contacts/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: currentUser.phone,
+        display_name: newName,
+        language: newLang
+      })
+    });
+
+    currentUser.display_name = newName;
+    localStorage.setItem('inai_user_name', newName);
+
+    if (newLang !== currentLanguage) {
+      setInaiLanguage(newLang);
+    }
+
+    const drawerName = document.getElementById('drawer-username');
+    if (drawerName) drawerName.innerText = newName || currentUser.phone;
+
+    showToastNotification('Settings saved successfully! ✓', 'success');
+    closeMobileProfileSettings();
+  } catch (err) {
+    showToastNotification('Failed to update settings', 'error');
+  }
+}
+
+// Helpers for reading pane star and delete
+function toggleCurrentStar() {
+  if (!activeConversation || !activeConversation.latestMessage) return;
+  toggleStar(activeConversation.latestMessage.id);
 }
 
 function toggleCurrentImportant() {
-  if (!activeEmail) return;
-  toggleImportant(activeEmail.id);
-}
-
-function toggleCurrentStar() {
-  if (!activeEmail) return;
-  toggleStar(activeEmail.id);
+  if (!activeConversation || !activeConversation.latestMessage) return;
+  toggleImportant(activeConversation.latestMessage.id);
 }
 
 function deleteCurrentEmail() {
-  if (!activeEmail) return;
-  executeBulkActionOnSingle(activeEmail.id, 'delete');
+  if (!activeConversation) return;
+  activeConversation.messages.forEach(m => {
+    executeBulkActionOnSingle(m.id, 'delete');
+  });
   closeReadingPane();
 }
 
 function archiveCurrentEmail() {
-  if (!activeEmail) return;
-  executeBulkActionOnSingle(activeEmail.id, 'archive');
+  if (!activeConversation) return;
+  activeConversation.messages.forEach(m => {
+    executeBulkActionOnSingle(m.id, 'archive');
+  });
   closeReadingPane();
+}
+
+function insertEmojiQuick(emoji) {
+  const input = document.getElementById('mob-chat-input');
+  if (!input) return;
+  input.value += emoji;
+  input.focus();
+}
+
+function openAttachmentPickerModal() {
+  showToastNotification('Direct document & media attachments ready 📎', 'info');
 }
 
 // ==================== REAL-TIME MULTI-LANGUAGE TRANSLATION ====================
@@ -1369,64 +2263,6 @@ async function toggleMessageTranslation() {
   }
 }
 
-// ==================== DIGITAL ID CARD & DYNAMIC QR MODAL ====================
-function openDigitalIdModal() {
-  if (!currentUser) return;
-  const modal = document.getElementById('digital-id-modal');
-  if (!modal) return;
-
-  const name = currentUser.name || 'INAI Member';
-  const phone = formatPhoneDisplay(currentUser.phone);
-  const email = `${currentUser.phone}@alphastack.wwisvnr.com`;
-
-  const nameEl = document.getElementById('id-card-name');
-  if (nameEl) nameEl.innerText = name;
-  const phoneEl = document.getElementById('id-card-phone');
-  if (phoneEl) phoneEl.innerText = phone;
-  const emailEl = document.getElementById('id-card-email');
-  if (emailEl) emailEl.innerText = email;
-
-  const qrImg = document.getElementById('id-card-qr-img');
-  if (qrImg) {
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent('mailto:' + email)}&format=svg&color=046a38`;
-  }
-
-  modal.style.display = 'flex';
-}
-
-function closeDigitalIdModal(e) {
-  const modal = document.getElementById('digital-id-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-function copyIdCardEmail() {
-  if (!currentUser) return;
-  const email = `${currentUser.phone}@alphastack.wwisvnr.com`;
-  navigator.clipboard.writeText(email).then(() => {
-    const btnText = document.getElementById('btn-copy-id-text');
-    if (btnText) {
-      btnText.innerText = 'Copied! ✓';
-      setTimeout(() => { btnText.innerText = 'Copy Mail ID'; }, 2500);
-    }
-    showToastNotification(`Mail ID copied: ${email} 📋`, 'success');
-  }).catch(() => {
-    showToastNotification(`Email: ${email}`);
-  });
-}
-
-function shareDigitalIdCard() {
-  if (!currentUser) return;
-  const email = `${currentUser.phone}@alphastack.wwisvnr.com`;
-  if (navigator.share) {
-    navigator.share({
-      title: `INAI Digital Mail Identity — ${currentUser.name || 'User'}`,
-      text: `Contact me on INAI via my phone email: ${email}`,
-      url: window.location.origin
-    }).catch(() => {});
-  } else {
-    copyIdCardEmail();
-  }
-}
 
 // ==================== COMPOSE & STANDALONE AUTO-CONTACT FETCH ====================
 async function fetchContactsSilently() {

@@ -516,43 +516,49 @@
 
           <div class="reading-card">
             <!-- Email Subject Header -->
-            <div class="reading-subject-box">
-              <span class="category-tag" id="reading-category-tag">PHONE-POWERED MAIL</span>
-              <h1 class="reading-title" id="full-subject">Message Subject</h1>
-            </div>
-
-            <!-- Sender Metadata -->
-            <div class="reading-sender-meta">
-              <div class="sender-avatar" id="full-avatar">A</div>
-              <div class="sender-details">
-                <div class="sender-name-line">
-                  <strong id="full-sender">sender@domain.com</strong>
-                  <span class="badge-source-tag" id="full-sender-badge">⚡ PhoneMail</span>
-                </div>
-                <div class="sender-sub-line">to <span id="full-to">me</span></div>
+            <div class="reading-subject-box" style="display: flex; align-items: center; justify-content: space-between;">
+              <div>
+                <span class="category-tag" id="reading-category-tag">CONVERSATION THREAD</span>
+                <h1 class="reading-title" id="full-subject" style="margin-top: 4px;">Message Subject</h1>
               </div>
-              <div class="reading-timestamp" id="full-date">12:30 PM</div>
+              <button type="button" class="btn-secondary" onclick="openActiveContactInfoModal()" style="display: flex; align-items: center; gap: 6px; padding: 7px 12px; font-size: 12px; border-radius: 8px;">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>Digital ID & Contact Info</span>
+              </button>
             </div>
 
-            <!-- Email Body Content -->
-            <div class="reading-body-text" id="full-body">
-              Email contents will be displayed here...
+            <!-- Chronological Messages Stream in Conversation -->
+            <div class="reading-thread-container" id="reading-thread-container">
+              <!-- Chronological messages render here -->
             </div>
 
-            <!-- Quick Action Dock -->
-            <div class="reading-action-dock">
-              <button class="dock-btn primary" onclick="startQuickReply()">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
-                <span>Reply</span>
-              </button>
-              <button class="dock-btn secondary" onclick="startQuickReply()">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
-                <span>Forward</span>
-              </button>
-              <button class="dock-btn secondary" onclick="openDesktopSettings()">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
-                <span>Sub-Numbers</span>
-              </button>
+            <!-- Inline Reply Dock at Bottom of Conversation -->
+            <div class="conversation-inline-dock" id="conversation-inline-dock">
+              <div class="inline-dock-header">
+                <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-main);">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                  <span>Reply in this Conversation</span>
+                </div>
+                <div style="font-size: 12px; color: var(--text-dim);" id="inline-dock-recipient-label">To: locked recipient</div>
+              </div>
+
+              <!-- Quoted Reply Banner -->
+              <div class="inline-quote-preview" id="desktop-quote-bar" style="display: none;">
+                <div>
+                  <strong id="desktop-quote-sender">Replying to ...</strong>
+                  <div style="font-size: 11.5px; opacity: 0.9;" id="desktop-quote-snippet">Original message snippet...</div>
+                </div>
+                <button type="button" class="close-btn" onclick="cancelDesktopQuotedReply()" style="font-size: 12px; padding: 2px 6px;">✕</button>
+              </div>
+
+              <textarea id="desktop-thread-reply-input" class="inline-dock-textarea" rows="3" placeholder="Type a reply to this conversation..."></textarea>
+
+              <div class="inline-dock-actions">
+                <button type="button" class="btn-primary" onclick="submitDesktopThreadReply()">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                  <span>Send Reply</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -644,58 +650,153 @@
     </div>
   </div>
 
-  <!-- ==================== DIGITAL ID CARD & DYNAMIC QR MODAL ==================== -->
+  <!-- ==================== DIGITAL ID CARD & CONTACT INFO MODAL (DESKTOP) ==================== -->
   <div id="digital-id-modal" class="id-card-modal-overlay" style="display: none;" onclick="closeDigitalIdModal(event)">
     <div class="id-card-dialog" onclick="event.stopPropagation()">
       <div class="id-card-top-bar">
         <div class="id-card-header-badge">
           <span class="online-dot"></span>
-          <span>OFFICIAL INAI DIGITAL MAIL ID</span>
+          <span id="id-modal-top-title">OFFICIAL INAI DIGITAL MAIL ID</span>
         </div>
         <button class="close-btn" onclick="closeDigitalIdModal()" aria-label="Close ID Card">✕</button>
       </div>
 
-      <!-- Luxury Smart Mail Card -->
-      <div class="smart-mail-card" id="smart-mail-card">
-        <div class="smart-card-shimmer"></div>
-        <div class="smart-card-top">
-          <div class="chip-hologram">
-            <div class="chip-line"></div>
-            <div class="chip-line"></div>
-          </div>
-          <div class="smart-card-brand">
-            <span class="saffron-text">IN</span><span class="green-text">AI</span>
-            <span class="country-tag">🇮🇳 BHARAT</span>
+      <!-- Segmented Switcher: [Digital ID Card] vs [Edit Person Info] -->
+      <div class="id-card-tab-bar">
+        <button type="button" class="id-tab-btn active" id="btn-id-tab-card" onclick="switchIdCardTab('card')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Digital ID Card</span>
+        </button>
+        <button type="button" class="id-tab-btn" id="btn-id-tab-edit" onclick="switchIdCardTab('edit')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          <span>Edit Person Info</span>
+        </button>
+      </div>
+
+      <!-- VIEW 1: 3D DIGITAL ID CARD VIEW -->
+      <div id="id-card-view-panel" class="id-panel-view active">
+        <!-- 3D Flippable Smart Mail Card -->
+        <div class="smart-mail-card-wrapper" onclick="flipSmartCard()">
+          <div class="smart-mail-card" id="smart-mail-card">
+            <!-- Front of Card -->
+            <div class="card-side card-front">
+              <div class="smart-card-shimmer"></div>
+              <div class="smart-card-top">
+                <div class="chip-hologram">
+                  <div class="chip-line"></div>
+                </div>
+                <div class="smart-card-brand">
+                  <span class="saffron-text">IN</span><span class="green-text">AI</span>
+                  <span class="country-tag">🇮🇳 BHARAT</span>
+                </div>
+              </div>
+
+              <div class="smart-card-middle">
+                <div class="smart-card-avatar-box">
+                  <div class="smart-card-avatar" id="id-card-avatar-img">S</div>
+                </div>
+                <div class="smart-card-meta">
+                  <div class="card-holder-name" id="id-card-name">Soumith</div>
+                  <div class="card-holder-phone" id="id-card-phone">+91 93815 64959</div>
+                  <div class="card-holder-email" id="id-card-email">9381564959@alphastack.wwisvnr.com</div>
+                  <div class="card-holder-tag" id="id-card-alias-tag">Sub-ID: .primary</div>
+                </div>
+                <div class="smart-card-qr-box">
+                  <img id="id-card-qr-img" src="" alt="Scan to send email" width="95" height="95">
+                </div>
+              </div>
+
+              <div class="smart-card-bottom">
+                <div class="card-protocol-text">SECURE PHONE-POWERED PROTOCOL</div>
+                <div class="card-status-verified">⚡ 100% VERIFIED IDENTITY</div>
+              </div>
+            </div>
+
+            <!-- Back of Card (Revealed on 3D Flip) -->
+            <div class="card-side card-back">
+              <div class="card-back-magstripe"></div>
+              <div class="card-back-body">
+                <div class="card-back-text">This digital identity card authorizes real-time, spam-free message transmission over the INAI Bharat Mail phone-to-email gateway.</div>
+                <div class="card-back-meta-row">
+                  <div>
+                    <span class="back-label">ISSUED:</span>
+                    <strong class="back-val" id="id-card-issue-date">2026-09-25</strong>
+                  </div>
+                  <div>
+                    <span class="back-label">SECURITY:</span>
+                    <strong class="back-val">SHA-256 E2E</strong>
+                  </div>
+                </div>
+                <div class="card-back-barcode">
+                  <span>||| | | || ||| || ||| | ||| |||| | | ||</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="smart-card-middle">
-          <div class="smart-card-meta">
-            <div class="card-holder-name" id="id-card-name">Soumith</div>
-            <div class="card-holder-phone" id="id-card-phone">+91 93815 64959</div>
-            <div class="card-holder-email" id="id-card-email">9381564959@alphastack.wwisvnr.com</div>
-          </div>
-          <div class="smart-card-qr-box">
-            <img id="id-card-qr-img" src="" alt="Scan to send email" width="105" height="105">
-          </div>
+        <div style="text-align: center; margin: 6px 0; font-size: 11px; color: var(--text-dim);">
+          <span>Tap card to flip 3D view 🔄</span>
         </div>
 
-        <div class="smart-card-bottom">
-          <div class="card-protocol-text">SECURE PHONE-POWERED PROTOCOL</div>
-          <div class="card-status-verified">⚡ 100% VERIFIED IDENTITY</div>
+        <div class="id-card-actions-row">
+          <button type="button" class="btn-primary full-width" onclick="copyIdCardEmail()" id="btn-copy-id">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="btn-copy-id-text">Copy Mail ID</span>
+          </button>
+          <button type="button" class="action-btn share-btn" onclick="shareDigitalIdCard()" id="btn-share-id" title="Share your INAI Card">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            <span>Share</span>
+          </button>
         </div>
       </div>
 
-      <div class="id-card-actions-row">
-        <button type="button" class="btn-primary full-width" onclick="copyIdCardEmail()" id="btn-copy-id">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          <span id="btn-copy-id-text">Copy Mail ID</span>
-        </button>
-        <button type="button" class="action-btn share-btn" onclick="shareDigitalIdCard()" id="btn-share-id" title="Share your INAI Card">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-          <span>Share</span>
-        </button>
+      <!-- VIEW 2: EDIT PERSON INFO FORM -->
+      <div id="id-card-edit-panel" class="id-panel-view" style="display: none;">
+        <form class="person-info-form" onsubmit="savePersonInfoSubmit(event)">
+          <div class="person-avatar-picker-cluster">
+            <div class="person-avatar-preview" id="edit-person-avatar-preview">U</div>
+            <div class="person-avatar-palette">
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="selectPersonAvatarGradient('emerald')" title="Emerald"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="selectPersonAvatarGradient('ocean')" title="Ocean"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);" onclick="selectPersonAvatarGradient('purple')" title="Purple"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="selectPersonAvatarGradient('amber')" title="Amber"></span>
+              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #ec4899, #be185d);" onclick="selectPersonAvatarGradient('rose')" title="Rose"></span>
+            </div>
+          </div>
+
+          <div class="form-group-desktop">
+            <label for="edit-person-name">NAME / DISPLAY NAME</label>
+            <input type="text" id="edit-person-name" class="desktop-profile-input" placeholder="Full Name" required>
+          </div>
+
+          <div class="form-group-desktop">
+            <label for="edit-person-phone">PHONE NUMBER</label>
+            <input type="text" id="edit-person-phone" class="desktop-profile-input" placeholder="+91 9876543210" readonly style="background: var(--bg-hover);">
+          </div>
+
+          <div class="form-group-desktop">
+            <label for="edit-person-email">EMAIL ADDRESS</label>
+            <input type="email" id="edit-person-email" class="desktop-profile-input" placeholder="user@alphastack.wwisvnr.com">
+          </div>
+
+          <div class="form-group-desktop">
+            <label for="edit-person-alias">OPTIONAL SUB-NUMBER ALIAS</label>
+            <input type="text" id="edit-person-alias" class="desktop-profile-input" placeholder="e.g. work, personal, vip">
+          </div>
+
+          <div class="form-group-desktop">
+            <label for="edit-person-bio">NOTES / BIO</label>
+            <textarea id="edit-person-bio" class="desktop-profile-input" rows="2" placeholder="Add personal note or contact description..."></textarea>
+          </div>
+
+          <div class="id-card-actions-row" style="margin-top: 14px;">
+            <button type="button" class="btn-secondary" onclick="switchIdCardTab('card')">Cancel</button>
+            <button type="submit" class="btn-primary" style="flex: 1;">Save Changes ✓</button>
+          </div>
+        </form>
       </div>
+
     </div>
   </div>
 

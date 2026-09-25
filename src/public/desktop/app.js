@@ -17,6 +17,11 @@ let currentLanguage = localStorage.getItem('inai_lang') || 'en';
 let isMessageTranslated = false;
 let originalMessageBody = '';
 let originalMessageSubject = '';
+let allConversations = [];
+let activeConversation = null;
+let activeConversationId = null;
+let activeReplyingMessage = null;
+let activeContactForModal = null;
 
 // ==================== RESPONSIVE SIDEBAR TOGGLE ====================
 function toggleSidebar() {
@@ -245,6 +250,187 @@ function getInitials(nameOrEmail) {
     return numMatch[0];
   }
   return 'I';
+}
+
+/**
+ * Deterministic vivid SVG profile picture generator
+ */
+function generateDefaultAvatar(seed, displayName = '') {
+  const str = String(seed || displayName || 'User').trim();
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  const gradients = [
+    ['#046A38', '#10B981'], // Bharat Green
+    ['#FF671F', '#F59E0B'], // Kesari Saffron
+    ['#2563EB', '#38BDF8'], // Ocean Blue
+    ['#7C3AED', '#C084FC'], // Royal Purple
+    ['#DB2777', '#F472B6'], // Rose Pink
+    ['#0D9488', '#2DD4BF'], // Teal Aurora
+    ['#DC2626', '#F87171'], // Crimson Flame
+    ['#4F46E5', '#818CF8']  // Indigo Deep
+  ];
+  
+  const pair = gradients[Math.abs(hash) % gradients.length];
+  const initial = getInitials(displayName || str);
+  
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+    <defs>
+      <linearGradient id="dg_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${pair[0]}"/>
+        <stop offset="100%" stop-color="${pair[1]}"/>
+      </linearGradient>
+    </defs>
+    <rect width="100" height="100" rx="50" fill="url(#dg_${Math.abs(hash)})"/>
+    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+    <text x="50" y="61" font-family="-apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', Roboto, sans-serif" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
+  </svg>`;
+
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+function normalizeSubject(sub) {
+  if (!sub) return '(no subject)';
+  let s = String(sub).trim();
+  s = s.replace(/^(\s*(re|fw|fwd|sv|aw|antw)\s*:\s*)+/i, '').trim();
+  return s.toLowerCase() || '(no subject)';
+}
+
+function extractCleanParticipant(str) {
+  if (!str) return '';
+  const s = String(str).trim();
+  const angleMatch = s.match(/<([^>]+)>/);
+  if (angleMatch) return angleMatch[1].trim().toLowerCase();
+  return s.replace(/^["']|["']$/g, '').trim().toLowerCase();
+}
+
+function getConversationKey(email, myPhone) {
+  if (email.conversation_id) return email.conversation_id;
+
+  const sender = extractCleanParticipant(email.sender_email);
+  const myClean = (myPhone || (currentUser && currentUser.phone) || '').replace(/\D/g, '');
+  
+  let recipients = [];
+  if (email.recipient_phone) {
+    recipients = email.recipient_phone.split(/[,;]/).map(r => extractCleanParticipant(r)).filter(Boolean);
+  } else if (email.recipient_emails) {
+    try {
+      const parsed = JSON.parse(email.recipient_emails);
+      if (Array.isArray(parsed)) recipients = parsed.map(r => extractCleanParticipant(r)).filter(Boolean);
+    } catch(e) {}
+  }
+
+  const isSenderMe = sender.includes(myClean) || (currentUser && sender.includes(currentUser.phone));
+  let counterparts = [];
+  if (isSenderMe) {
+    counterparts = recipients.filter(r => !r.includes(myClean));
+  } else {
+    counterparts = [sender, ...recipients.filter(r => !r.includes(myClean) && r !== sender)];
+  }
+
+  const normSub = normalizeSubject(email.subject);
+
+  if (counterparts.length >= 2) {
+    const sorted = [...new Set(counterparts)].sort();
+    return `group_${sorted.join('__')}_${normSub}`;
+  }
+
+  const otherParty = counterparts[0] || sender || 'unknown';
+  return `direct_${otherParty}_${normSub}`;
+}
+
+function groupEmailsIntoConversations(emails) {
+  const myPhone = currentUser ? currentUser.phone : '';
+  const convMap = new Map();
+
+  emails.forEach(email => {
+    const key = getConversationKey(email, myPhone);
+    if (!convMap.has(key)) {
+      convMap.set(key, {
+        id: email.conversation_id || key,
+        key: key,
+        messages: [],
+        subject: email.subject || '(No Subject)',
+        is_starred: 0,
+        is_important: 0,
+        folder: email.folder || 'INBOX',
+        has_attachments: false,
+        created_at: email.created_at
+      });
+    }
+
+    const conv = convMap.get(key);
+    conv.messages.push(email);
+
+    if (email.is_starred === 1) conv.is_starred = 1;
+    if (email.is_important === 1) conv.is_important = 1;
+    if (email.has_attachments || (email.attachments && email.attachments.length > 0)) {
+      conv.has_attachments = true;
+    }
+    if (new Date(email.created_at) > new Date(conv.created_at)) {
+      conv.created_at = email.created_at;
+      conv.subject = email.subject || conv.subject;
+    }
+  });
+
+  const convList = [];
+  convMap.forEach(conv => {
+    conv.messages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+    const latest = conv.messages[conv.messages.length - 1];
+    conv.latestMessage = latest;
+    conv.latest_subject = latest.subject || conv.subject || '(No Subject)';
+    conv.latest_snippet = (latest.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
+    conv.message_count = conv.messages.length;
+    conv.is_read = conv.messages.every(m => m.is_read === 1) ? 1 : 0;
+    conv.unread_count = conv.messages.filter(m => m.is_read === 0).length;
+
+    const isGroup = conv.key.startsWith('group_');
+    conv.is_group = isGroup;
+
+    const myClean = (myPhone || '').replace(/\D/g, '');
+    let counterpart = '';
+    let senderName = '';
+
+    for (let i = conv.messages.length - 1; i >= 0; i--) {
+      const m = conv.messages[i];
+      const s = extractCleanParticipant(m.sender_email);
+      if (!s.includes(myClean)) {
+        counterpart = s;
+        senderName = m.sender_name || '';
+        break;
+      }
+    }
+    if (!counterpart) {
+      counterpart = extractCleanParticipant(latest.recipient_phone || latest.sender_email);
+      senderName = latest.sender_name || '';
+    }
+
+    conv.participant_raw = counterpart;
+    conv.sender_name = senderName;
+
+    const isPhoneMail = isPhoneMailSender(counterpart);
+    conv.is_phonemail = isPhoneMail;
+
+    if (isGroup) {
+      conv.display_title = `Group (${conv.message_count} msgs)`;
+      conv.display_subtitle = '👥 Group Conversation';
+    } else {
+      const formatted = formatSenderDisplay(counterpart, false, senderName);
+      conv.display_title = formatted;
+      conv.display_subtitle = isPhoneMail ? '⚡ INAI Verified' : '🌐 External Mail';
+    }
+
+    const seed = conv.display_title || counterpart;
+    conv.avatar_url = latest.participant_avatar || generateDefaultAvatar(seed, conv.display_title);
+
+    convList.push(conv);
+  });
+
+  convList.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  return convList;
 }
 
 function getRecipientsDisplay(email) {
@@ -1633,223 +1819,118 @@ function archiveCurrentEmail() {
   closeReadingPane();
 }
 
-// ==================== EMAIL LIST RENDERING (GROUPED & SWIPEABLE) ====================
+// ==================== EMAIL LIST RENDERING (GROUPED INTO CONVERSATIONS) ====================
 function renderEmailList(emails) {
   const container = document.getElementById('email-items-container');
   if (!container) return;
   container.innerHTML = '';
 
-  let listToRender = emails || [];
+  const rawList = emails || [];
+  allConversations = groupEmailsIntoConversations(rawList);
+
+  let filtered = [...allConversations];
   if (currentMailSourceFilter === 'phonemail') {
-    listToRender = listToRender.filter(e => isPhoneMailSender(e.sender_email));
+    filtered = filtered.filter(c => c.is_phonemail);
   } else if (currentMailSourceFilter === 'external') {
-    listToRender = listToRender.filter(e => !isPhoneMailSender(e.sender_email));
+    filtered = filtered.filter(c => !c.is_phonemail);
   }
 
-  if (listToRender.length === 0) {
-    let emptyMsg = `No messages found in ${getFolderFriendlyName(currentFolder)}.`;
+  if (filtered.length === 0) {
+    let emptyMsg = `No conversations found in ${getFolderFriendlyName(currentFolder)}.`;
     if (currentMailSourceFilter === 'phonemail') {
-      emptyMsg = `No INAI network messages in ${getFolderFriendlyName(currentFolder)}.`;
+      emptyMsg = `No INAI network conversations in ${getFolderFriendlyName(currentFolder)}.`;
     } else if (currentMailSourceFilter === 'external') {
-      emptyMsg = `No external (Gmail, Rediff, etc.) messages in ${getFolderFriendlyName(currentFolder)}.`;
+      emptyMsg = `No external (Gmail, Rediff, etc.) conversations in ${getFolderFriendlyName(currentFolder)}.`;
     }
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-dim); padding: 80px 20px;">
         <div style="margin-bottom: 14px;">
           <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
         </div>
-        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Messages</h3>
+        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Conversations</h3>
         <p style="font-size: 13px;">${emptyMsg}</p>
       </div>
     `;
     return;
   }
 
-  // Date categorization
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const yesterdayStart = todayStart - 86400000;
-  const weekStart = todayStart - 6 * 86400000;
-
-  const groups = [
-    { key: 'today', title: 'Today', items: [] },
-    { key: 'yesterday', title: 'Yesterday', items: [] },
-    { key: 'this_week', title: 'This Week', items: [] },
-    { key: 'older', title: 'Older', items: [] }
-  ];
-
-  listToRender.forEach(email => {
-    const t = new Date(email.created_at).getTime();
-    if (t >= todayStart) groups[0].items.push(email);
-    else if (t >= yesterdayStart) groups[1].items.push(email);
-    else if (t >= weekStart) groups[2].items.push(email);
-    else groups[3].items.push(email);
-  });
-
-  groups.forEach(grp => {
-    if (grp.items.length === 0) return;
-
-    // Group Header
-    const grpHeader = document.createElement('div');
-    grpHeader.className = 'email-group-header';
-    grpHeader.innerHTML = `
-      <span class="email-group-title">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>${grp.title}</span>
-      </span>
-      <span class="email-group-count">${grp.items.length}</span>
-    `;
-    container.appendChild(grpHeader);
-
-    grp.items.forEach(email => {
-      const row = createEmailRowElement(email);
-      container.appendChild(row);
-    });
+  // Render conversation rows
+  filtered.forEach(conv => {
+    const row = createConversationRowElement(conv);
+    container.appendChild(row);
   });
 
   updateBulkToolbar();
 }
 
-function createEmailRowElement(email) {
+function createConversationRowElement(conv) {
   const row = document.createElement('div');
-  const isSelected = selectedEmailIds.has(email.id);
-  const isStarred = email.is_starred === 1;
-  const isImportant = email.is_important === 1;
+  const isSelected = selectedEmailIds.has(conv.id);
+  const isStarred = conv.is_starred === 1;
+  const isImportant = conv.is_important === 1;
 
-  row.id = `email-row-${email.id}`;
-  row.dataset.id = email.id;
-  row.className = `email-card-item ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}`;
+  row.id = `conv-row-${conv.id}`;
+  row.dataset.id = conv.id;
+  row.className = `email-card-item ${conv.unread_count > 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}`;
   row.onclick = () => {
-    openEmailDetails(email);
+    openConversation(conv.id);
   };
 
-  const dateObj = new Date(email.created_at);
+  const dateObj = new Date(conv.created_at);
   const isToday = new Date().toDateString() === dateObj.toDateString();
   const timeDisplay = isToday 
     ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-  const isSentFolder = currentFolder.toUpperCase() === 'SENT';
-  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
-  const recipientsDisplay = getRecipientsDisplay(email);
-
-  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
-  const sourceBadgeHtml = isFromPhoneMail
+  const sourceBadgeHtml = conv.is_phonemail
     ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
     : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
-  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
-  const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
-  const displaySender = (isSentFolder || isSentByMe) 
-    ? `To: ${recipientsDisplay || 'Recipient'}` 
-    : formattedSender;
-  const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
+  const msgCountBadge = conv.message_count > 1 
+    ? `<span class="conv-count-badge">${conv.message_count} msgs</span>` 
+    : '';
 
   row.innerHTML = `
-    <!-- Touch Swipe Left Actions (Archive & Delete) -->
-    <div class="swipe-actions-container">
-      <div class="swipe-left-reveal" style="display: none;">
-        <button class="swipe-btn archive" onclick="executeBulkActionOnSingle('${email.id}', 'archive'); event.stopPropagation();" title="Archive">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          <span>Archive</span>
-        </button>
-        <button class="swipe-btn delete" onclick="executeBulkActionOnSingle('${email.id}', 'delete'); event.stopPropagation();" title="Delete">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          <span>Delete</span>
-        </button>
-      </div>
-      <div class="swipe-right-reveal" style="display: none;">
-        <button class="swipe-btn important" onclick="toggleImportant('${email.id}', event); event.stopPropagation();" title="Important">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Flag</span>
-        </button>
-        <button class="swipe-btn star" onclick="toggleStar('${email.id}', event); event.stopPropagation();" title="Star">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Star</span>
-        </button>
-      </div>
-    </div>
-
     <!-- Row Controls: Checkbox and Star -->
-    <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
+    <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${conv.latestMessage.id}', event)">
       <label class="custom-checkbox" onclick="event.stopPropagation()">
-        <input type="checkbox" class="row-checkbox" id="check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
+        <input type="checkbox" class="row-checkbox" id="check-${conv.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${conv.latestMessage.id}', event)">
         <span class="checkmark"></span>
       </label>
     </div>
 
-    <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+    <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${conv.latestMessage.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </span>
 
-    <div class="item-avatar-circle">${avatarInitial}</div>
-    <div class="item-sender-col" title="${escapeHtml(isSentFolder ? (recipientsDisplay || 'Recipient') : formattedSender)}">
-      ${escapeHtml(displaySender)}
+    <div class="item-avatar-circle" style="background-image: url('${conv.avatar_url}'); background-size: cover; background-position: center;">
+      ${!conv.avatar_url ? getInitials(conv.display_title) : ''}
+    </div>
+    <div class="item-sender-col" title="${escapeHtml(conv.display_title)}">
+      ${escapeHtml(conv.display_title)}
     </div>
     <div class="item-content-preview">
       ${sourceBadgeHtml}
+      ${msgCountBadge}
       ${isImportant ? '<span style="font-size: 10px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1px 6px; border-radius: 4px; margin-right: 4px;">PRIORITY</span>' : ''}
-      <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
-      <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
+      <span class="item-subject-title">${escapeHtml(conv.latest_subject)}</span>
+      <span class="item-body-snippet"> — ${escapeHtml(conv.latest_snippet)}</span>
     </div>
     <div class="item-date-col">${timeDisplay}</div>
 
     <!-- Desktop Hover Actions -->
     <div class="row-quick-actions" onclick="event.stopPropagation()">
-      <button class="quick-action-btn" onclick="toggleImportant('${email.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
+      <button class="quick-action-btn" onclick="toggleImportant('${conv.latestMessage.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
-      <button class="quick-action-btn" onclick="executeBulkActionOnSingle('${email.id}', 'archive')" title="Archive">
+      <button class="quick-action-btn" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'archive')" title="Archive">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
       </button>
-      <button class="quick-action-btn danger" onclick="executeBulkActionOnSingle('${email.id}', 'delete')" title="Delete">
+      <button class="quick-action-btn danger" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'delete')" title="Delete">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
     </div>
   `;
-
-  // Attach Touch Swipe Event Listeners
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let isSwiping = false;
-
-  row.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    isSwiping = false;
-  }, { passive: true });
-
-  row.addEventListener('touchmove', (e) => {
-    const diffX = e.touches[0].clientX - touchStartX;
-    const diffY = e.touches[0].clientY - touchStartY;
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 20) {
-      isSwiping = true;
-      const leftReveal = row.querySelector('.swipe-left-reveal');
-      const rightReveal = row.querySelector('.swipe-right-reveal');
-      if (diffX < -30 && leftReveal) {
-        leftReveal.style.display = 'flex';
-        if (rightReveal) rightReveal.style.display = 'none';
-      } else if (diffX > 30 && rightReveal) {
-        rightReveal.style.display = 'flex';
-        if (leftReveal) leftReveal.style.display = 'none';
-      }
-    }
-  }, { passive: true });
-
-  row.addEventListener('touchend', (e) => {
-    const diffX = e.changedTouches[0].clientX - touchStartX;
-    if (isSwiping && Math.abs(diffX) > 80) {
-      if (diffX < -80) {
-        executeBulkActionOnSingle(email.id, 'archive');
-      } else if (diffX > 80) {
-        toggleImportant(email.id);
-      }
-    }
-    const leftReveal = row.querySelector('.swipe-left-reveal');
-    const rightReveal = row.querySelector('.swipe-right-reveal');
-    if (leftReveal) leftReveal.style.display = 'none';
-    if (rightReveal) rightReveal.style.display = 'none';
-  }, { passive: true });
 
   return row;
 }
@@ -1874,94 +1955,269 @@ function switchFolder(folder, element) {
   loadEmails(folder);
 }
 
-// ==================== READING PANE VIEW ====================
-function openEmailDetails(email) {
-  if (!email) return;
-  activeEmail = email;
-  isMessageTranslated = false;
+// ==================== READING PANE VIEW (CONVERSATION THREAD) ====================
+function openConversation(convId) {
+  const conv = allConversations.find(c => c.id === convId || c.key === convId);
+  if (!conv) return;
 
-  // Mark as read in UI & backend
-  if (email.is_read === 0) {
-    email.is_read = 1;
-    fetch(`/api/emails/${email.id}/read`, { method: 'POST' }).catch(() => {});
-  }
+  activeConversation = conv;
+  activeConversationId = conv.id;
+  activeEmail = conv.latestMessage;
+
+  // Mark all messages as read
+  conv.messages.forEach(m => {
+    if (m.is_read === 0) {
+      m.is_read = 1;
+      fetch(`/api/emails/${m.id}/read`, { method: 'POST' }).catch(() => {});
+    }
+  });
+  conv.is_read = 1;
+  conv.unread_count = 0;
 
   const listPane = document.getElementById('mail-list-pane');
   const readingPane = document.getElementById('reading-pane');
   if (listPane) listPane.style.display = 'none';
   if (readingPane) readingPane.style.display = 'flex';
 
-  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
-  const recipientsDisplay = getRecipientsDisplay(email);
-  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
-  
-  const formattedSenderClean = isFromPhoneMail 
-    ? formatSenderDisplay(email.sender_email, false, email.sender_name) 
-    : formatSenderDisplay(email.sender_email, true, email.sender_name);
-
-  originalMessageSubject = email.subject || '(No Subject)';
-  originalMessageBody = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
-
   const subjEl = document.getElementById('full-subject');
-  if (subjEl) subjEl.innerText = originalMessageSubject;
+  if (subjEl) subjEl.innerText = conv.latest_subject;
 
-  const senderEl = document.getElementById('full-sender');
-  if (senderEl) {
-    senderEl.innerText = isSentByMe 
-      ? (currentUser.name ? `${currentUser.name} (+91 ${currentUser.phone})` : `User (+91 ${currentUser.phone})`) 
-      : formattedSenderClean;
+  const toLabel = document.getElementById('inline-dock-recipient-label');
+  if (toLabel) {
+    toLabel.innerText = `To: ${conv.display_title} (🔒 Locked)`;
   }
 
-  const senderBadgeEl = document.getElementById('full-sender-badge');
-  if (senderBadgeEl) {
-    if (isFromPhoneMail) {
-      senderBadgeEl.className = 'badge-source-tag badge-phonemail-pill';
-      senderBadgeEl.innerHTML = '<svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI Network</span>';
-    } else {
-      senderBadgeEl.className = 'badge-source-tag badge-external-pill';
-      senderBadgeEl.innerHTML = '<svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External Provider</span>';
-    }
-  }
+  // Populate thread container
+  renderDesktopConversationThread(conv);
 
-  const avatarEl = document.getElementById('full-avatar');
-  if (avatarEl) {
-    avatarEl.innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : formattedSenderClean);
-  }
+  // Reset reply input & quote banner
+  cancelDesktopQuotedReply();
+  const replyInput = document.getElementById('desktop-thread-reply-input');
+  if (replyInput) replyInput.value = '';
 
-  const toEl = document.getElementById('full-to');
-  if (toEl) {
-    toEl.innerText = isSentByMe 
-      ? (recipientsDisplay || 'Recipient') 
-      : (currentUser ? `${currentUser.name || 'me'} (+91 ${currentUser.phone})` : 'me');
-  }
-
-  const dateEl = document.getElementById('full-date');
-  if (dateEl) {
-    dateEl.innerText = new Date(email.created_at).toLocaleString([], { 
-      dateStyle: 'medium', 
-      timeStyle: 'short' 
-    });
-  }
-
-  const bodyEl = document.getElementById('full-body');
-  if (bodyEl) {
-    bodyEl.innerHTML = originalMessageBody;
-  }
-
+  // Star status
   const starBtn = document.getElementById('pane-star-btn');
   if (starBtn) {
-    const isStarred = email.is_starred === 1;
-    starBtn.style.color = isStarred ? 'var(--accent-amber)' : 'var(--text-dim)';
+    starBtn.style.color = conv.is_starred === 1 ? 'var(--accent-amber)' : 'var(--text-dim)';
   }
-
   const impBtn = document.getElementById('pane-important-btn');
   if (impBtn) {
-    const isImp = email.is_important === 1;
-    impBtn.style.color = isImp ? '#eab308' : 'var(--text-dim)';
+    impBtn.style.color = conv.is_important === 1 ? '#eab308' : 'var(--text-dim)';
+  }
+}
+
+function renderDesktopConversationThread(conv) {
+  const threadContainer = document.getElementById('reading-thread-container');
+  if (!threadContainer) return;
+  threadContainer.innerHTML = '';
+
+  const myPhone = currentUser ? currentUser.phone : '';
+  const myClean = (myPhone || '').replace(/\D/g, '');
+
+  conv.messages.forEach((msg, idx) => {
+    const isFirst = idx === 0;
+    const cleanSender = extractCleanParticipant(msg.sender_email);
+    const isOutgoing = cleanSender.includes(myClean) || (currentUser && cleanSender.includes(currentUser.phone));
+    const senderDisplay = formatSenderDisplay(msg.sender_email, false, msg.sender_name);
+    const timeDisplay = new Date(msg.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+    const isPhoneMail = isPhoneMailSender(msg.sender_email);
+
+    const avatarSvg = generateDefaultAvatar(msg.sender_email, senderDisplay);
+    const hasReplied = msg.has_replied === 1;
+
+    // First email shows Subject, replies hide Subject
+    const subjectHtml = (isFirst && msg.subject) ? `
+      <div class="thread-subject-chip">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <span>${escapeHtml(msg.subject)}</span>
+      </div>
+    ` : '';
+
+    // Quoted reply snippet
+    let quotedHtml = '';
+    if (msg.quoted_text || msg.reply_to_id) {
+      const qSender = msg.quoted_sender || 'Original Message';
+      const qText = (msg.quoted_text || '').substring(0, 95);
+      quotedHtml = `
+        <div class="thread-quoted-box">
+          <strong>${escapeHtml(qSender)} wrote:</strong> ${escapeHtml(qText)}
+        </div>
+      `;
+    }
+
+    const card = document.createElement('div');
+    card.className = `thread-message-card ${isOutgoing ? 'outgoing' : 'incoming'}`;
+    card.id = `thread-card-${msg.id}`;
+
+    const rawBody = msg.body_html || escapeHtml(msg.body_text || '').replace(/\n/g, '<br>');
+
+    // Single-reply constraint badge or button
+    let replyActionHtml = '';
+    if (hasReplied) {
+      replyActionHtml = `<span class="replied-lock-badge">Replied ✓</span>`;
+    } else {
+      replyActionHtml = `
+        <button type="button" class="thread-reply-btn" onclick="triggerDesktopReply('${msg.id}', event)">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+          <span>Reply</span>
+        </button>
+      `;
+    }
+
+    card.innerHTML = `
+      <div class="thread-card-header">
+        <div class="thread-sender-info">
+          <div class="thread-avatar" style="background-image: url('${avatarSvg}');"></div>
+          <div class="thread-meta-col">
+            <div class="thread-sender-name">
+              <span>${escapeHtml(senderDisplay)}</span>
+              <span class="badge-source-tag ${isPhoneMail ? 'badge-phonemail-pill' : 'badge-external-pill'}">
+                ${isPhoneMail ? '⚡ INAI Network' : '🌐 External Provider'}
+              </span>
+            </div>
+            <div class="thread-time">${timeDisplay}</div>
+          </div>
+        </div>
+        <div class="thread-header-actions">
+          ${replyActionHtml}
+        </div>
+      </div>
+      ${subjectHtml}
+      ${quotedHtml}
+      <div class="thread-card-body">
+        ${rawBody}
+      </div>
+    `;
+
+    threadContainer.appendChild(card);
+  });
+}
+
+function openEmailDetails(email) {
+  if (!email) return;
+  const convKey = email.conversation_id || getConversationKey(email);
+  const conv = allConversations.find(c => c.id === convKey || c.key === convKey);
+  if (conv) {
+    openConversation(conv.id);
+  } else {
+    loadEmails(currentFolder).then(() => {
+      openConversation(email.conversation_id || email.id);
+    });
+  }
+}
+
+// ==================== DESKTOP THREAD REPLY LOGIC ====================
+function triggerDesktopReply(msgId, e) {
+  if (e) e.stopPropagation();
+  if (!activeConversation) return;
+
+  const msg = activeConversation.messages.find(m => m.id === msgId);
+  if (!msg) return;
+
+  if (msg.has_replied === 1) {
+    showToastNotification('This message has already been replied to once.', 'info');
+    return;
   }
 
-  const transLabel = document.getElementById('pane-trans-label');
-  if (transLabel) transLabel.innerText = 'AI Translate';
+  activeReplyingMessage = msg;
+  const quoteBar = document.getElementById('desktop-quote-bar');
+  const quoteSender = document.getElementById('desktop-quote-sender');
+  const quoteSnippet = document.getElementById('desktop-quote-snippet');
+
+  if (quoteBar && quoteSender && quoteSnippet) {
+    const senderDisplay = formatSenderDisplay(msg.sender_email, false, msg.sender_name);
+    quoteSender.innerText = `Replying to ${senderDisplay}`;
+    quoteSnippet.innerText = (msg.body_text || msg.body_html || '').replace(/\s+/g, ' ').trim().substring(0, 90);
+    quoteBar.style.display = 'flex';
+  }
+
+  const input = document.getElementById('desktop-thread-reply-input');
+  if (input) {
+    input.focus();
+    input.placeholder = `Reply to ${formatSenderDisplay(msg.sender_email, false, msg.sender_name)}...`;
+  }
+}
+
+function cancelDesktopQuotedReply() {
+  activeReplyingMessage = null;
+  const quoteBar = document.getElementById('desktop-quote-bar');
+  if (quoteBar) quoteBar.style.display = 'none';
+  const input = document.getElementById('desktop-thread-reply-input');
+  if (input) input.placeholder = 'Type a reply to this conversation...';
+}
+
+async function submitDesktopThreadReply() {
+  if (!activeConversation) return;
+  const input = document.getElementById('desktop-thread-reply-input');
+  if (!input) return;
+  const body = input.value.trim();
+  if (!body) {
+    showToastNotification('Please enter a reply message', 'warning');
+    return;
+  }
+
+  const to = activeConversation.participant_raw || activeConversation.latestMessage.sender_email;
+  const cleanSubject = activeConversation.latest_subject.replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
+  const subject = `Re: ${cleanSubject}`;
+
+  try {
+    const payload = {
+      sender_phone: currentUser.phone,
+      to: to,
+      subject: subject,
+      body: body,
+      reply_to_id: activeReplyingMessage ? activeReplyingMessage.id : null,
+      conversation_id: activeConversation.id
+    };
+
+    const res = await fetch('/api/emails/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      input.value = '';
+      if (activeReplyingMessage) {
+        activeReplyingMessage.has_replied = 1;
+      }
+      cancelDesktopQuotedReply();
+
+      // Append new outgoing message card to thread
+      const now = new Date();
+      const newMsg = {
+        id: data.email ? data.email.id : `tmp_${Date.now()}`,
+        sender_email: `${currentUser.phone}@alphastack.wwisvnr.com`,
+        sender_name: currentUser.name || currentUser.phone,
+        subject: subject,
+        body_text: body,
+        created_at: now.toISOString(),
+        is_read: 1,
+        has_replied: 0,
+        quoted_sender: activeReplyingMessage ? formatSenderDisplay(activeReplyingMessage.sender_email, false, activeReplyingMessage.sender_name) : null,
+        quoted_text: activeReplyingMessage ? (activeReplyingMessage.body_text || '').substring(0, 95) : null
+      };
+
+      activeConversation.messages.push(newMsg);
+      activeConversation.latestMessage = newMsg;
+      activeConversation.latest_snippet = body.substring(0, 95);
+      activeConversation.created_at = newMsg.created_at;
+
+      renderDesktopConversationThread(activeConversation);
+
+      // Scroll to bottom of reading pane
+      const threadContainer = document.getElementById('reading-thread-container');
+      if (threadContainer) threadContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+      showToastNotification('Reply sent successfully! 🚀', 'success');
+      emailFolderCache = {};
+    } else {
+      showToastNotification(data.error || 'Failed to send reply', 'error');
+    }
+  } catch (err) {
+    showToastNotification('Failed to send reply', 'error');
+  }
 }
 
 function closeReadingPane(shouldReload = true) {
@@ -2820,58 +3076,213 @@ function fallbackLocalTranslate(text, lang) {
   return translated;
 }
 
-// ==================== DIGITAL ID CARD & DYNAMIC QR CODE ====================
+// ==================== DIGITAL ID CARD & PERSON INFO MANAGEMENT (DESKTOP) ====================
+function openActiveContactInfoModal() {
+  if (!activeConversation) return;
+  openContactInfoModal(activeConversation.participant_raw);
+}
+
 function openDigitalIdModal() {
-  if (!currentUser) return;
+  openContactInfoModal(currentUser ? currentUser.phone : null);
+}
+
+async function openContactInfoModal(phoneOrEmail) {
+  const target = phoneOrEmail || (activeConversation && activeConversation.participant_raw) || (currentUser && currentUser.phone);
+  if (!target) return;
+
+  activeContactForModal = target;
   const modal = document.getElementById('digital-id-modal');
   if (!modal) return;
 
-  const name = currentUser.name || 'INAI Member';
-  const phone = formatPhoneDisplay(currentUser.phone);
-  const email = `${currentUser.phone}@alphastack.wwisvnr.com`;
+  switchIdCardTab('card');
+
+  const isPM = isPhoneMailSender(target);
+  const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
+  const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : target;
 
   const nameEl = document.getElementById('id-card-name');
-  if (nameEl) nameEl.innerText = name;
   const phoneEl = document.getElementById('id-card-phone');
-  if (phoneEl) phoneEl.innerText = phone;
   const emailEl = document.getElementById('id-card-email');
-  if (emailEl) emailEl.innerText = email;
+  const aliasTagEl = document.getElementById('id-card-alias-tag');
+  const avatarEl = document.getElementById('id-card-avatar-img');
+  const qrEl = document.getElementById('id-card-qr-img');
+  const dateEl = document.getElementById('id-card-issue-date');
 
-  const qrImg = document.getElementById('id-card-qr-img');
-  if (qrImg) {
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent('mailto:' + email)}&format=svg&color=046a38`;
+  const defaultEmail = isPM ? `${cleanPhone}@alphastack.wwisvnr.com` : target;
+  const displayName = (activeConversation && activeConversation.sender_name) || (isPM ? `User ${cleanPhone.slice(-4)}` : target.split('@')[0]);
+
+  if (nameEl) nameEl.innerText = displayName;
+  if (phoneEl) phoneEl.innerText = formattedPhone;
+  if (emailEl) emailEl.innerText = defaultEmail;
+  if (aliasTagEl) aliasTagEl.innerText = 'Sub-ID: .primary';
+  if (dateEl) dateEl.innerText = new Date().toISOString().split('T')[0];
+
+  const avatarSvg = generateDefaultAvatar(target, displayName);
+  if (avatarEl) {
+    avatarEl.style.backgroundImage = `url('${avatarSvg}')`;
+    avatarEl.style.backgroundSize = 'cover';
+    avatarEl.innerText = '';
   }
+
+  if (qrEl) {
+    const qrData = encodeURIComponent(`mailto:${defaultEmail}?subject=INAI%20Contact`);
+    qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${qrData}`;
+  }
+
+  // Pre-fill edit inputs
+  const editName = document.getElementById('edit-person-name');
+  const editPhone = document.getElementById('edit-person-phone');
+  const editEmail = document.getElementById('edit-person-email');
+  const editAlias = document.getElementById('edit-person-alias');
+  const editBio = document.getElementById('edit-person-bio');
+  const editAvatarPrev = document.getElementById('edit-person-avatar-preview');
+
+  if (editName) editName.value = displayName;
+  if (editPhone) editPhone.value = formattedPhone;
+  if (editEmail) editEmail.value = defaultEmail;
+  if (editAlias) editAlias.value = 'primary';
+  if (editBio) editBio.value = '';
+  if (editAvatarPrev) {
+    editAvatarPrev.style.backgroundImage = `url('${avatarSvg}')`;
+    editAvatarPrev.style.backgroundSize = 'cover';
+    editAvatarPrev.innerText = '';
+  }
+
+  try {
+    const fetchPhone = cleanPhone || target;
+    const res = await fetch(`/api/contacts/detail/${encodeURIComponent(fetchPhone)}`);
+    const data = await res.json();
+    if (data.contact) {
+      const c = data.contact;
+      if (c.display_name && nameEl) nameEl.innerText = c.display_name;
+      if (c.email && emailEl) emailEl.innerText = c.email;
+      if (c.bio && editBio) editBio.value = c.bio;
+      if (editName && c.display_name) editName.value = c.display_name;
+      if (editEmail && c.email) editEmail.value = c.email;
+    }
+  } catch (err) {}
 
   modal.style.display = 'flex';
 }
 
 function closeDigitalIdModal(e) {
+  if (e && e.target && e.target.id !== 'digital-id-modal' && !e.target.classList.contains('close-btn')) return;
   const modal = document.getElementById('digital-id-modal');
   if (modal) modal.style.display = 'none';
+  const card = document.getElementById('smart-mail-card');
+  if (card) card.classList.remove('flipped');
+}
+
+function switchIdCardTab(tab) {
+  const btnCard = document.getElementById('btn-id-tab-card');
+  const btnEdit = document.getElementById('btn-id-tab-edit');
+  const panelCard = document.getElementById('id-card-view-panel');
+  const panelEdit = document.getElementById('id-card-edit-panel');
+
+  if (tab === 'card') {
+    if (btnCard) btnCard.classList.add('active');
+    if (btnEdit) btnEdit.classList.remove('active');
+    if (panelCard) panelCard.style.display = 'block';
+    if (panelEdit) panelEdit.style.display = 'none';
+  } else {
+    if (btnCard) btnCard.classList.remove('active');
+    if (btnEdit) btnEdit.classList.add('active');
+    if (panelCard) panelCard.style.display = 'none';
+    if (panelEdit) panelEdit.style.display = 'block';
+  }
+}
+
+function flipSmartCard() {
+  const card = document.getElementById('smart-mail-card');
+  if (card) card.classList.toggle('flipped');
+}
+
+function selectPersonAvatarGradient(palette) {
+  const target = activeContactForModal || (currentUser && currentUser.phone) || 'User';
+  const preview = document.getElementById('edit-person-avatar-preview');
+  const cardAvatar = document.getElementById('id-card-avatar-img');
+  const newSvg = generateDefaultAvatar(`${target}_${palette}`, target);
+  
+  if (preview) {
+    preview.style.backgroundImage = `url('${newSvg}')`;
+    preview.style.backgroundSize = 'cover';
+  }
+  if (cardAvatar) {
+    cardAvatar.style.backgroundImage = `url('${newSvg}')`;
+    cardAvatar.style.backgroundSize = 'cover';
+  }
+}
+
+async function savePersonInfoSubmit(e) {
+  e.preventDefault();
+  const phone = (document.getElementById('edit-person-phone').value || '').trim();
+  const displayName = (document.getElementById('edit-person-name').value || '').trim();
+  const email = (document.getElementById('edit-person-email').value || '').trim();
+  const subAlias = (document.getElementById('edit-person-alias').value || '').trim();
+  const bio = (document.getElementById('edit-person-bio').value || '').trim();
+
+  try {
+    const res = await fetch('/api/contacts/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone: phone.replace(/\D/g, '').slice(-10),
+        display_name: displayName,
+        email: email,
+        sub_alias: subAlias,
+        bio: bio
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToastNotification('Contact info updated successfully! ✓', 'success');
+      const nameEl = document.getElementById('id-card-name');
+      if (nameEl) nameEl.innerText = displayName;
+      const emailEl = document.getElementById('id-card-email');
+      if (emailEl) emailEl.innerText = email;
+      const aliasTag = document.getElementById('id-card-alias-tag');
+      if (aliasTag && subAlias) aliasTag.innerText = `Sub-ID: .${subAlias}`;
+
+      if (activeConversation) {
+        activeConversation.display_title = displayName;
+        const subjEl = document.getElementById('full-subject');
+        if (subjEl) subjEl.innerText = activeConversation.latest_subject;
+      }
+      switchIdCardTab('card');
+    } else {
+      showToastNotification(data.error || 'Failed to update contact', 'error');
+    }
+  } catch (err) {
+    showToastNotification('Network error saving contact info', 'error');
+  }
 }
 
 function copyIdCardEmail() {
-  if (!currentUser) return;
-  const email = `${currentUser.phone}@alphastack.wwisvnr.com`;
+  const emailEl = document.getElementById('id-card-email');
+  if (!emailEl) return;
+  const email = emailEl.innerText.trim();
   navigator.clipboard.writeText(email).then(() => {
     const btnText = document.getElementById('btn-copy-id-text');
     if (btnText) {
       btnText.innerText = 'Copied! ✓';
-      setTimeout(() => { btnText.innerText = 'Copy Mail ID'; }, 2500);
+      setTimeout(() => { btnText.innerText = 'Copy Mail ID'; }, 2000);
     }
-    showToastNotification(`Mail ID copied: ${email} 📋`);
+    showToastNotification(`Mail ID copied to clipboard: ${email} 📋`, 'success');
   }).catch(() => {
     showToastNotification(`Email: ${email}`);
   });
 }
 
 function shareDigitalIdCard() {
-  if (!currentUser) return;
-  const email = `${currentUser.phone}@alphastack.wwisvnr.com`;
+  const emailEl = document.getElementById('id-card-email');
+  const nameEl = document.getElementById('id-card-name');
+  const email = emailEl ? emailEl.innerText.trim() : '';
+  const name = nameEl ? nameEl.innerText.trim() : 'INAI User';
+
   if (navigator.share) {
     navigator.share({
-      title: `INAI Digital Mail Identity — ${currentUser.name || 'User'}`,
-      text: `Contact me on INAI via my phone email: ${email}`,
+      title: `${name}'s Official INAI Mail ID`,
+      text: `Connect with ${name} on INAI Bharat Mail at: ${email}`,
       url: window.location.origin
     }).catch(() => {});
   } else {

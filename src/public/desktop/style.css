@@ -3241,4 +3241,414 @@ button {
   margin-top: 20px;
 }
 
+/* ==================== DESKTOP CONVERSATION THREAD & ID CARD UPGRADES ==================== */
+.conv-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--green-main, #046A38);
+  background: rgba(4, 106, 56, 0.1);
+  padding: 2px 7px;
+  border-radius: 12px;
+  border: 1px solid rgba(4, 106, 56, 0.2);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+}
+
+/* Chronological Conversation Thread in Reading Pane */
+.reading-thread-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.thread-message-card {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  padding: 18px 22px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s;
+}
+
+.thread-message-card:hover {
+  border-color: #cbd5e1;
+}
+
+.thread-message-card.outgoing {
+  background: #f8fafc;
+  border-left: 4px solid var(--green-main, #046A38);
+}
+
+.thread-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.thread-sender-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.thread-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  color: #ffffff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+.thread-meta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.thread-sender-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-main, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thread-time {
+  font-size: 12px;
+  color: var(--text-dim, #64748b);
+}
+
+.thread-subject-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-main, #046A38);
+  background: rgba(4, 106, 56, 0.08);
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.thread-quoted-box {
+  background: rgba(0, 0, 0, 0.03);
+  border-left: 3px solid var(--green-main, #046A38);
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 12.5px;
+  color: var(--text-dim, #64748b);
+}
+
+.thread-card-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-main, #1e293b);
+  word-break: break-word;
+}
+
+.thread-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light, #f1f5f9);
+}
+
+.thread-reply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main, #334155);
+  background: var(--bg-hover, #f1f5f9);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.thread-reply-btn:hover {
+  background: var(--green-main, #046A38);
+  color: #ffffff;
+  border-color: var(--green-main, #046A38);
+}
+
+.replied-lock-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #10b981;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+/* Inline Reply Dock at Bottom of Conversation */
+.conversation-inline-dock {
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-top: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+}
+
+.inline-dock-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.inline-quote-preview {
+  background: rgba(4, 106, 56, 0.08);
+  border-left: 3px solid var(--green-main, #046A38);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.inline-dock-textarea {
+  width: 100%;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 80px;
+  margin-bottom: 12px;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.inline-dock-textarea:focus {
+  border-color: var(--green-main, #046A38);
+  box-shadow: 0 0 0 3px rgba(4, 106, 56, 0.1);
+}
+
+.inline-dock-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 3D Smart Card Flip & Tab Switcher in Desktop */
+.id-card-tab-bar {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: var(--bg-hover, #f1f5f9);
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.id-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dim, #64748b);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.id-tab-btn.active {
+  background: #ffffff;
+  color: var(--text-main, #0f172a);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.smart-mail-card-wrapper {
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.smart-mail-card {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+  position: relative;
+}
+
+.smart-mail-card.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-side {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-front {
+  transform: rotateY(0deg);
+}
+
+.card-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #032a18 0%, #0f172a 100%);
+  border-radius: 18px;
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.15);
+  box-sizing: border-box;
+}
+
+.card-back-magstripe {
+  height: 38px;
+  background: #000000;
+  margin: -20px -20px 16px -20px;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+}
+
+.card-back-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-back-text {
+  font-size: 11px;
+  color: rgba(255,255,255,0.8);
+  line-height: 1.4;
+}
+
+.card-back-meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  border-top: 1px solid rgba(255,255,255,0.15);
+  padding-top: 8px;
+}
+
+.back-label {
+  color: rgba(255,255,255,0.6);
+  margin-right: 4px;
+}
+
+.back-val {
+  color: #ffffff;
+  font-family: monospace;
+}
+
+.card-back-barcode {
+  letter-spacing: 4px;
+  font-size: 14px;
+  opacity: 0.5;
+  text-align: center;
+}
+
+.person-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.person-avatar-picker-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.person-avatar-preview {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 800;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.person-avatar-palette {
+  display: flex;
+  gap: 8px;
+}
+
+.avatar-palette-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+  transition: transform 0.15s;
+}
+
+.avatar-palette-chip:hover {
+  transform: scale(1.15);
+}
+
+.form-group-desktop {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group-desktop label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim, #64748b);
+  letter-spacing: 0.5px;
+}
+
+.desktop-profile-input {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+  background: var(--bg-surface, #ffffff);
+  color: var(--text-main, #0f172a);
+}
+
+.desktop-profile-input:focus {
+  border-color: var(--green-main, #046A38);
+}
+
 

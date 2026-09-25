@@ -1743,3 +1743,859 @@ button {
 .app-toast.success { background: #046A38; }
 .app-toast.error { background: #dc2626; }
 .app-toast.warning { background: #d97706; }
+
+/* ==================== MOBILE QUICK FILTER PILLS ==================== */
+.mobile-quick-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobile-quick-filter-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.quick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.quick-pill:active {
+  transform: scale(0.96);
+}
+
+.quick-pill.active {
+  background: #046A38;
+  border-color: #046A38;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(4, 106, 56, 0.28);
+}
+
+.quick-pill.active svg {
+  stroke: #ffffff;
+}
+
+.unread-dot-mini {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563eb;
+  display: inline-block;
+}
+
+.quick-pill.active .unread-dot-mini {
+  background: #ffffff;
+}
+
+.pill-badge {
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 800;
+}
+
+.quick-pill.active .pill-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.search-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+/* ==================== WHATSAPP-STYLE CONVERSATION SCREEN ==================== */
+.whatsapp-chat-screen {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: #eae6df;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .whatsapp-chat-screen {
+  background: #0b141a;
+}
+
+.whatsapp-top-bar {
+  background: #046A38;
+  color: #ffffff;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  z-index: 10;
+}
+
+.top-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.whatsapp-back-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  margin-right: -2px;
+}
+
+.whatsapp-back-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.whatsapp-contact-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.whatsapp-header-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.whatsapp-header-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.whatsapp-header-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.whatsapp-header-title {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #ffffff;
+}
+
+.whatsapp-header-subtitle {
+  font-size: 11px;
+  opacity: 0.88;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #e2e8f0;
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.top-bar-right .icon-btn {
+  color: #ffffff;
+}
+
+.top-bar-right .icon-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* WhatsApp Chat Timeline */
+.whatsapp-timeline-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background-color: #efeae2;
+  background-image: radial-gradient(#d1d7db 0.75px, transparent 0.75px);
+  background-size: 16px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+[data-theme="dark"] .whatsapp-timeline-container {
+  background-color: #0c1317;
+  background-image: radial-gradient(#1f2c34 0.75px, transparent 0.75px);
+}
+
+.whatsapp-date-chip {
+  align-self: center;
+  background: rgba(255, 255, 255, 0.88);
+  color: #54656f;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  margin: 6px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+[data-theme="dark"] .whatsapp-date-chip {
+  background: #182229;
+  color: #8696a0;
+}
+
+/* Chat Message Rows & Bubbles */
+.chat-msg-row {
+  display: flex;
+  width: 100%;
+  margin-bottom: 2px;
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  touch-action: pan-y;
+}
+
+.chat-msg-row.incoming {
+  justify-content: flex-start;
+}
+
+.chat-msg-row.outgoing {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-width: 82%;
+  min-width: 130px;
+  padding: 8px 12px 6px;
+  border-radius: 12px;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  word-break: break-word;
+}
+
+/* WhatsApp Incoming Bubble (White/Surface) */
+.chat-bubble.incoming {
+  background: #ffffff;
+  color: #111b21;
+  border-top-left-radius: 3px;
+}
+
+[data-theme="dark"] .chat-bubble.incoming {
+  background: #202c33;
+  color: #e9edef;
+}
+
+/* WhatsApp Outgoing Bubble (Emerald Green) */
+.chat-bubble.outgoing {
+  background: #d9fdd3;
+  color: #111b21;
+  border-top-right-radius: 3px;
+}
+
+[data-theme="dark"] .chat-bubble.outgoing {
+  background: #005c4b;
+  color: #e9edef;
+}
+
+/* Subject Tag (Shown on first email in thread only) */
+.bubble-subject-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(4, 106, 56, 0.09);
+  color: #046A38;
+  border: 1px solid rgba(4, 106, 56, 0.2);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+[data-theme="dark"] .bubble-subject-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.bubble-sender-name {
+  font-size: 12px;
+  font-weight: 800;
+  color: #046A38;
+  margin-bottom: 4px;
+}
+
+[data-theme="dark"] .bubble-sender-name {
+  color: #10b981;
+}
+
+/* WhatsApp Quoted Reply Box inside bubble */
+.bubble-quote-box {
+  background: rgba(0, 0, 0, 0.05);
+  border-left: 3.5px solid #046A38;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  margin-bottom: 6px;
+}
+
+[data-theme="dark"] .bubble-quote-box {
+  background: rgba(255, 255, 255, 0.08);
+  border-left-color: #10b981;
+}
+
+.quote-box-sender {
+  font-weight: 800;
+  color: #046A38;
+  margin-bottom: 2px;
+  font-size: 11px;
+}
+
+.quote-box-text {
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+[data-theme="dark"] .quote-box-text {
+  color: #cbd5e1;
+}
+
+.bubble-body-content {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: inherit;
+}
+
+/* Compact preview for very long emails */
+.bubble-compact-preview {
+  margin-top: 6px;
+}
+
+.btn-expand-email {
+  background: none;
+  border: none;
+  color: #046A38;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+[data-theme="dark"] .btn-expand-email {
+  color: #34d399;
+}
+
+/* Bubble Footer with Timestamp, Double Ticks & Reply action */
+.bubble-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: #667781;
+}
+
+[data-theme="dark"] .bubble-footer {
+  color: #8696a0;
+}
+
+.double-ticks {
+  color: #53bdeb;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: -2px;
+  margin-left: 2px;
+}
+
+.bubble-reply-action-btn {
+  background: none;
+  border: none;
+  color: #046A38;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 1px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: auto;
+}
+
+.bubble-replied-pill {
+  font-size: 10px;
+  font-weight: 700;
+  color: #059669;
+  background: rgba(5, 150, 105, 0.1);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: auto;
+}
+
+/* ==================== WHATSAPP BOTTOM DOCK ==================== */
+.whatsapp-bottom-dock {
+  background: var(--bg-surface);
+  border-top: 1px solid var(--border-light);
+  padding: 8px 10px env(safe-area-inset-bottom, 8px);
+  position: relative;
+  z-index: 20;
+}
+
+/* Quoted Reply Banner above dock */
+.whatsapp-quote-banner {
+  background: var(--bg-subtle);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  animation: slideUp 0.18s ease;
+  border-left: 4px solid #046A38;
+}
+
+.quote-bar-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.quote-bar-sender {
+  font-size: 12px;
+  font-weight: 800;
+  color: #046A38;
+  margin-bottom: 2px;
+}
+
+.quote-bar-snippet {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quote-bar-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+/* Bottom Input Row */
+.whatsapp-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.whatsapp-tool-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  padding: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.whatsapp-tool-btn:active {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.whatsapp-textarea {
+  flex: 1;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  padding: 9px 14px;
+  font-size: 14px;
+  color: var(--text-main);
+  outline: none;
+  resize: none;
+  max-height: 120px;
+  min-height: 38px;
+  line-height: 1.4;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.whatsapp-textarea:focus {
+  border-color: #046A38;
+}
+
+.whatsapp-send-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #046A38;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(4, 106, 56, 0.35);
+  transition: transform 0.15s, background-color 0.15s;
+}
+
+.whatsapp-send-btn:active {
+  transform: scale(0.92);
+  background: #03522b;
+}
+
+/* ==================== TRADITIONAL EMAIL VIEW MODAL ==================== */
+.traditional-email-card {
+  max-height: 85vh;
+}
+
+.trad-meta-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trad-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.trad-meta-label {
+  font-weight: 800;
+  color: var(--text-dim);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.trad-meta-val {
+  color: var(--text-main);
+  word-break: break-all;
+}
+
+.trad-meta-val.bold {
+  font-weight: 700;
+}
+
+.trad-meta-input.locked {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: var(--text-main);
+  font-weight: 600;
+  outline: none;
+  flex: 1;
+}
+
+.locked-chip {
+  font-size: 10px;
+  font-weight: 700;
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.trad-body-viewport {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-main);
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: 8px 4px;
+}
+
+/* ==================== 3D SMART MAIL CARD FLIP & PERSON INFO ==================== */
+.id-card-tab-bar {
+  display: flex;
+  padding: 4px 16px 8px;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.id-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.id-tab-btn.active {
+  background: #046A38;
+  color: #ffffff;
+  border-color: #046A38;
+}
+
+.id-panel-view {
+  padding: 16px 0 0;
+}
+
+.smart-mail-card-wrapper {
+  perspective: 1000px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.smart-mail-card {
+  position: relative;
+  width: 100%;
+  min-height: 195px;
+  border-radius: 16px;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.smart-mail-card.flipped {
+  transform: rotateY(180deg);
+}
+
+.card-side {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-sizing: border-box;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  background: linear-gradient(135deg, #046A38 0%, #03522b 50%, #02361c 100%);
+  color: #ffffff;
+  box-shadow: 0 10px 25px -5px rgba(4, 106, 56, 0.4);
+}
+
+.card-front {
+  position: relative;
+}
+
+.card-back {
+  position: absolute;
+  top: 0; left: 0;
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-back-magstripe {
+  height: 36px;
+  background: #0f172a;
+  margin: -16px -18px 10px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+.card-back-text {
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.card-back-meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.back-label {
+  font-size: 9px;
+  opacity: 0.7;
+  display: block;
+}
+
+.card-back-barcode {
+  font-family: monospace;
+  letter-spacing: 2px;
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.7;
+  margin-top: 6px;
+}
+
+.smart-card-avatar-box {
+  flex-shrink: 0;
+}
+
+.smart-card-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.smart-card-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-holder-tag {
+  font-size: 9.5px;
+  background: rgba(255, 255, 255, 0.15);
+  display: inline-block;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+/* Person Info Form Styles */
+.person-info-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.person-avatar-picker-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.person-avatar-preview {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.person-avatar-palette {
+  display: flex;
+  gap: 8px;
+}
+
+.avatar-palette-chip {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s;
+}
+
+.avatar-palette-chip:active {
+  transform: scale(0.9);
+}
+
+.form-group-mob {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group-mob label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.edit-person-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ==================== CONVERSATION CARD ON HOME SCREEN ==================== */
+.conv-count-chip {
+  font-size: 10px;
+  font-weight: 800;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+  padding: 1px 6px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+.conv-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #2563eb;
+  flex-shrink: 0;
+}
+
