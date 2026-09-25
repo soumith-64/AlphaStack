@@ -6,6 +6,9 @@ let activeConversation = null;
 let currentMessages = [];
 let replyingToId = null;
 let activeFilter = 'all';
+let activeSourceFilter = 'all'; // 'all' | 'phonemail' | 'external'
+let allConversationsList = [];
+let cachedDeviceContacts = [];
 let socket = null;
 
 // ==================== ONBOARDING FLOW ====================
@@ -16,6 +19,16 @@ function goToScreen(screenId) {
 }
 
 // ==================== PERSISTENCE & FORMATTING HELPERS ====================
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function saveMobileSession(user) {
   currentUser = user;
   const remEl = document.getElementById('mobile-auth-remember-me');
@@ -28,33 +41,207 @@ function saveMobileSession(user) {
   sessionStorage.setItem('phonemail-mobile-user', str);
 }
 
+function isPhoneMailSender(rawSender) {
+  if (!rawSender) return false;
+  const str = String(rawSender).toLowerCase();
+  
+  if (
+    str.includes('@gmail.com') ||
+    str.includes('@rediff') ||
+    str.includes('@yahoo.') ||
+    str.includes('@outlook.') ||
+    str.includes('@hotmail.') ||
+    str.includes('@icloud.') ||
+    str.includes('@zoho.') ||
+    str.includes('@proton.') ||
+    str.includes('@aol.')
+  ) {
+    return false;
+  }
+
+  if (
+    str.includes('@alphastack.wwisvnr.com') ||
+    str.includes('@phonemail.com') ||
+    /\b\d{10}\b/.test(str)
+  ) {
+    return true;
+  }
+
+  if (str.includes('@') && !str.includes('alphastack.wwisvnr.com') && !str.includes('phonemail.com')) {
+    return false;
+  }
+
+  return true;
+}
+
+function formatPhoneDisplay(digits, tag = '') {
+  const p = String(digits).replace(/\D/g, '').slice(-10);
+  if (p.length === 10) {
+    const formatted = `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+    return tag ? `${formatted} (.${tag})` : formatted;
+  }
+  return digits;
+}
+
+/**
+ * Cleanly format sender:
+ * - If from another PhoneMail user: HIDE @alphastack.wwisvnr.com and just show the phone number (+91 93815 64959)
+ * - If from external (Gmail, Rediff, etc.): show display name and external email.
+ */
 function formatSenderDisplay(rawSender, includeAddress = false) {
   if (!rawSender) return 'Unknown';
   let str = String(rawSender).trim();
 
+  let name = '';
+  let email = str;
   const match = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
   if (match) {
-    let name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
-    const email = (match[2] || '').trim();
-    if (name) {
-      name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      if (includeAddress) return `${name} <${email}>`;
-      return name;
+    name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    email = (match[2] || '').trim();
+  } else {
+    email = str.replace(/^[<"']+|[>"']+$/g, '').trim();
+  }
+
+  const phoneAliasMatch = email.match(/^(\d{10})(?:\.([a-zA-Z0-9_-]+))?@(alphastack\.wwisvnr\.com|phonemail\.com)/i);
+  const plainPhoneMatch = email.match(/^(\d{10})@/);
+  const rawDigitMatch = /^\d{10}$/.test(email);
+
+  if (phoneAliasMatch || plainPhoneMatch || rawDigitMatch) {
+    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : email);
+    const tag = phoneAliasMatch && phoneAliasMatch[2] ? phoneAliasMatch[2] : '';
+    const phoneFormatted = formatPhoneDisplay(phone, tag);
+
+    if (!name || /^User\s*\d+/i.test(name) || name.replace(/\D/g, '') === phone) {
+      return phoneFormatted;
     }
-    return email;
+
+    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return `${name} (${phoneFormatted})`;
   }
 
-  const phoneEmailMatch = str.match(/^(\d{10})@/);
-  if (phoneEmailMatch) {
-    const p = phoneEmailMatch[1];
-    return `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+  if (name) {
+    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    if (includeAddress) return `${name} <${email}>`;
+    return name;
   }
 
-  if (/^\d{10}$/.test(str)) {
-    return `+91 ${str.slice(0, 5)} ${str.slice(5)}`;
+  return email;
+}
+
+// ==================== MODERN POPUP TOAST & NOTIFICATION SYSTEM (MOBILE) ====================
+function showNotify(options) {
+  let opts = typeof options === 'string' ? { message: options, type: 'info' } : (options || {});
+  const container = document.getElementById('app-toast-container') || document.body;
+  const toast = document.createElement('div');
+  const type = opts.type || 'info';
+  const duration = opts.duration !== undefined ? opts.duration : 3500;
+  toast.className = `app-toast ${type}`;
+
+  const iconMap = {
+    success: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    error: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    warning: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    info: `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`
+  };
+
+  const defaultTitles = {
+    success: 'Success',
+    error: 'Error',
+    warning: 'Attention',
+    info: 'PhoneMail'
+  };
+
+  const title = opts.title || defaultTitles[type] || 'Notice';
+  const message = opts.message || '';
+
+  toast.innerHTML = `
+    <div class="app-toast-icon-wrap">${iconMap[type] || iconMap.info}</div>
+    <div class="app-toast-content">
+      <div class="app-toast-title">${escapeHtml(title)}</div>
+      <div class="app-toast-message">${escapeHtml(message)}</div>
+    </div>
+    <button type="button" class="app-toast-close" title="Dismiss">✕</button>
+  `;
+
+  const closeBtn = toast.querySelector('.app-toast-close');
+  const dismiss = () => {
+    toast.classList.remove('visible');
+    toast.classList.add('hiding');
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 250);
+  };
+  closeBtn.onclick = dismiss;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+
+  if (duration > 0) {
+    setTimeout(dismiss, duration);
+  }
+}
+
+showNotify.success = (msg, title) => showNotify({ type: 'success', message: msg, title: title || 'Success' });
+showNotify.error = (msg, title) => showNotify({ type: 'error', message: msg, title: title || 'Error' });
+showNotify.warning = (msg, title) => showNotify({ type: 'warning', message: msg, title: title || 'Attention' });
+showNotify.info = (msg, title) => showNotify({ type: 'info', message: msg, title: title || 'PhoneMail' });
+
+function showMobileToast(msg, type = 'info') {
+  if (typeof type === 'string' && showNotify[type]) {
+    showNotify[type](msg);
+  } else {
+    showNotify({ message: msg, type: 'info' });
+  }
+}
+
+function showPromptDialog({ title, message, placeholder = '', defaultValue = '', confirmText = 'Search', cancelText = 'Cancel', onConfirm }) {
+  const overlay = document.getElementById('app-dialog-overlay');
+  if (!overlay) {
+    const val = prompt(`${title}\n${message}`, defaultValue);
+    if (val !== null && onConfirm) onConfirm(val);
+    return;
   }
 
-  return str.replace(/^[<"']+|[>"']+$/g, '').trim();
+  overlay.innerHTML = `
+    <div class="app-dialog-card">
+      <div class="app-dialog-header">
+        <div class="app-dialog-icon">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="app-dialog-title">${escapeHtml(title)}</div>
+      </div>
+      <div class="app-dialog-body">${escapeHtml(message)}</div>
+      <input type="text" class="app-dialog-input" id="app-dialog-input-field" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}">
+      <div class="app-dialog-actions">
+        <button type="button" class="btn-secondary" id="dialog-cancel-btn" style="padding: 7px 14px; font-size: 13px;">${escapeHtml(cancelText)}</button>
+        <button type="button" class="btn-wa-green" id="dialog-confirm-btn" style="padding: 7px 16px; font-size: 13px;">${escapeHtml(confirmText)}</button>
+      </div>
+    </div>
+  `;
+  overlay.style.display = 'flex';
+
+  const input = document.getElementById('app-dialog-input-field');
+  const cancelBtn = document.getElementById('dialog-cancel-btn');
+  const confirmBtn = document.getElementById('dialog-confirm-btn');
+
+  setTimeout(() => input && input.focus(), 60);
+
+  const closeDialog = () => {
+    overlay.style.display = 'none';
+    overlay.innerHTML = '';
+  };
+
+  cancelBtn.onclick = closeDialog;
+  confirmBtn.onclick = () => {
+    const val = input.value.trim();
+    closeDialog();
+    if (onConfirm) onConfirm(val);
+  };
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      confirmBtn.click();
+    } else if (e.key === 'Escape') {
+      closeDialog();
+    }
+  };
 }
 
 // ==================== PHONE.EMAIL OFFICIAL LISTENER (MOBILE) ====================
@@ -77,11 +264,12 @@ window.phoneEmailListener = async (userObj) => {
       saveMobileSession(currentUser);
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
+      showNotify.success(`Welcome to PhoneMail, ${currentUser.name}!`, 'Signed In');
     } else {
-      alert(data.error || 'Failed to authenticate phone number with Phone.Email');
+      showNotify.error(data.error || 'Failed to authenticate phone number with Phone.Email', 'Auth Error');
     }
   } catch (err) {
-    alert('Verification error: ' + err.message);
+    showNotify.error('Verification error: ' + err.message, 'Network Error');
   }
 };
 
@@ -220,7 +408,7 @@ function initMobileOtpInputs() {
 async function requestOTP() {
   const phone = document.getElementById('mobile-phone-input').value.trim();
   if (!phone || phone.length < 10) {
-    alert('Please enter a valid 10-digit Indian phone number');
+    showNotify.warning('Please enter a valid 10-digit Indian phone number', 'Invalid Number');
     return;
   }
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
@@ -244,10 +432,10 @@ async function requestOTP() {
       clearMobileOtp();
       startMobileTimer();
     } else {
-      alert(data.error || 'Failed to dispatch verification code');
+      showNotify.error(data.error || 'Failed to dispatch verification code', 'OTP Error');
     }
   } catch (err) {
-    alert('Failed to request verification: ' + err.message);
+    showNotify.error('Failed to request verification: ' + err.message, 'Connection Error');
   }
 }
 
@@ -433,7 +621,7 @@ async function completeMobileProfile() {
   const ln = (document.getElementById('mobile-last-name').value || '').trim();
 
   if (!fn) {
-    alert('Please enter your first name');
+    showNotify.warning('Please enter your first name', 'Incomplete Profile');
     document.getElementById('mobile-first-name').focus();
     return;
   }
@@ -459,11 +647,12 @@ async function completeMobileProfile() {
       saveMobileSession(currentUser);
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
+      showNotify.success(`Welcome to PhoneMail, ${currentUser.name}!`, 'Registered');
     } else {
-      alert(data.error || 'Failed to complete profile');
+      showNotify.error(data.error || 'Failed to complete profile', 'Registration Error');
     }
   } catch (err) {
-    alert('Error saving profile: ' + err.message);
+    showNotify.error('Error saving profile: ' + err.message, 'Server Error');
   }
 }
 
@@ -510,21 +699,6 @@ function playNotificationChime() {
     osc2.start(now + 0.1);
     osc2.stop(now + 0.5);
   } catch (e) {}
-}
-
-function showMobileToast(msg) {
-  let toast = document.getElementById('mobile-toast-banner');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'mobile-toast-banner';
-    toast.className = 'mobile-toast-banner';
-    document.body.appendChild(toast);
-  }
-  toast.innerHTML = `<span class="toast-icon">✉️</span><div class="toast-text">${msg}</div>`;
-  toast.classList.add('visible');
-  setTimeout(() => {
-    toast.classList.remove('visible');
-  }, 3500);
 }
 
 // ==================== MAIN SPIKE MAIL CONVERSATIONAL APP ====================
@@ -582,29 +756,72 @@ async function loadConversations() {
     fetch('/api/emails/sync', { method: 'POST' }).catch(() => {});
     const res = await fetch(`/api/conversations?phone=${currentUser.phone}`);
     const data = await res.json();
-    renderConversations(data.conversations || []);
+    allConversationsList = data.conversations || [];
+
+    // Live counts for the two classification tabs (PhoneMail vs External)
+    const totalAll = allConversationsList.length;
+    const totalPhoneMail = allConversationsList.filter(c => isPhoneMailSender(c.participant_phone)).length;
+    const totalExternal = allConversationsList.filter(c => !isPhoneMailSender(c.participant_phone)).length;
+
+    const elAll = document.getElementById('mob-count-all');
+    if (elAll) elAll.innerText = totalAll;
+    const elPM = document.getElementById('mob-count-phonemail');
+    if (elPM) elPM.innerText = totalPhoneMail;
+    const elExt = document.getElementById('mob-count-external');
+    if (elExt) elExt.innerText = totalExternal;
+
+    renderConversations(allConversationsList);
   } catch (err) {
     console.error('Failed to load conversations:', err);
   }
+}
+
+function setMobileSourceFilter(source) {
+  activeSourceFilter = source;
+  ['all', 'phonemail', 'external'].forEach(s => {
+    const btn = document.getElementById(`mob-source-${s}`);
+    if (btn) {
+      if (s === source) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+  renderConversations(allConversationsList);
 }
 
 function renderConversations(conversations) {
   const container = document.getElementById('conversations-list');
   container.innerHTML = '';
 
-  let filtered = conversations;
+  let filtered = conversations || [];
+
+  // Filter 1: Tab source classification (Same App PhoneMail vs External)
+  if (activeSourceFilter === 'phonemail') {
+    filtered = filtered.filter(c => isPhoneMailSender(c.participant_phone));
+  } else if (activeSourceFilter === 'external') {
+    filtered = filtered.filter(c => !isPhoneMailSender(c.participant_phone));
+  }
+
+  // Filter 2: Status chips (unread, starred)
   if (activeFilter === 'unread') {
-    filtered = conversations.filter(c => c.unread_count > 0);
+    filtered = filtered.filter(c => c.unread_count > 0);
   } else if (activeFilter === 'starred') {
-    filtered = conversations.filter(c => c.unread_count > 0 || c.is_group === 1);
+    filtered = filtered.filter(c => c.unread_count > 0 || c.is_group === 1);
   }
 
   if (filtered.length === 0) {
+    let emptyMsg = 'No conversations found.';
+    if (activeSourceFilter === 'phonemail') {
+      emptyMsg = 'No PhoneMail network conversations found.';
+    } else if (activeSourceFilter === 'external') {
+      emptyMsg = 'No external (Gmail, Rediff, etc.) conversations found.';
+    }
     container.innerHTML = `
       <div style="text-align: center; color: #667781; padding: 40px 20px;">
-        <div style="font-size: 36px; margin-bottom: 8px;">💬</div>
-        <p>No conversations found.</p>
-        <p style="font-size: 12px; margin-top: 4px;">Use search or compose to start an email chat.</p>
+        <div style="margin-bottom: 10px;">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <p style="font-weight: 600; color: #334155;">${emptyMsg}</p>
+        <p style="font-size: 12px; margin-top: 4px; color: #94a3b8;">Use compose to start a new message.</p>
       </div>
     `;
     return;
@@ -619,15 +836,27 @@ function renderConversations(conversations) {
     const timeDisplay = conv.last_time ? new Date(conv.last_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
     const badgeHtml = conv.unread_count > 0 ? `<div class="chat-unread-badge">${conv.unread_count}</div>` : '';
 
+    const isFromPhoneMail = isPhoneMailSender(conv.participant_phone);
+    const sourceBadgeHtml = isFromPhoneMail
+      ? `<span class="badge-source-tag badge-phonemail-pill" style="margin-left: 6px;">⚡ PhoneMail</span>`
+      : `<span class="badge-source-tag badge-external-pill" style="margin-left: 6px;">🌐 External</span>`;
+
+    const cleanSender = conv.is_group === 1 
+      ? '👥 ' + conv.subject 
+      : formatSenderDisplay(conv.participant_phone);
+
     item.innerHTML = `
       <div class="chat-avatar">${conv.is_group === 1 ? '👥' : initial}</div>
       <div class="chat-details">
         <div class="chat-top-row">
-          <div class="chat-sender-name">${conv.is_group === 1 ? '👥 ' + conv.subject : formatSenderDisplay(conv.participant_phone)}</div>
+          <div class="chat-sender-name" style="display: flex; align-items: center;">
+            <span>${escapeHtml(cleanSender)}</span>
+            ${sourceBadgeHtml}
+          </div>
           <div class="chat-timestamp">${timeDisplay}</div>
         </div>
         <div class="chat-bottom-row">
-          <div class="chat-preview-text">${conv.last_message || conv.subject || 'No messages'}</div>
+          <div class="chat-preview-text">${escapeHtml(conv.last_message || conv.subject || 'No messages')}</div>
           ${badgeHtml}
         </div>
       </div>
@@ -731,7 +960,7 @@ function closeChatView() {
 function selectMessageForQuote(msg) {
   // Check single-reply constraint
   if (msg.has_replied === 1) {
-    alert('Notice: This message has already been replied to. Each message can be replied to only once.');
+    showNotify.warning('This message has already been replied to. Each message can be replied to only once.', 'Single Reply Policy');
     return;
   }
   replyingToId = msg.id;
@@ -750,7 +979,14 @@ function cancelQuote() {
 function openFullEmailModal(emailId) {
   const msg = currentMessages.find(m => m.id === emailId);
   if (msg) {
-    alert(msg.body_text);
+    showPromptDialog({
+      title: 'Full Email Content',
+      message: msg.body_text,
+      placeholder: '',
+      confirmText: 'Done',
+      cancelText: 'Close',
+      onConfirm: () => {}
+    });
   }
 }
 
@@ -779,14 +1015,115 @@ async function sendChatMessage() {
       cancelQuote();
       openConversation(activeConversation.id);
     } else {
-      alert(data.error || 'Failed to send message');
+      showNotify.error(data.error || 'Failed to send message', 'Send Failed');
     }
   } catch (err) {
-    alert('Send error: ' + err.message);
+    showNotify.error('Send error: ' + err.message, 'Network Error');
   }
 }
 
 // ==================== TRADITIONAL COMPOSE & CONTACTS PICKER ====================
+async function pickMobileDeviceContacts() {
+  const input = document.getElementById('trad-to');
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const selected = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+      if (selected && selected.length > 0) {
+        const rawPhones = [];
+        selected.forEach(c => {
+          if (c.tel) c.tel.forEach(t => rawPhones.push(t));
+        });
+
+        if (rawPhones.length === 0) {
+          showNotify.warning('No phone numbers found in selected device contacts.', 'No Contacts');
+          return;
+        }
+
+        showNotify.info('Checking which device contacts are on PhoneMail...', 'Contact Sync');
+        const res = await fetch('/api/contacts/filter-phonemail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumbers: rawPhones })
+        });
+        const data = await res.json();
+        const registered = data.registeredContacts || [];
+
+        if (registered.length === 0) {
+          showNotify.info('None of the selected device contacts are registered on PhoneMail yet.', 'No Matches');
+        } else {
+          try {
+            localStorage.setItem('phonemail_cached_device_contacts', JSON.stringify(registered));
+            cachedDeviceContacts = registered;
+          } catch (e) {}
+
+          if (registered.length === 1) {
+            if (input) input.value = registered[0].phone_number;
+            showNotify.success(`Selected ${registered[0].display_name} (+91 ${registered[0].phone_number})`, 'Contact Selected');
+          } else {
+            showNotify.success(`Found ${registered.length} PhoneMail contacts from your device!`);
+            const picker = document.getElementById('mobile-contacts-picker');
+            if (picker) renderMobileContactsDropdown(registered, picker, input);
+          }
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        showNotify.info('Device contact picker cancelled.');
+      }
+    }
+  } else {
+    showPromptDialog({
+      title: 'Search Contacts',
+      message: 'Enter 10-digit mobile number or name to search registered PhoneMail users:',
+      placeholder: 'e.g. 9876543210 or Rahul',
+      confirmText: 'Search',
+      onConfirm: async (q) => {
+        if (!q) return;
+        try {
+          const res = await fetch(`/api/contacts?phone=${currentUser ? currentUser.phone : ''}&q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          const list = data.contacts || [];
+          if (list.length === 0) {
+            showNotify.info(`No registered PhoneMail user found for "${q}". External email addresses can be entered directly.`, 'No Matches');
+          } else if (list.length === 1) {
+            if (input) input.value = list[0].phone_number;
+            showNotify.success(`Selected ${list[0].display_name} (+91 ${list[0].phone_number})`);
+          } else {
+            const picker = document.getElementById('mobile-contacts-picker');
+            if (picker) renderMobileContactsDropdown(list, picker, input);
+          }
+        } catch (err) {
+          showNotify.error('Failed to search: ' + err.message);
+        }
+      }
+    });
+  }
+}
+
+function renderMobileContactsDropdown(matches, container, targetInput) {
+  container.innerHTML = '';
+  matches.slice(0, 6).forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'mobile-contact-item';
+    item.innerHTML = `
+      <div class="mobile-contact-avatar">${(c.display_name || c.phone_number || 'P').charAt(0).toUpperCase()}</div>
+      <div class="mobile-contact-info">
+        <div class="mobile-contact-name">${escapeHtml(c.display_name || `User ${c.phone_number}`)} <span style="font-size:10px; color:#046A38; font-weight:700;">✓ PhoneMail</span></div>
+        <div class="mobile-contact-phone">📞 +91 ${escapeHtml(c.phone_number)}</div>
+      </div>
+    `;
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      targetInput.value = c.phone_number;
+      container.style.display = 'none';
+      const subj = document.getElementById('trad-subject');
+      if (subj) subj.focus();
+    };
+    container.appendChild(item);
+  });
+  container.style.display = 'block';
+}
+
 function setupMobileContactsPicker() {
   const input = document.getElementById('trad-to');
   const picker = document.getElementById('mobile-contacts-picker');
@@ -813,54 +1150,47 @@ function setupMobileContactsPicker() {
         if (matches.length === 0) {
           picker.innerHTML = `
             <div style="padding: 10px; font-size: 11px; color: #64748b;">
-              No registered PhoneMail user for "${q}". External emails (e.g. Gmail) can be entered directly.
+              No registered PhoneMail user for "${escapeHtml(q)}". External emails (e.g. Gmail) can be entered directly.
             </div>
           `;
           picker.style.display = 'block';
           return;
         }
 
-        renderMobileContacts(matches, picker, input);
+        renderMobileContactsDropdown(matches, picker, input);
         return;
       }
 
-      // Empty query: only show recent contacts
+      // Empty query: combine recent conversation contacts + cached device contacts
+      let combined = [];
       const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
       const data = await res.json();
       const recent = data.contacts || [];
-      if (recent.length === 0) {
+      recent.forEach(c => combined.push(c));
+
+      try {
+        const rawCached = localStorage.getItem('phonemail_cached_device_contacts');
+        if (rawCached) {
+          const deviceList = JSON.parse(rawCached);
+          if (Array.isArray(deviceList)) {
+            deviceList.forEach(dc => {
+              if (!combined.some(item => item.phone_number === dc.phone_number)) {
+                combined.push(dc);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      if (combined.length === 0) {
         picker.style.display = 'none';
         return;
       }
 
-      renderMobileContacts(recent, picker, input);
+      renderMobileContactsDropdown(combined, picker, input);
     } catch (e) {
       console.warn('Contacts picker error:', e);
     }
-  }
-
-  function renderMobileContacts(matches, container, targetInput) {
-    container.innerHTML = '';
-    matches.slice(0, 5).forEach(c => {
-      const item = document.createElement('div');
-      item.className = 'mobile-contact-item';
-      item.innerHTML = `
-        <div class="mobile-contact-avatar">${(c.display_name || c.phone_number || 'P').charAt(0).toUpperCase()}</div>
-        <div class="mobile-contact-info">
-          <div class="mobile-contact-name">${c.display_name || `User ${c.phone_number}`} <span style="font-size:10px; color:#046A38; font-weight:700;">✓ PhoneMail</span></div>
-          <div class="mobile-contact-phone">📞 +91 ${c.phone_number}</div>
-        </div>
-      `;
-      item.onmousedown = (e) => {
-        e.preventDefault();
-        targetInput.value = c.phone_number;
-        container.style.display = 'none';
-        const subj = document.getElementById('trad-subject');
-        if (subj) subj.focus();
-      };
-      container.appendChild(item);
-    });
-    container.style.display = 'block';
   }
 
   input.addEventListener('input', () => {
@@ -893,7 +1223,6 @@ function toggleTraditionalInChat() {
   document.getElementById('trad-modal-title').innerText = 'Compose in Traditional View';
   const toInput = document.getElementById('trad-to');
   
-  // SPEC REQUIREMENT: "The To field should be pre-filled and locked."
   toInput.value = activeConversation.participant_phone;
   toInput.disabled = true;
   const picker = document.getElementById('mobile-contacts-picker');
@@ -916,11 +1245,10 @@ async function submitTraditionalCompose() {
   const body = document.getElementById('trad-body').value.trim();
 
   if (!to || !body) {
-    alert('Please enter recipient and message body.');
+    showNotify.warning('Please enter recipient and message body.', 'Incomplete');
     return;
   }
 
-  // Parse recipients (comma separated)
   const recipients = to.split(',').map(r => r.trim()).filter(Boolean);
 
   try {
@@ -943,11 +1271,12 @@ async function submitTraditionalCompose() {
       if (activeConversation) {
         openConversation(activeConversation.id);
       }
+      showNotify.success('Email sent successfully!', 'Message Sent');
     } else {
-      alert(data.error || 'Failed to send email');
+      showNotify.error(data.error || 'Failed to send email', 'Send Failed');
     }
   } catch (err) {
-    alert('Send error: ' + err.message);
+    showNotify.error('Send error: ' + err.message, 'Network Error');
   }
 }
 
@@ -973,8 +1302,8 @@ async function loadAliases() {
         const item = document.createElement('div');
         item.className = 'alias-pill';
         item.innerHTML = `
-          <span>🏷️ <strong>${a.alias_email}</strong></span>
-          <span style="color: #667781; font-size: 11px;">${a.label || 'Alias'}</span>
+          <span>🏷️ <strong>${escapeHtml(a.alias_email)}</strong></span>
+          <span style="color: #667781; font-size: 11px;">${escapeHtml(a.label || 'Alias')}</span>
         `;
         container.appendChild(item);
       });
@@ -990,7 +1319,7 @@ async function addAlias() {
   const tag = document.getElementById('new-alias-tag').value.trim();
   const label = document.getElementById('new-alias-label').value.trim();
   if (!tag) {
-    alert('Please enter an alias tag (e.g. work, son, 1)');
+    showNotify.warning('Please enter an alias tag (e.g. work, son, 1)', 'Missing Tag');
     return;
   }
   try {
@@ -1004,11 +1333,12 @@ async function addAlias() {
       document.getElementById('new-alias-tag').value = '';
       document.getElementById('new-alias-label').value = '';
       loadAliases();
+      showNotify.success(`Sub-number .${tag} created!`, 'Sub-Number Added');
     } else {
-      alert(data.error || 'Failed to add alias');
+      showNotify.error(data.error || 'Failed to add alias', 'Alias Error');
     }
   } catch (err) {
-    alert('Error adding alias: ' + err.message);
+    showNotify.error('Error adding alias: ' + err.message, 'Server Error');
   }
 }
 

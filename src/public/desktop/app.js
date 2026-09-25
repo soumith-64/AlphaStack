@@ -2,6 +2,7 @@
 let currentUser = null;
 
 let currentFolder = 'INBOX';
+let currentMailSourceFilter = 'all'; // 'all' | 'phonemail' | 'external'
 let allEmails = [];
 let activeEmail = null;
 let selectedEmailIndex = -1;
@@ -9,6 +10,7 @@ let socket = null;
 let currentReplyToId = null;
 let currentReplyConvId = null;
 let cachedContacts = [];
+let cachedDeviceContacts = [];
 
 // ==================== NOTIFICATION CHIME (WEB AUDIO API) ====================
 function playNotificationChime() {
@@ -46,7 +48,7 @@ function playNotificationChime() {
   }
 }
 
-// ==================== STRING UTILITIES ====================
+// ==================== STRING UTILITIES & DOMAIN PRIVACY ====================
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -57,40 +59,120 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+/**
+ * Checks whether an email address is from an internal PhoneMail user
+ * or an external mail provider (e.g. Gmail, Rediff, Yahoo, Outlook, etc.)
+ */
+function isPhoneMailSender(rawSender) {
+  if (!rawSender) return false;
+  const str = String(rawSender).toLowerCase();
+  
+  // Explicit external domains
+  if (
+    str.includes('@gmail.com') ||
+    str.includes('@rediff') ||
+    str.includes('@yahoo.') ||
+    str.includes('@outlook.') ||
+    str.includes('@hotmail.') ||
+    str.includes('@icloud.') ||
+    str.includes('@zoho.') ||
+    str.includes('@proton.') ||
+    str.includes('@aol.')
+  ) {
+    return false;
+  }
+
+  // Internal PhoneMail domain identifiers or 10-digit Indian phone pattern
+  if (
+    str.includes('@alphastack.wwisvnr.com') ||
+    str.includes('@phonemail.com') ||
+    /\b\d{10}\b/.test(str)
+  ) {
+    return true;
+  }
+
+  // Any external domain not matching alphastack or phonemail
+  if (str.includes('@') && !str.includes('alphastack.wwisvnr.com') && !str.includes('phonemail.com')) {
+    return false;
+  }
+
+  return true;
+}
+
+function formatPhoneDisplay(digits, tag = '') {
+  const p = String(digits).replace(/\D/g, '').slice(-10);
+  if (p.length === 10) {
+    const formatted = `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+    return tag ? `${formatted} (.${tag})` : formatted;
+  }
+  return digits;
+}
+
+/**
+ * Cleanly format sender:
+ * - If from another PhoneMail user: HIDE @alphastack.wwisvnr.com and just show the phone number (+91 93815 64959)
+ * - If from external (Gmail, Rediff, etc.): show display name and external email.
+ */
 function formatSenderDisplay(rawSender, includeAddress = false) {
   if (!rawSender) return 'Unknown';
   let str = String(rawSender).trim();
 
-  // Pattern: "Soumith JV" <soumithjv10@gmail.com> or 'Soumith JV' <...> or Soumith JV <...>
-  const match = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
-  if (match) {
-    let name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
-    const email = (match[2] || '').trim();
-    if (name) {
-      // Clean up and format name in title case
-      name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-      if (includeAddress) {
-        return `${name} <${email}>`;
-      }
-      return name;
+  let name = '';
+  let email = str;
+  const angleMatch = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
+  if (angleMatch) {
+    name = (angleMatch[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    email = (angleMatch[2] || '').trim();
+  } else {
+    email = str.replace(/^[<"']+|[>"']+$/g, '').trim();
+  }
+
+  // Check for internal PhoneMail pattern (e.g. 9381564959@alphastack.wwisvnr.com or 9381564959.work@...)
+  const phoneAliasMatch = email.match(/^(\d{10})(?:\.([a-zA-Z0-9_-]+))?@(alphastack\.wwisvnr\.com|phonemail\.com)/i);
+  const plainPhoneMatch = email.match(/^(\d{10})@/);
+  const rawDigitMatch = /^\d{10}$/.test(email);
+
+  if (phoneAliasMatch || plainPhoneMatch || rawDigitMatch) {
+    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : email);
+    const tag = phoneAliasMatch && phoneAliasMatch[2] ? phoneAliasMatch[2] : '';
+    const phoneFormatted = formatPhoneDisplay(phone, tag);
+
+    // If name is "User 9381564959" or empty or matches digits, just show the clean phone number
+    if (!name || /^User\s*\d+/i.test(name) || name.replace(/\D/g, '') === phone) {
+      return phoneFormatted;
     }
-    return email;
+
+    // Personalized user name
+    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return `${name} (${phoneFormatted})`;
   }
 
-  // Pattern: 9876543210@alphastack.wwisvnr.com or 9876543210@...
-  const phoneEmailMatch = str.match(/^(\d{10})@/);
-  if (phoneEmailMatch) {
-    const p = phoneEmailMatch[1];
-    return `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+  // External email (Gmail, Rediff, etc.)
+  if (name) {
+    name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    if (includeAddress) {
+      return `${name} <${email}>`;
+    }
+    return name;
   }
 
-  // Pattern: raw 10-digit phone
+  return email;
+}
+
+function cleanRecipientAddress(addr) {
+  if (!addr) return '';
+  let str = String(addr).trim();
+  const phoneAliasMatch = str.match(/^(\d{10})(?:\.([a-zA-Z0-9_-]+))?@(alphastack\.wwisvnr\.com|phonemail\.com)/i);
+  if (phoneAliasMatch) {
+    return formatPhoneDisplay(phoneAliasMatch[1], phoneAliasMatch[2]);
+  }
+  const plainPhone = str.match(/^(\d{10})@/);
+  if (plainPhone) {
+    return formatPhoneDisplay(plainPhone[1]);
+  }
   if (/^\d{10}$/.test(str)) {
-    return `+91 ${str.slice(0, 5)} ${str.slice(5)}`;
+    return formatPhoneDisplay(str);
   }
-
-  // Clean off quotes or angle brackets
-  str = str.replace(/^[<"']+|[>"']+$/g, '').trim();
   return str;
 }
 
@@ -103,20 +185,21 @@ function getInitials(nameOrEmail) {
 
 function getRecipientsDisplay(email) {
   if (!email) return '';
+  let list = [];
   if (email.recipient_emails) {
     try {
       const parsed = JSON.parse(email.recipient_emails);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter(Boolean).join(', ');
+        list = parsed.filter(Boolean);
       } else if (typeof parsed === 'string') {
-        return parsed;
+        list = [parsed];
       }
     } catch (e) {
       const clean = String(email.recipient_emails).replace(/[\[\]"']/g, '').trim();
-      if (clean) return clean;
+      if (clean) list = clean.split(',').map(s => s.trim()).filter(Boolean);
     }
   }
-  return '';
+  return list.map(cleanRecipientAddress).join(', ');
 }
 
 function getFolderFriendlyName(folder) {
@@ -129,6 +212,122 @@ function getFolderFriendlyName(folder) {
     'TRASH': 'Trash Bin'
   };
   return map[folder] || folder;
+}
+
+// ==================== MODERN POPUP TOAST & NOTIFICATION SYSTEM ====================
+function showNotify(options) {
+  let opts = typeof options === 'string' ? { message: options, type: 'info' } : (options || {});
+  const container = document.getElementById('app-toast-container') || document.body;
+  const toast = document.createElement('div');
+  const type = opts.type || 'info';
+  const duration = opts.duration !== undefined ? opts.duration : 4000;
+  toast.className = `app-toast ${type}`;
+
+  const iconMap = {
+    success: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+    error: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    warning: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    info: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`
+  };
+
+  const defaultTitles = {
+    success: 'Success',
+    error: 'Error',
+    warning: 'Attention',
+    info: 'PhoneMail'
+  };
+
+  const title = opts.title || defaultTitles[type] || 'Notice';
+  const message = opts.message || '';
+
+  toast.innerHTML = `
+    <div class="app-toast-icon-wrap">${iconMap[type] || iconMap.info}</div>
+    <div class="app-toast-content">
+      <div class="app-toast-title">${escapeHtml(title)}</div>
+      <div class="app-toast-message">${escapeHtml(message)}</div>
+    </div>
+    <button type="button" class="app-toast-close" title="Dismiss">✕</button>
+  `;
+
+  const closeBtn = toast.querySelector('.app-toast-close');
+  const dismiss = () => {
+    toast.classList.remove('visible');
+    toast.classList.add('hiding');
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 300);
+  };
+  closeBtn.onclick = dismiss;
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+
+  if (duration > 0) {
+    setTimeout(dismiss, duration);
+  }
+}
+
+showNotify.success = (msg, title) => showNotify({ type: 'success', message: msg, title: title || 'Success' });
+showNotify.error = (msg, title) => showNotify({ type: 'error', message: msg, title: title || 'Error' });
+showNotify.warning = (msg, title) => showNotify({ type: 'warning', message: msg, title: title || 'Attention' });
+showNotify.info = (msg, title) => showNotify({ type: 'info', message: msg, title: title || 'PhoneMail' });
+
+function showToastNotification(msg, type = 'info') {
+  if (typeof type === 'string' && showNotify[type]) {
+    showNotify[type](msg);
+  } else {
+    showNotify({ message: msg, type: 'info' });
+  }
+}
+
+function showPromptDialog({ title, message, placeholder = '', defaultValue = '', confirmText = 'Search', cancelText = 'Cancel', onConfirm }) {
+  const overlay = document.getElementById('app-dialog-overlay');
+  if (!overlay) {
+    const val = prompt(`${title}\n${message}`, defaultValue);
+    if (val !== null && onConfirm) onConfirm(val);
+    return;
+  }
+
+  overlay.innerHTML = `
+    <div class="app-dialog-card">
+      <div class="app-dialog-header">
+        <div class="app-dialog-icon">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </div>
+        <div class="app-dialog-title">${escapeHtml(title)}</div>
+      </div>
+      <div class="app-dialog-body">${escapeHtml(message)}</div>
+      <input type="text" class="app-dialog-input" id="app-dialog-input-field" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(defaultValue)}">
+      <div class="app-dialog-actions">
+        <button type="button" class="action-btn" id="dialog-cancel-btn" style="padding: 7px 14px; font-size: 13px;">${escapeHtml(cancelText)}</button>
+        <button type="button" class="btn-primary" id="dialog-confirm-btn" style="min-width: 90px; padding: 7px 16px; font-size: 13px;">${escapeHtml(confirmText)}</button>
+      </div>
+    </div>
+  `;
+  overlay.style.display = 'flex';
+
+  const input = document.getElementById('app-dialog-input-field');
+  const cancelBtn = document.getElementById('dialog-cancel-btn');
+  const confirmBtn = document.getElementById('dialog-confirm-btn');
+
+  setTimeout(() => input && input.focus(), 60);
+
+  const closeDialog = () => {
+    overlay.style.display = 'none';
+    overlay.innerHTML = '';
+  };
+
+  cancelBtn.onclick = closeDialog;
+  confirmBtn.onclick = () => {
+    const val = input.value.trim();
+    closeDialog();
+    if (onConfirm) onConfirm(val);
+  };
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      confirmBtn.click();
+    } else if (e.key === 'Escape') {
+      closeDialog();
+    }
+  };
 }
 
 // ==================== THEME MANAGEMENT (TIRANGA LIGHT & DARK) ====================
@@ -195,12 +394,12 @@ window.phoneEmailListener = async (userObj) => {
       document.getElementById('desktop-main-container').style.display = 'flex';
       playNotificationChime();
       initDesktopApp();
-      showToastNotification(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`);
+      showNotify.success(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`, 'Signed In');
     } else {
-      alert(data.error || 'Failed to authenticate phone number with Phone.Email');
+      showNotify.error(data.error || 'Failed to authenticate phone number with Phone.Email', 'Auth Failed');
     }
   } catch (err) {
-    alert('Verification communication error: ' + err.message);
+    showNotify.error('Verification communication error: ' + err.message, 'Network Error');
   }
 };
 
@@ -385,7 +584,7 @@ async function handleDesktopPhoneSubmit(event) {
   const rawPhone = phoneInput ? phoneInput.value.trim() : '';
 
   if (!rawPhone || rawPhone.length < 10) {
-    alert('Please enter a valid 10-digit Indian phone number.');
+    showNotify.warning('Please enter a valid 10-digit Indian phone number.', 'Invalid Phone Number');
     if (phoneInput) phoneInput.focus();
     return;
   }
@@ -439,10 +638,10 @@ async function handleDesktopPhoneSubmit(event) {
       // Start 45s Telegram-style countdown timer
       startOtpCountdown();
     } else {
-      alert(data.error || 'Failed to dispatch verification code');
+      showNotify.error(data.error || 'Failed to dispatch verification code', 'OTP Failed');
     }
   } catch (err) {
-    alert('Network error: ' + err.message);
+    showNotify.error('Network error: ' + err.message, 'Connection Error');
   } finally {
     if (btn) btn.disabled = false;
     if (btnLabel) btnLabel.innerText = 'Send Real-Time OTP';
@@ -696,7 +895,7 @@ async function handleDesktopProfileSubmit(event) {
   const tag = (document.getElementById('profile-selected-subtag').value || 'work').trim();
 
   if (!fn) {
-    alert('Please enter your first name.');
+    showNotify.warning('Please enter your first name.', 'Profile Incomplete');
     document.getElementById('profile-first-name').focus();
     return;
   }
@@ -730,12 +929,12 @@ async function handleDesktopProfileSubmit(event) {
       document.getElementById('desktop-main-container').style.display = 'flex';
       playNotificationChime();
       initDesktopApp();
-      showToastNotification(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`);
+      showNotify.success(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`, 'Registered');
     } else {
-      alert(data.error || 'Failed to complete profile');
+      showNotify.error(data.error || 'Failed to complete profile', 'Registration Error');
     }
   } catch (err) {
-    alert('Error saving profile: ' + err.message);
+    showNotify.error('Error saving profile: ' + err.message, 'Server Error');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -906,6 +1105,19 @@ async function loadEmails(folder = currentFolder) {
     const res = await fetch(`/api/emails?folder=${folder}&phone=${currentUser.phone}`);
     const data = await res.json();
     allEmails = data.emails || [];
+
+    // Calculate live counts for the two email classification tabs
+    const countAll = allEmails.length;
+    const countPhoneMail = allEmails.filter(e => isPhoneMailSender(e.sender_email)).length;
+    const countExternal = allEmails.filter(e => !isPhoneMailSender(e.sender_email)).length;
+
+    const elAll = document.getElementById('count-source-all');
+    if (elAll) elAll.innerText = countAll;
+    const elPM = document.getElementById('count-source-phonemail');
+    if (elPM) elPM.innerText = countPhoneMail;
+    const elExt = document.getElementById('count-source-external');
+    if (elExt) elExt.innerText = countExternal;
+
     renderEmailList(allEmails);
 
     // Update unread count badge & indicator
@@ -927,23 +1139,50 @@ async function loadEmails(folder = currentFolder) {
   }
 }
 
+function setMailSourceFilter(filter) {
+  currentMailSourceFilter = filter;
+  ['all', 'phonemail', 'external'].forEach(f => {
+    const btn = document.getElementById(`tab-source-${f}`);
+    if (btn) {
+      if (f === filter) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+  renderEmailList(allEmails);
+}
+
 function renderEmailList(emails) {
   const container = document.getElementById('email-items-container');
   if (!container) return;
   container.innerHTML = '';
 
-  if (emails.length === 0) {
+  let listToRender = emails || [];
+  if (currentMailSourceFilter === 'phonemail') {
+    listToRender = listToRender.filter(e => isPhoneMailSender(e.sender_email));
+  } else if (currentMailSourceFilter === 'external') {
+    listToRender = listToRender.filter(e => !isPhoneMailSender(e.sender_email));
+  }
+
+  if (listToRender.length === 0) {
+    let emptyMsg = `No messages found in ${getFolderFriendlyName(currentFolder)}.`;
+    if (currentMailSourceFilter === 'phonemail') {
+      emptyMsg = `No PhoneMail network messages in ${getFolderFriendlyName(currentFolder)}.`;
+    } else if (currentMailSourceFilter === 'external') {
+      emptyMsg = `No external (Gmail, Rediff, etc.) messages in ${getFolderFriendlyName(currentFolder)}.`;
+    }
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-dim); padding: 80px 20px;">
-        <div style="font-size: 40px; margin-bottom: 12px;">📭</div>
-        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">Inbox Zero</h3>
-        <p style="font-size: 13px;">No messages found in ${getFolderFriendlyName(currentFolder)}.</p>
+        <div style="margin-bottom: 14px;">
+          <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+        </div>
+        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Messages</h3>
+        <p style="font-size: 13px;">${emptyMsg}</p>
       </div>
     `;
     return;
   }
 
-  emails.forEach((email, index) => {
+  listToRender.forEach((email, index) => {
     const row = document.createElement('div');
     row.className = `email-card-item ${email.is_read === 0 ? 'unread' : ''}`;
     row.onclick = () => {
@@ -962,6 +1201,12 @@ function renderEmailList(emails) {
     const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
     const recipientsDisplay = getRecipientsDisplay(email);
 
+    const isFromPhoneMail = isPhoneMailSender(email.sender_email);
+    const sourceBadgeHtml = isFromPhoneMail
+      ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent from PhoneMail user">⚡ PhoneMail</span>`
+      : `<span class="badge-source-tag badge-external-pill" title="Sent from external mail service">🌐 External</span>`;
+
+    // Strictly hide @alphastack.wwisvnr.com: formatSenderDisplay renders only the clean phone number
     const formattedSender = formatSenderDisplay(email.sender_email);
     const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
     const displaySender = (isSentFolder || isSentByMe) 
@@ -975,11 +1220,14 @@ function renderEmailList(emails) {
         <span class="checkmark"></span>
       </label>
       <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
-        ${isStarred ? '★' : '☆'}
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </span>
       <div class="item-avatar-circle">${avatarInitial}</div>
-      <div class="item-sender-col" title="${escapeHtml(isSentFolder ? (recipientsDisplay || 'Recipient') : formatSenderDisplay(email.sender_email, true))}">${escapeHtml(displaySender)}</div>
+      <div class="item-sender-col" title="${escapeHtml(isSentFolder ? (recipientsDisplay || 'Recipient') : formattedSender)}">
+        ${escapeHtml(displaySender)}
+      </div>
       <div class="item-content-preview">
+        ${sourceBadgeHtml}
         <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
         <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
       </div>
@@ -1020,16 +1268,33 @@ function openEmailDetails(email) {
 
   const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
   const recipientsDisplay = getRecipientsDisplay(email);
-  const formattedSenderWithAddr = formatSenderDisplay(email.sender_email, true);
+  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
+  
+  // Format sender: strictly hide @alphastack.wwisvnr.com and @phonemail.com
+  const formattedSenderClean = isFromPhoneMail 
+    ? formatSenderDisplay(email.sender_email) 
+    : formatSenderDisplay(email.sender_email, true);
 
   document.getElementById('full-subject').innerText = email.subject || '(No Subject)';
   document.getElementById('full-sender').innerText = isSentByMe 
-    ? (currentUser.name ? `${currentUser.name} <${email.sender_email}>` : email.sender_email) 
-    : formattedSenderWithAddr;
-  document.getElementById('full-avatar').innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : email.sender_email);
+    ? (currentUser.name ? `${currentUser.name} (+91 ${currentUser.phone})` : `+91 ${currentUser.phone}`) 
+    : formattedSenderClean;
+
+  const senderBadgeEl = document.getElementById('full-sender-badge');
+  if (senderBadgeEl) {
+    if (isFromPhoneMail) {
+      senderBadgeEl.className = 'badge-source-tag badge-phonemail-pill';
+      senderBadgeEl.innerHTML = '⚡ PhoneMail Network';
+    } else {
+      senderBadgeEl.className = 'badge-source-tag badge-external-pill';
+      senderBadgeEl.innerHTML = '🌐 External Provider';
+    }
+  }
+
+  document.getElementById('full-avatar').innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : formattedSenderClean);
   document.getElementById('full-to').innerText = isSentByMe 
     ? (recipientsDisplay || 'Recipient') 
-    : (currentUser ? `${currentUser.name || 'me'} (${currentUser.email || currentUser.phone})` : 'me');
+    : (currentUser ? `${currentUser.name || 'me'} (+91 ${currentUser.phone})` : 'me');
   document.getElementById('full-date').innerText = new Date(email.created_at).toLocaleString([], { 
     dateStyle: 'medium', 
     timeStyle: 'short' 
@@ -1173,11 +1438,11 @@ async function pickDeviceContacts() {
         });
 
         if (rawPhones.length === 0) {
-          showToastNotification('No telephone numbers found in selected contacts.');
+          showNotify.warning('No phone numbers found in selected device contacts.', 'No Phone Numbers');
           return;
         }
 
-        showToastNotification('Checking which contacts are registered on PhoneMail...');
+        showNotify.info('Checking which device contacts are registered on PhoneMail...', 'Contact Sync');
         const res = await fetch('/api/contacts/filter-phonemail', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1187,40 +1452,54 @@ async function pickDeviceContacts() {
         const registered = data.registeredContacts || [];
 
         if (registered.length === 0) {
-          showToastNotification('None of the selected device contacts are registered on PhoneMail yet.');
-        } else if (registered.length === 1) {
-          if (input) input.value = registered[0].phone_number;
-          showToastNotification(`Selected: ${registered[0].display_name} (+91 ${registered[0].phone_number})`);
+          showNotify.info('None of the selected device contacts are registered on PhoneMail yet.', 'No Matches');
         } else {
-          renderContactsDropdown(registered, 'Device Contacts Registered with PhoneMail');
+          // Cache in localStorage for automatic future auto-completion
+          try {
+            localStorage.setItem('phonemail_cached_device_contacts', JSON.stringify(registered));
+            cachedDeviceContacts = registered;
+          } catch (e) {}
+
+          if (registered.length === 1) {
+            if (input) input.value = registered[0].phone_number;
+            showNotify.success(`Selected ${registered[0].display_name} (+91 ${registered[0].phone_number})`, 'Device Contact');
+          } else {
+            showNotify.success(`Found ${registered.length} registered PhoneMail contacts from your device!`, 'Device Contacts');
+            renderContactsDropdown(registered, 'Device Contacts Registered with PhoneMail');
+          }
         }
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
-        showToastNotification('Device contact picker cancelled.');
+        showNotify.info('Device contact picker cancelled or unavailable.');
       }
     }
   } else {
-    // Desktop prompt fallback
-    const query = prompt('Enter a 10-digit phone number or name to search registered PhoneMail users:');
-    if (query && query.trim()) {
-      const q = query.trim();
-      try {
-        const res = await fetch(`/api/contacts?phone=${currentUser ? currentUser.phone : ''}&q=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        const list = data.contacts || [];
-        if (list.length === 0) {
-          showToastNotification(`No registered PhoneMail user found for "${q}".`);
-        } else if (list.length === 1) {
-          if (input) input.value = list[0].phone_number;
-          showToastNotification(`Found registered user: ${list[0].display_name} (+91 ${list[0].phone_number})`);
-        } else {
-          renderContactsDropdown(list, `Matching Registered Users for "${q}"`);
+    // Elegant fallback prompt dialog
+    showPromptDialog({
+      title: 'Search PhoneMail Contacts',
+      message: 'Enter a 10-digit mobile number or name to search registered PhoneMail users:',
+      placeholder: 'e.g. 9876543210 or Rahul',
+      confirmText: 'Search',
+      onConfirm: async (q) => {
+        if (!q) return;
+        try {
+          const res = await fetch(`/api/contacts?phone=${currentUser ? currentUser.phone : ''}&q=${encodeURIComponent(q)}`);
+          const data = await res.json();
+          const list = data.contacts || [];
+          if (list.length === 0) {
+            showNotify.info(`No registered PhoneMail user found for "${q}". External email addresses can be entered directly.`, 'No Matches');
+          } else if (list.length === 1) {
+            if (input) input.value = list[0].phone_number;
+            showNotify.success(`Selected ${list[0].display_name} (+91 ${list[0].phone_number})`, 'Contact Selected');
+          } else {
+            renderContactsDropdown(list, `Matching Registered Users for "${q}"`);
+          }
+        } catch (err) {
+          showNotify.error('Failed to search contacts: ' + err.message, 'Search Error');
         }
-      } catch (err) {
-        showToastNotification('Failed to search contacts: ' + err.message);
       }
-    }
+    });
   }
 }
 
@@ -1252,7 +1531,7 @@ function setupContactsAutocomplete() {
           dropdown.innerHTML = `
             <div class="contacts-autocomplete-header" style="color: var(--text-dim); font-size: 11px; font-weight: normal; padding: 10px;">
               No registered PhoneMail users matching "${escapeHtml(q)}".<br>
-              <span style="color: var(--accent-green); font-size: 11px;">External emails (e.g. @gmail.com) can be entered directly.</span>
+              <span style="color: var(--green-main); font-size: 11px;">External emails (e.g. @gmail.com) can be entered directly.</span>
             </div>
           `;
           dropdown.style.display = 'block';
@@ -1263,17 +1542,37 @@ function setupContactsAutocomplete() {
         return;
       }
 
-      // If query is empty: ONLY show recent conversation contacts (people this user actually communicated with)
+      // If query is empty: combine recent conversation contacts + cached device contacts
+      let combined = [];
       const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
       const data = await res.json();
       const recentContacts = data.contacts || [];
+      recentContacts.forEach(c => combined.push(c));
 
-      if (recentContacts.length === 0) {
+      // Check cached device contacts from localStorage
+      try {
+        const rawCached = localStorage.getItem('phonemail_cached_device_contacts');
+        if (rawCached) {
+          const deviceList = JSON.parse(rawCached);
+          if (Array.isArray(deviceList)) {
+            deviceList.forEach(dc => {
+              if (!combined.some(item => item.phone_number === dc.phone_number)) {
+                combined.push({
+                  ...dc,
+                  is_device: true
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      if (combined.length === 0) {
         dropdown.style.display = 'none';
         return;
       }
 
-      renderContactsDropdown(recentContacts, 'Recent Contacts (PhoneMail)');
+      renderContactsDropdown(combined, 'Recent & Synced Device Contacts');
     } catch (err) {
       console.warn('Failed to load contacts for autocomplete:', err);
     }
@@ -1321,7 +1620,7 @@ function closeComposeModal() {
 function startQuickReply() {
   if (!activeEmail) return;
   if (activeEmail.has_replied === 1) {
-    alert('Notice: This message has already been replied to. Each message can be replied to only once.');
+    showNotify.warning('This message has already been replied to. Each message can be replied to only once.', 'Single Reply Policy');
     return;
   }
   openComposeModal();
@@ -1331,7 +1630,12 @@ function startQuickReply() {
   const isSentByMe = Boolean(activeEmail.sender_email && currentUser && activeEmail.sender_email.includes(currentUser.phone));
   const replyTarget = isSentByMe ? (getRecipientsDisplay(activeEmail) || activeEmail.sender_email) : activeEmail.sender_email;
 
-  document.getElementById('desk-compose-to').value = replyTarget;
+  // If replyTarget is a PhoneMail user, extract only their phone number so the compose "To" stays clean
+  const cleanTarget = isPhoneMailSender(replyTarget) 
+    ? (replyTarget.match(/\b\d{10}\b/) ? replyTarget.match(/\b\d{10}\b/)[0] : replyTarget)
+    : replyTarget;
+
+  document.getElementById('desk-compose-to').value = cleanTarget;
   document.getElementById('desk-compose-subject').value = (activeEmail.subject || '').startsWith('Re:')
     ? activeEmail.subject
     : `Re: ${activeEmail.subject || ''}`;
@@ -1344,7 +1648,7 @@ async function sendDesktopEmail() {
   const body = document.getElementById('desk-compose-body').value.trim();
 
   if (!to || !body) {
-    alert('Please enter recipients and message content.');
+    showNotify.warning('Please enter recipient and message content.', 'Compose Incomplete');
     return;
   }
 
@@ -1367,12 +1671,12 @@ async function sendDesktopEmail() {
     if (res.ok && data.success) {
       closeComposeModal();
       loadEmails();
-      showToastNotification('Email sent successfully!');
+      showNotify.success('Email sent successfully!', 'Message Sent');
     } else {
-      alert(data.error || 'Failed to send email');
+      showNotify.error(data.error || 'Failed to send email', 'Send Failed');
     }
   } catch (err) {
-    alert('Error: ' + err.message);
+    showNotify.error('Error sending email: ' + err.message, 'Network Error');
   }
 }
 
@@ -1444,7 +1748,7 @@ async function addDesktopAlias() {
   const tag = document.getElementById('desk-new-tag').value.trim();
   const label = document.getElementById('desk-new-label').value.trim();
   if (!tag) {
-    alert('Please enter an alias tag (e.g. work, banking, 1)');
+    showNotify.warning('Please enter an alias tag (e.g. work, banking, 1)', 'Missing Tag');
     return;
   }
   try {
@@ -1458,48 +1762,13 @@ async function addDesktopAlias() {
       document.getElementById('desk-new-tag').value = '';
       document.getElementById('desk-new-label').value = '';
       loadDesktopAliases();
-      showToastNotification(`Sub-number .${tag} created!`);
+      showNotify.success(`Sub-number .${tag} created!`, 'Sub-Number Added');
     } else {
-      alert(data.error || 'Failed to add alias');
+      showNotify.error(data.error || 'Failed to add alias', 'Alias Error');
     }
   } catch (err) {
-    alert(err.message);
+    showNotify.error(err.message, 'Server Error');
   }
-}
-
-// ==================== RESPONSIVE SIDEBAR TOGGLE ====================
-function toggleSidebar() {
-  const sidebar = document.getElementById('gmail-sidebar');
-  const backdrop = document.getElementById('sidebar-backdrop');
-  if (!sidebar) return;
-
-  sidebar.classList.toggle('open');
-  if (backdrop) {
-    backdrop.classList.toggle('active', sidebar.classList.contains('open'));
-  }
-}
-
-function closeMobileSidebar() {
-  const sidebar = document.getElementById('gmail-sidebar');
-  const backdrop = document.getElementById('sidebar-backdrop');
-  if (sidebar) sidebar.classList.remove('open');
-  if (backdrop) backdrop.classList.remove('active');
-}
-
-// ==================== TOAST NOTIFICATION ====================
-function showToastNotification(msg) {
-  let toast = document.getElementById('bright-toast');
-  if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'bright-toast';
-    toast.className = 'bright-toast-pill';
-    document.body.appendChild(toast);
-  }
-  toast.innerText = msg;
-  toast.classList.add('visible');
-  setTimeout(() => {
-    toast.classList.remove('visible');
-  }, 3000);
 }
 
 // ==================== SESSION RESTORATION & LOGOUT ====================

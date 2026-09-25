@@ -186,20 +186,46 @@
     <!-- Top WhatsApp Header -->
     <div class="app-header">
       <div class="header-left">
-        <button class="icon-btn" onclick="toggleDrawer()">☰</button>
+        <button class="icon-btn" onclick="toggleDrawer()" aria-label="Menu">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
         <span class="app-title">PhoneMail</span>
       </div>
       <div class="header-right">
-        <button class="icon-btn" onclick="openProfileModal()">👤</button>
+        <button class="icon-btn" onclick="openProfileModal()" aria-label="Profile">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
       </div>
     </div>
 
     <!-- Search Bar & Filter Chips (Spike Mail Style) -->
     <div class="search-filter-section">
       <div class="search-bar-row">
-        <span class="search-icon">🔍</span>
+        <span class="search-icon">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
         <input type="text" id="chat-search" placeholder="Search phone number or email..." oninput="onSearchInput(this.value)">
       </div>
+
+      <!-- TWO TABS: Same App (PhoneMail) vs Another App (Gmail, Rediff, etc.) -->
+      <div class="mobile-source-tabs">
+        <button class="mob-source-tab active" id="mob-source-all" onclick="setMobileSourceFilter('all')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          <span>All</span>
+          <span class="mob-tab-badge" id="mob-count-all">0</span>
+        </button>
+        <button class="mob-source-tab" id="mob-source-phonemail" onclick="setMobileSourceFilter('phonemail')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>PhoneMail</span>
+          <span class="mob-tab-badge mob-pm" id="mob-count-phonemail">0</span>
+        </button>
+        <button class="mob-source-tab" id="mob-source-external" onclick="setMobileSourceFilter('external')">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>External (Gmail...)</span>
+          <span class="mob-tab-badge mob-ext" id="mob-count-external">0</span>
+        </button>
+      </div>
+
       <div class="filter-chips">
         <button class="chip active" onclick="setFilter('all', this)">All</button>
         <button class="chip" onclick="setFilter('unread', this)">Unread</button>
@@ -215,7 +241,7 @@
 
     <!-- Floating Action Button for Traditional Compose -->
     <button class="fab-compose" title="Compose New Email" onclick="openTraditionalCompose()">
-      ✏️
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     </button>
 
   </div>
@@ -223,20 +249,24 @@
   <!-- ==================== INSIDE CHAT / CONVERSATION VIEW (SPIKE MAIL) ==================== -->
   <div id="chat-view-container" class="chat-view-wrapper">
     <div class="chat-header">
-      <button class="icon-btn back-btn" onclick="closeChatView()">←</button>
+      <button class="icon-btn back-btn" onclick="closeChatView()" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      </button>
       <div class="chat-contact-info">
-        <div class="contact-name" id="chat-contact-name">hr@alphastack.tech</div>
-        <div class="contact-status" id="chat-contact-status">PhoneMail Active</div>
+        <div class="contact-name" id="chat-contact-name">+91 98765 43210</div>
+        <div class="contact-status" id="chat-contact-status">⚡ PhoneMail Verified</div>
       </div>
       <div class="chat-header-actions">
         <!-- WhatsApp Camera Slot used for Traditional Email Mode toggle -->
-        <button class="icon-btn camera-tab-toggle" title="Traditional Email Mode (To field locked)" onclick="toggleTraditionalInChat()">✉️</button>
+        <button class="icon-btn camera-tab-toggle" title="Traditional Email Mode" onclick="toggleTraditionalInChat()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </button>
       </div>
     </div>
 
     <!-- Compact Subject Bar right above messages -->
     <div class="chat-subject-bar" id="chat-subject-bar">
-      <span>📌 Subject:</span> <strong id="chat-subject-text">Welcome to AlphaStack!</strong>
+      <span>Subject:</span> <strong id="chat-subject-text">Welcome to AlphaStack!</strong>
     </div>
 
     <!-- Chat Message Stream -->
@@ -252,8 +282,10 @@
 
     <!-- Message Input Box with Compact Subject Field -->
     <div class="chat-input-bar">
-      <input type="text" id="chat-message-input" placeholder="Type an email..." onkeydown="if(event.key==='Enter') sendChatMessage()">
-      <button class="send-btn" onclick="sendChatMessage()">➤</button>
+      <input type="text" id="chat-message-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChatMessage()">
+      <button class="send-btn" onclick="sendChatMessage()" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
     </div>
   </div>
 
@@ -266,7 +298,13 @@
       </div>
       <div class="modal-body">
         <div class="trad-field" style="position: relative;">
-          <label>To:</label>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">To:</label>
+            <button type="button" id="mob-pick-contacts-btn" onclick="pickMobileDeviceContacts()" style="font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Automatically fetch or sync contacts from your device">
+              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>Sync Contacts</span>
+            </button>
+          </div>
           <input type="text" id="trad-to" placeholder="Phone number (e.g. 9845012345) or email" autocomplete="off">
           <div id="mobile-contacts-picker" class="mobile-contacts-picker" style="display: none;"></div>
         </div>
@@ -294,17 +332,21 @@
       </div>
       <div class="modal-body">
         <div class="profile-hero">
-          <div class="profile-avatar-large">👤</div>
+          <div class="profile-avatar-large">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
           <h4 id="profile-name">Soumith V</h4>
-          <p id="profile-email">9876543210@phonemail.com</p>
+          <p id="profile-email">+91 98765 43210</p>
         </div>
 
         <!-- Digital ID QR Card for Village / Offline Users -->
         <div class="qr-card-box">
-          <div class="qr-header">🪪 Digital PhoneMail ID Card</div>
+          <div class="qr-header">Digital PhoneMail ID Card</div>
           <div class="qr-code-placeholder">
-            <div style="font-size: 32px;">📱</div>
-            <div style="font-weight: 700; margin-top: 4px;">9876543210</div>
+            <div style="font-size: 28px;">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </div>
+            <div style="font-weight: 700; margin-top: 4px;" id="mob-digital-phone">+91 98765 43210</div>
             <div style="font-size: 11px; opacity: 0.8;">Scan or share at banks & govt offices</div>
           </div>
         </div>
@@ -330,17 +372,32 @@
   <div id="drawer-menu" class="drawer-wrapper" onclick="toggleDrawer()">
     <div class="drawer-content" onclick="event.stopPropagation()">
       <div class="drawer-header">
-        <div class="profile-avatar-small">👤</div>
+        <div class="profile-avatar-small">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
         <div style="font-weight: 700;" id="drawer-username">Soumith V</div>
-        <div style="font-size: 12px; opacity: 0.8;" id="drawer-email">9876543210@phonemail.com</div>
+        <div style="font-size: 12px; opacity: 0.8;" id="drawer-email">+91 98765 43210</div>
       </div>
       <div class="drawer-items">
-        <div class="drawer-item active" onclick="toggleDrawer()"><span>📥</span> Home (Unified Chats)</div>
-        <a href="/desktop/" class="drawer-item" style="text-decoration: none; color: inherit;"><span>💻</span> Desktop Webmail</a>
-        <div class="drawer-item" onclick="openProfileModal(); toggleDrawer();"><span>⚙️</span> Settings & Sub-Numbers</div>
+        <div class="drawer-item active" onclick="toggleDrawer()">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+          Home (Unified Chats)
+        </div>
+        <a href="/desktop/" class="drawer-item" style="text-decoration: none; color: inherit;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Desktop Webmail
+        </a>
+        <div class="drawer-item" onclick="openProfileModal(); toggleDrawer();">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Settings & Sub-Numbers
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Modern Popup Toast & Dialog Overlay -->
+  <div id="app-toast-container" class="app-toast-container"></div>
+  <div id="app-dialog-overlay" class="app-dialog-overlay" style="display: none;"></div>
 
   <script src="app.js"></script>
 </body>

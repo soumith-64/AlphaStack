@@ -290,7 +290,7 @@ router.post('/contacts/filter-phonemail', async (req, res) => {
       SELECT id, phone_number, email_address, display_name, registration_channel
       FROM users 
       WHERE phone_number IN (${placeholders})
-        AND registration_channel IN ('PHONE_EMAIL', 'WEB_CLIENT', 'MOBILE_APP', 'TELEGRAM', 'WEB_PORTAL')
+        AND (registration_channel != 'INBOUND_EMAIL' OR has_mobile_app = 1)
     `, uniqueNumbers);
 
     res.json({ registeredContacts: registered });

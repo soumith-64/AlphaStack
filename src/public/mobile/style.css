@@ -535,6 +535,68 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; colo
   font-size: 14px;
 }
 
+/* TWO TABS: Same App (PhoneMail) vs Another App (Gmail, Rediff...) */
+.mobile-source-tabs {
+  display: flex;
+  gap: 6px;
+  background: #f0f2f5;
+  padding: 3px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+}
+
+.mob-source-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.mob-source-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.mob-source-tab#mob-source-phonemail.active {
+  color: #046A38;
+}
+
+.mob-source-tab#mob-source-external.active {
+  color: #2563eb;
+}
+
+.mob-tab-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 9999px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.mob-source-tab.active .mob-tab-badge.mob-pm {
+  background: rgba(4, 106, 56, 0.12);
+  color: #046A38;
+}
+
+.mob-source-tab.active .mob-tab-badge.mob-ext {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+
 .filter-chips {
   display: flex;
   gap: 8px;
@@ -1144,3 +1206,231 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; colo
   font-size: 11.5px;
   color: var(--wa-gray);
 }
+
+/* ==================== BADGES FOR PHONE-MAIL VS EXTERNAL ==================== */
+.badge-source-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.2px;
+}
+
+.badge-phonemail-pill {
+  background: rgba(4, 106, 56, 0.12);
+  color: #046A38;
+  border: 1px solid rgba(4, 106, 56, 0.25);
+}
+
+.badge-external-pill {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+/* ==================== MODERN POPUP TOAST NOTIFICATIONS (MOBILE) ==================== */
+.app-toast-container {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  right: 14px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.app-toast.visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.app-toast.hiding {
+  transform: translateY(-20px);
+  opacity: 0;
+}
+
+.app-toast-icon-wrap {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.app-toast-icon-wrap svg {
+  width: 14px;
+  height: 14px;
+}
+
+.app-toast.success {
+  border-color: rgba(4, 106, 56, 0.35);
+}
+.app-toast.success .app-toast-icon-wrap {
+  background: rgba(4, 106, 56, 0.15);
+  color: #046A38;
+}
+
+.app-toast.error {
+  border-color: rgba(220, 38, 38, 0.35);
+}
+.app-toast.error .app-toast-icon-wrap {
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+}
+
+.app-toast.warning {
+  border-color: rgba(245, 158, 11, 0.35);
+}
+.app-toast.warning .app-toast-icon-wrap {
+  background: rgba(245, 158, 11, 0.15);
+  color: #d97706;
+}
+
+.app-toast.info {
+  border-color: rgba(37, 99, 235, 0.35);
+}
+.app-toast.info .app-toast-icon-wrap {
+  background: rgba(37, 99, 235, 0.15);
+  color: #2563eb;
+}
+
+.app-toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 2px;
+}
+
+.app-toast-message {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.app-toast-close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* ==================== APP DIALOG MODAL (POPUP PROMPT & CONFIRM) ==================== */
+.app-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: mobDialogFadeIn 0.2s ease-out;
+}
+
+@keyframes mobDialogFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.app-dialog-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.28);
+  max-width: 380px;
+  width: 100%;
+  padding: 20px;
+}
+
+.app-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.app-dialog-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(4, 106, 56, 0.12);
+  color: #046A38;
+}
+
+.app-dialog-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.app-dialog-body {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.4;
+  margin-bottom: 14px;
+}
+
+.app-dialog-input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13.5px;
+  margin-bottom: 16px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.app-dialog-input:focus {
+  border-color: #046A38;
+  background: #ffffff;
+}
+
+.app-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
