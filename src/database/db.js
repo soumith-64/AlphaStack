@@ -69,6 +69,9 @@ async function getSqliteDb() {
     }
     const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
     db.run(schemaSql);
+    try {
+      db.run('ALTER TABLE emails ADD COLUMN is_important INT DEFAULT 0;');
+    } catch (e) {}
     saveToDisk();
   } catch (err) {
     console.warn('Notice: SQLite initialization warning:', err.message);

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PhoneMail — India's Phone-Number-Powered Email</title>
+  <title>INAI — India's Unified Phone-to-Email WebApp</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -26,9 +26,9 @@
     <!-- STEP 1: PHONEMAIL ONE-CLICK REAL-TIME AUTH CARD -->
     <div class="auth-card" id="desktop-card-phone">
       <div class="brand-badge">
-        <span class="online-dot"></span> 🇮🇳 Bharat's Phone-Email Engine
+        <span class="online-dot"></span> 🇮🇳 Bharat's Next-Gen AI Phone-Email Engine
       </div>
-      <h1 class="auth-title">Welcome to <span class="saffron-text">Phone</span><span class="green-text">Mail</span></h1>
+      <h1 class="auth-title">Welcome to <span class="saffron-text">IN</span><span class="green-text">AI</span></h1>
       <p class="auth-subtitle">Sign in using your mobile number for real-time OTP verification & instant unified inbox access.</p>
 
       <!-- SIMPLE DIRECT PHONE INPUT WITH AUTO-DETECTION -->
@@ -261,11 +261,11 @@
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           </div>
           <div class="brand-name">
-            <span class="saffron-text">Phone</span><span class="green-text">Mail</span>
+            <span class="saffron-text">IN</span><span class="green-text">AI</span>
           </div>
           <span class="tiranga-tag">🇮🇳 Bharat</span>
         </div>
-        <div class="phone-handle-chip" id="top-phone-chip" title="Your PhoneMail Identity">
+        <div class="phone-handle-chip" id="top-phone-chip" title="Your INAI Identity">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
           <span id="top-phone-chip-text">+91 9876543210</span>
         </div>
@@ -282,6 +282,28 @@
       </div>
 
       <div class="nav-right">
+        <!-- Real-Time Language Selector Dropdown -->
+        <div class="lang-dropdown-wrapper" style="position: relative;">
+          <button class="nav-icon-btn lang-select-btn" id="desk-lang-btn" onclick="toggleDeskLangMenu(event)" title="Translate Language / भाषा अनुवाद" aria-label="Language">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span class="lang-code-pill" id="desk-current-lang-code">EN</span>
+          </button>
+          <div class="inai-lang-menu" id="desk-lang-menu" style="display: none;">
+            <button type="button" class="lang-menu-opt active" onclick="setInaiLanguage('en')">🇬🇧 English</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('hi')">🇮🇳 हिन्दी (Hindi)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('ta')">🇮🇳 தமிழ் (Tamil)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('te')">🇮🇳 తెలుగు (Telugu)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('kn')">🇮🇳 ಕನ್ನಡ (Kannada)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('bn')">🇮🇳 বাংলা (Bengali)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('es')">🇪🇸 Español (Spanish)</button>
+          </div>
+        </div>
+
+        <!-- Digital ID Card & Dynamic QR Modal Trigger -->
+        <button class="nav-icon-btn digital-id-btn" onclick="openDigitalIdModal()" title="Digital ID Card & QR Code" aria-label="Digital ID">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="17" y1="7" x2="17.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/><line x1="17" y1="17" x2="17.01" y2="17"/></svg>
+        </button>
+
         <!-- Theme Toggle Button (Light / Dark) -->
         <button class="nav-icon-btn theme-toggle-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Switch Light / Dark Theme" aria-label="Toggle Theme">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -289,7 +311,7 @@
         <button class="nav-icon-btn" onclick="syncAndLoadEmails()" title="Sync Messages with Server" aria-label="Sync">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
-        <a href="/mobile/" class="nav-icon-btn" title="Open Mobile Spike View" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
+        <a href="/mobile/" class="nav-icon-btn" title="Open Mobile View" style="text-decoration: none; display: flex; align-items: center; justify-content: center;">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
         </a>
         <button class="nav-icon-btn" onclick="openDesktopSettings()" title="Settings & Sub-Numbers" aria-label="Settings">
@@ -311,49 +333,69 @@
           <span class="compose-plus">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
           </span>
-          <span class="compose-text">Compose Email</span>
+          <span class="compose-text" data-i18n="compose">Compose Email</span>
           <kbd class="compose-kbd">C</kbd>
         </button>
 
         <!-- Navigation Folders -->
-        <div class="sidebar-group-title">MAILBOXES</div>
+        <div class="sidebar-group-title" data-i18n="mailboxes">MAILBOXES</div>
         <nav class="folder-nav">
-          <button class="nav-item active" onclick="switchFolder('INBOX', this)">
+          <button class="nav-item" onclick="switchFolder('ALL', this)" id="nav-item-all">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            </span>
+            <span class="nav-label" data-i18n="all_mail">All Mail</span>
+            <span class="nav-badge" id="all-count-badge" style="display:none;">0</span>
+          </button>
+          <button class="nav-item active" onclick="switchFolder('INBOX', this)" id="nav-item-inbox">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
             </span>
-            <span class="nav-label">Inbox</span>
+            <span class="nav-label" data-i18n="inbox">Inbox</span>
             <span class="nav-badge" id="inbox-count-badge">0</span>
           </button>
-          <button class="nav-item" onclick="switchFolder('STARRED', this)">
+          <button class="nav-item" onclick="switchFolder('IMPORTANT', this)" id="nav-item-important">
+            <span class="nav-icon" style="color: #eab308;">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </span>
+            <span class="nav-label" data-i18n="important">Important</span>
+            <span class="nav-badge" id="important-count-badge" style="display:none; background: #eab308; color: #fff;">0</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('STARRED', this)" id="nav-item-starred">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
             </span>
-            <span class="nav-label">Starred</span>
+            <span class="nav-label" data-i18n="starred">Starred</span>
           </button>
-          <button class="nav-item" onclick="switchFolder('SENT', this)">
+          <button class="nav-item" onclick="switchFolder('SENT', this)" id="nav-item-sent">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </span>
-            <span class="nav-label">Sent</span>
+            <span class="nav-label" data-i18n="sent">Sent</span>
           </button>
-          <button class="nav-item" onclick="switchFolder('DRAFTS', this)">
+          <button class="nav-item" onclick="switchFolder('DRAFTS', this)" id="nav-item-drafts">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             </span>
-            <span class="nav-label">Drafts</span>
+            <span class="nav-label" data-i18n="drafts">Drafts</span>
           </button>
-          <button class="nav-item" onclick="switchFolder('SPAM', this)">
+          <button class="nav-item" onclick="switchFolder('ARCHIVE', this)" id="nav-item-archive">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </span>
+            <span class="nav-label" data-i18n="archive">Archive</span>
+          </button>
+          <button class="nav-item" onclick="switchFolder('SPAM', this)" id="nav-item-spam">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             </span>
-            <span class="nav-label">Spam</span>
+            <span class="nav-label" data-i18n="spam">Spam</span>
           </button>
-          <button class="nav-item" onclick="switchFolder('TRASH', this)">
+          <button class="nav-item" onclick="switchFolder('TRASH', this)" id="nav-item-trash">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
             </span>
-            <span class="nav-label">Trash</span>
+            <span class="nav-label" data-i18n="trash">Trash</span>
           </button>
         </nav>
 
@@ -378,31 +420,61 @@
 
         <!-- Email List View -->
         <section class="email-list-panel" id="mail-list-pane">
-          <!-- Toolbar with Two Email Classification Tabs -->
+          <!-- Toolbar with Two Email Classification Tabs & Bulk Actions -->
           <div class="list-toolbar">
             <div class="toolbar-left">
-              <label class="custom-checkbox">
+              <label class="custom-checkbox" title="Select All">
                 <input type="checkbox" id="select-all-check" onchange="toggleSelectAll(this)">
                 <span class="checkmark"></span>
               </label>
               <h2 class="folder-header-title" id="current-folder-title">Inbox</h2>
             </div>
 
-            <!-- TWO TABS: Same App (PhoneMail) vs Another App (Gmail, Rediff, etc.) -->
+            <!-- FLOATING BULK ACTIONS TOOLBAR (Reveals when >= 1 email is checked) -->
+            <div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
+              <span class="bulk-count-badge" id="bulk-count-badge">0 selected</span>
+              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('read')" title="Mark as Read">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>Read</span>
+              </button>
+              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('unread')" title="Mark as Unread">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/></svg>
+                <span>Unread</span>
+              </button>
+              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('important')" title="Mark as Important">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>Important</span>
+              </button>
+              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('star')" title="Star">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>Star</span>
+              </button>
+              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('archive')" title="Archive">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                <span>Archive</span>
+              </button>
+              <button type="button" class="bulk-act-btn danger" onclick="executeBulkAction('delete')" title="Delete">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                <span>Delete</span>
+              </button>
+              <button type="button" class="bulk-act-close" onclick="clearEmailSelection()" title="Clear Selection">✕</button>
+            </div>
+
+            <!-- TWO TABS: Same App (INAI) vs External (Gmail, Rediff, etc.) -->
             <div class="mailbox-source-tabs">
               <button class="source-tab-btn active" id="tab-source-all" onclick="setMailSourceFilter('all')">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                <span>All Mail</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                <span data-i18n="source_all">All Mail</span>
                 <span class="source-tab-count" id="count-source-all">0</span>
               </button>
               <button class="source-tab-btn" id="tab-source-phonemail" onclick="setMailSourceFilter('phonemail')">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>PhoneMail Network</span>
+                <span data-i18n="source_inai">INAI Network</span>
                 <span class="source-tab-count phonemail-count" id="count-source-phonemail">0</span>
               </button>
               <button class="source-tab-btn" id="tab-source-external" onclick="setMailSourceFilter('external')">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span>External (Gmail, Rediff...)</span>
+                <span data-i18n="source_external">External (Gmail...)</span>
                 <span class="source-tab-count external-count" id="count-source-external">0</span>
               </button>
             </div>
@@ -412,7 +484,7 @@
             </div>
           </div>
 
-          <!-- Email Items Stream -->
+          <!-- Email Items Stream (Cleanly Grouped by Date with Swiping) -->
           <div class="email-cards-list" id="email-items-container">
             <!-- Cards rendered dynamically via app.js -->
           </div>
@@ -424,11 +496,23 @@
           <div class="reading-header-bar">
             <button class="btn-back-action" onclick="closeReadingPane()">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;"><polyline points="15 18 9 12 15 6"/></svg>
-              <span>Back to messages</span>
+              <span data-i18n="back_to_messages">Back to messages</span>
             </button>
             <div class="reading-actions">
+              <!-- Real-Time AI Translation in Reading Pane -->
+              <button class="action-btn" id="pane-translate-btn" onclick="toggleMessageTranslation()" title="AI Real-Time Translation">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span style="font-size: 11px; margin-left: 4px;" id="pane-trans-label">AI Translate</span>
+              </button>
+              <!-- Mark as Important Toggle -->
+              <button class="action-btn" id="pane-important-btn" onclick="toggleCurrentImportant()" title="Mark as Important">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </button>
               <button class="action-btn" id="pane-star-btn" onclick="toggleCurrentStar()" title="Star Message">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              </button>
+              <button class="action-btn" onclick="archiveCurrentEmail()" title="Archive Email">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
               </button>
               <button class="action-btn danger" onclick="deleteCurrentEmail()" title="Move to Trash">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -500,20 +584,12 @@
 
       <div class="compose-body">
         <div class="compose-field" style="position: relative;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <label style="margin-bottom: 0;">To</label>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <button type="button" id="desk-pick-contacts-btn" onclick="pickDeviceContacts()" style="font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border-light); background: var(--bg-subtle); color: var(--text-main); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Automatically fetch or sync contacts from your device">
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span>Sync Device Contacts</span>
-              </button>
-            </div>
-          </div>
-          <input type="text" id="desk-compose-to" placeholder="Search registered PhoneMail user or type external email" autocomplete="off">
+          <label style="margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); display: block;">TO (RECIPIENT)</label>
+          <input type="text" id="desk-compose-to" placeholder="Type name, phone number, or external email (e.g. user@gmail.com)" autocomplete="off">
           <div id="desk-contacts-dropdown" class="contacts-autocomplete" style="display: none;"></div>
         </div>
         <div class="compose-field">
-          <label>Subject</label>
+          <label style="margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); display: block;">SUBJECT</label>
           <input type="text" id="desk-compose-subject" placeholder="Subject">
         </div>
         <textarea id="desk-compose-body" rows="8" placeholder="Type your message here..."></textarea>
@@ -536,7 +612,7 @@
     <div class="settings-dialog">
       <div class="settings-header">
         <div>
-          <h3 class="settings-title">PhoneMail Preferences & Sub-Numbers</h3>
+          <h3 class="settings-title">INAI Preferences & Sub-Numbers</h3>
           <p class="settings-subtitle">Manage your Indian phone identity, extensions, and routing</p>
         </div>
         <button class="close-btn" onclick="closeDesktopSettings()" aria-label="Close Settings">✕</button>
@@ -553,7 +629,7 @@
             </div>
             <div class="id-item">
               <span class="id-label">Default Email Address</span>
-              <strong class="id-value accent" id="settings-email">9876543210@phonemail.com</strong>
+              <strong class="id-value accent" id="settings-email">9876543210@alphastack.wwisvnr.com</strong>
             </div>
           </div>
         </div>
@@ -561,7 +637,7 @@
         <!-- Sub-Number Aliases -->
         <div class="settings-section">
           <h4>SUB-NUMBER ALIASES</h4>
-          <p class="section-help-text">Create dedicated extensions (e.g., <code>9876543210.work@phonemail.com</code>) to organize your life.</p>
+          <p class="section-help-text">Create dedicated extensions (e.g., <code>9876543210.work@alphastack.wwisvnr.com</code>) to organize your life.</p>
           <div id="desk-aliases-list" class="aliases-scroll-list"></div>
           
           <div class="add-alias-form">
@@ -574,23 +650,56 @@
     </div>
   </div>
 
-  <!-- ==================== ONE-TIME CONTACT SYNC PERMISSION MODAL ==================== -->
-  <div id="contact-sync-modal" class="app-dialog-overlay" style="display: none;">
-    <div class="app-dialog-card" style="max-width: 440px; text-align: center; padding: 26px;">
-      <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(4, 106, 56, 0.12); color: var(--green-main); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
-        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  <!-- ==================== DIGITAL ID CARD & DYNAMIC QR MODAL ==================== -->
+  <div id="digital-id-modal" class="id-card-modal-overlay" style="display: none;" onclick="closeDigitalIdModal(event)">
+    <div class="id-card-dialog" onclick="event.stopPropagation()">
+      <div class="id-card-top-bar">
+        <div class="id-card-header-badge">
+          <span class="online-dot"></span>
+          <span>OFFICIAL INAI DIGITAL MAIL ID</span>
+        </div>
+        <button class="close-btn" onclick="closeDigitalIdModal()" aria-label="Close ID Card">✕</button>
       </div>
-      <h3 style="font-size: 19px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">Real-Time Contact Sync</h3>
-      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
-        Allow PhoneMail to automatically discover and sync your contacts who are on PhoneMail in real time. We will only ask for this permission once!
-      </p>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button type="button" class="btn-primary full-width" onclick="acceptOneTimeContactSync()" style="height: 44px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Allow & Sync Contacts (One-time)</span>
+
+      <!-- Luxury Smart Mail Card -->
+      <div class="smart-mail-card" id="smart-mail-card">
+        <div class="smart-card-shimmer"></div>
+        <div class="smart-card-top">
+          <div class="chip-hologram">
+            <div class="chip-line"></div>
+            <div class="chip-line"></div>
+          </div>
+          <div class="smart-card-brand">
+            <span class="saffron-text">IN</span><span class="green-text">AI</span>
+            <span class="country-tag">🇮🇳 BHARAT</span>
+          </div>
+        </div>
+
+        <div class="smart-card-middle">
+          <div class="smart-card-meta">
+            <div class="card-holder-name" id="id-card-name">Soumith</div>
+            <div class="card-holder-phone" id="id-card-phone">+91 93815 64959</div>
+            <div class="card-holder-email" id="id-card-email">9381564959@alphastack.wwisvnr.com</div>
+          </div>
+          <div class="smart-card-qr-box">
+            <img id="id-card-qr-img" src="" alt="Scan to send email" width="105" height="105">
+          </div>
+        </div>
+
+        <div class="smart-card-bottom">
+          <div class="card-protocol-text">SECURE PHONE-POWERED PROTOCOL</div>
+          <div class="card-status-verified">⚡ 100% VERIFIED IDENTITY</div>
+        </div>
+      </div>
+
+      <div class="id-card-actions-row">
+        <button type="button" class="btn-primary full-width" onclick="copyIdCardEmail()" id="btn-copy-id">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="btn-copy-id-text">Copy Mail ID</span>
         </button>
-        <button type="button" class="action-btn" onclick="declineOneTimeContactSync()" style="height: 38px; color: var(--text-muted); justify-content: center; border: none; background: transparent; font-size: 13px;">
-          <span>Maybe Later</span>
+        <button type="button" class="action-btn share-btn" onclick="shareDigitalIdCard()" id="btn-share-id" title="Share your INAI Card">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span>Share</span>
         </button>
       </div>
     </div>

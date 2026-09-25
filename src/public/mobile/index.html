@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PhoneMail — Mobile</title>
+  <title>INAI — India's Unified Phone-to-Email WebApp</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <script src="/socket.io/socket.io.js"></script>
   <!-- Official Phone.Email Real-Time SMS & WhatsApp Verification SDK -->
@@ -14,108 +14,62 @@
 </head>
 <body>
 
-  <!-- ==================== ONBOARDING FLOW (WHATSAPP DESIGN LANGUAGE) ==================== -->
+  <!-- Top Tricolor Ribbon (Tiranga: Kesari Saffron - White - India Green) -->
+  <div class="tiranga-ribbon"></div>
+
+  <!-- ==================== MOBILE AUTH SCREENS (INAI BRANDED) ==================== -->
   <div id="onboarding-container" class="onboarding-wrapper">
 
-    <!-- Screen 1: Language Selection -->
-    <div id="screen-language" class="onboarding-screen active">
-      <div class="ob-header">
-        <div class="whatsapp-logo-icon">🌐</div>
-        <h2>Welcome to PhoneMail</h2>
-        <p>Choose your language to get started</p>
-      </div>
-      <div class="language-list">
-        <label class="lang-option">
-          <input type="radio" name="lang" value="en" checked>
-          <div class="lang-text"><strong>English</strong> <span>(Default)</span></div>
-          <span class="custom-radio"></span>
-        </label>
-        <label class="lang-option">
-          <input type="radio" name="lang" value="hi">
-          <div class="lang-text"><strong>हिन्दी</strong> <span>(Hindi)</span></div>
-          <span class="custom-radio"></span>
-        </label>
-        <label class="lang-option">
-          <input type="radio" name="lang" value="ta">
-          <div class="lang-text"><strong>தமிழ்</strong> <span>(Tamil)</span></div>
-          <span class="custom-radio"></span>
-        </label>
-        <label class="lang-option">
-          <input type="radio" name="lang" value="te">
-          <div class="lang-text"><strong>తెలుగు</strong> <span>(Telugu)</span></div>
-          <span class="custom-radio"></span>
-        </label>
-        <label class="lang-option">
-          <input type="radio" name="lang" value="es">
-          <div class="lang-text"><strong>Español</strong> <span>(Spanish)</span></div>
-          <span class="custom-radio"></span>
-        </label>
-      </div>
-      <div class="ob-footer">
-        <button class="btn-wa-next" onclick="goToScreen('screen-terms')">➔</button>
-      </div>
-    </div>
-
-    <!-- Screen 2: Terms & Conditions -->
-    <div id="screen-terms" class="onboarding-screen">
-      <div class="terms-hero">
-        <div class="hero-circle">✉️</div>
-        <h2>Welcome to PhoneMail</h2>
-        <p>Read our <a href="#">Privacy Policy</a>. Tap "Agree & Continue" to accept the <a href="#">Terms of Service</a>.</p>
-      </div>
-      <div class="ob-footer">
-        <button class="btn-wa-green full-width" onclick="goToScreen('screen-phone')">AGREE AND CONTINUE</button>
-      </div>
-    </div>
-
-    <!-- Screen 3: Phone Verification (PhoneMail Official One-Click Sign-In) -->
-    <div id="screen-phone" class="onboarding-screen">
-      <div class="phone-verify-header">
-        <div class="whatsapp-logo-icon" style="margin: 0 auto 10px; font-size: 32px; width: 60px; height: 60px; background: rgba(4, 106, 56, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">📱</div>
-        <h3>Verify Your Mobile Number</h3>
-        <p>Sign in instantly with your verified phone number to access your unified PhoneMail inbox.</p>
+    <!-- Screen 1: Phone Verification -->
+    <div id="screen-phone" class="onboarding-screen active">
+      <div class="brand-hero-cluster">
+        <div class="brand-badge-pill">
+          <span class="online-dot"></span> 🇮🇳 Bharat's Next-Gen AI Phone-Email
+        </div>
+        <h1 class="auth-title">Welcome to <span class="saffron-text">IN</span><span class="green-text">AI</span></h1>
+        <p class="auth-subtitle">Sign in with your mobile number for instant unified inbox access & real-time delivery.</p>
       </div>
 
       <!-- Direct Phone Input with Auto-detection -->
-      <div class="mobile-phone-card" style="margin-top: 14px;">
-        <label class="mobile-phone-label" style="display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">YOUR MOBILE NUMBER</label>
-        <div class="mobile-phone-input-row" style="display: flex; align-items: center; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 4px 6px 4px 12px; gap: 8px;">
-          <span style="font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap;">🇮🇳 +91</span>
-          <input type="tel" id="mobile-phone-input" style="flex: 1; border: none; background: transparent; font-size: 15px; font-weight: 600; color: #0f172a; outline: none; padding: 6px 0;" placeholder="Enter 10-digit number" autocomplete="tel" maxlength="10" inputmode="numeric">
-          <button type="button" id="mob-detect-btn" onclick="autoDetectMobilePhone()" style="display: inline-flex; align-items: center; gap: 4px; background: rgba(4, 106, 56, 0.08); border: 1px solid rgba(4, 106, 56, 0.2); color: #046A38; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; cursor: pointer;" title="Auto-detect phone number">
+      <form class="mobile-phone-card" onsubmit="handleMobilePhoneSubmit(event)">
+        <label class="mobile-field-label">YOUR MOBILE NUMBER</label>
+        <div class="mobile-phone-input-row">
+          <span class="phone-prefix">🇮🇳 +91</span>
+          <input type="tel" id="mobile-phone-input" class="phone-input" placeholder="Enter 10-digit number" autocomplete="tel" maxlength="10" inputmode="numeric">
+          <button type="button" id="mob-detect-btn" onclick="autoDetectMobilePhone()" class="btn-autofill" title="Auto-fill phone number">
             <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>Auto-fill</span>
           </button>
         </div>
-        <button type="button" class="btn-wa-green full-width" style="margin-top: 10px; height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="requestOTP()">
+        <button type="submit" class="btn-primary-mobile full-width" style="margin-top: 12px;">
           <span>Continue with Real-Time OTP</span>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
+      </form>
+
+      <div class="auth-or-separator">
+        <span>OR ONE-TAP SIGN IN</span>
       </div>
 
-      <div class="auth-or-separator" style="display: flex; align-items: center; text-align: center; margin: 16px 0 12px; color: #94a3b8; font-size: 11px; font-weight: 700;">
-        <span style="flex: 1; border-bottom: 1px solid #e2e8f0;"></span>
-        <span style="padding: 0 10px;">OR ONE-TAP SIGN IN</span>
-        <span style="flex: 1; border-bottom: 1px solid #e2e8f0;"></span>
-      </div>
-
+      <!-- Redesigned Attractive INAI Phone Hero Button -->
       <div class="phonemail-hero-container">
         <div class="phonemail-status-pill">
           <span class="phonemail-pulse-ring"></span>
           <span>⚡ Real-Time SMS & WhatsApp OTP</span>
         </div>
 
-        <button type="button" class="phonemail-hero-btn" id="mobile-phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with PhoneMail">
+        <button type="button" class="phonemail-hero-btn" id="mobile-phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with Phone">
           <div class="btn-left-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
             </svg>
           </div>
           <div class="btn-content-text">
-            <span class="btn-main-title">Sign In with Phone</span>
+            <span class="btn-main-title">Sign In with Phone Number</span>
             <span class="btn-sub-caption">Real-Time OTP Verification</span>
           </div>
           <div class="btn-right-badge">
+            <span class="instant-chip">One-Tap</span>
             <svg class="btn-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="5" y1="12" x2="19" y2="12"></line>
               <polyline points="12 5 19 12 12 19"></polyline>
@@ -123,324 +77,402 @@
           </div>
         </button>
 
-        <!-- Hidden official Phone.Email element for official SDK binding -->
+        <!-- Hidden Phone.Email Embed SDK Button -->
         <div class="pe-signin-embed" style="opacity: 0.001; position: absolute; pointer-events: none; width: 1px; height: 1px; overflow: hidden;">
           <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
         </div>
 
-        <!-- Remember Me by Default Checkbox -->
-        <div class="remember-me-container" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 6px;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: #64748b; user-select: none;">
-            <input type="checkbox" id="mobile-auth-remember-me" checked style="accent-color: #046A38; width: 16px; height: 16px; cursor: pointer;">
-            <span>Keep me signed in (Remember details)</span>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0 6px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: var(--text-muted); user-select: none;">
+            <input type="checkbox" id="mob-remember-me" checked style="accent-color: #046A38; width: 16px; height: 16px; cursor: pointer;">
+            <span>Keep me signed in on this device</span>
           </label>
         </div>
-
-        <div class="phonemail-trust-grid" style="margin-top: 14px;">
-          <div class="trust-item">
-            <div class="trust-icon">💬</div>
-            <div><strong>Instant OTP</strong> via SMS & WhatsApp</div>
-          </div>
-          <div class="trust-item">
-            <div class="trust-icon">📬</div>
-            <div><strong>Zero Setup</strong> — Phone is your email</div>
-          </div>
-          <div class="trust-item">
-            <div class="trust-icon">🔒</div>
-            <div><strong>100% Free & Secure</strong> authentication</div>
-          </div>
-        </div>
       </div>
     </div>
 
-    <!-- Screen 4: Real-Time OTP Verification -->
+    <!-- Screen 2: OTP Verification -->
     <div id="screen-otp" class="onboarding-screen">
-      <div class="otp-header">
-        <h3>Verifying your number</h3>
-        <p>Enter the 6-digit code sent via SMS to <strong id="verify-phone-label">your number</strong>. <a href="#" onclick="goToScreen('screen-phone')">Wrong number?</a></p>
+      <div class="telegram-card-header">
+        <div class="telegram-icon-badge">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </div>
+        <h2 class="auth-title">Enter Verification Code</h2>
+        <div class="telegram-phone-display">
+          <span class="telegram-phone-number" id="mob-tg-phone-display">+91 ••••••••••</span>
+          <button type="button" class="telegram-edit-btn" onclick="backToPhoneStep()">Edit</button>
+        </div>
+        <p class="auth-subtitle">We sent a 6-digit verification code to your mobile number.</p>
       </div>
 
-      <div class="otp-inputs" id="mobile-otp-inputs">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="0" autocomplete="one-time-code" autofocus>
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="1" autocomplete="one-time-code">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="2" autocomplete="one-time-code">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="3" autocomplete="one-time-code">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="4" autocomplete="one-time-code">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="5" autocomplete="one-time-code">
+      <!-- 6-CELL OTP GRID -->
+      <div class="telegram-otp-grid" id="mobile-otp-grid">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="0" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="1" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="2" autocomplete="one-time-code">
+        <span class="telegram-otp-divider">—</span>
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="3" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="4" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="5" autocomplete="one-time-code">
       </div>
 
-      <!-- WebOTP Auto-detection badge -->
-      <div class="otp-autodetect-badge" id="mob-webotp-badge" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: #046A38; margin: 8px 0; background: rgba(4, 106, 56, 0.08); padding: 6px 12px; border-radius: 20px;">
-        <span class="phonemail-pulse-ring" style="width: 8px; height: 8px; background: #046A38;"></span>
-        <span>Auto-detecting SMS OTP via WebOTP API...</span>
-      </div>
+      <div class="otp-status-banner" id="mobile-otp-status"></div>
 
-      <p class="otp-hint" id="mobile-otp-hint" style="min-height: 20px;">Enter 6-digit code sent via SMS</p>
-
-      <div class="otp-timer-mobile" id="mobile-timer-wrap">
-        Resend code in <strong id="mobile-timer-seconds">0:45</strong>
-      </div>
-
-      <div class="otp-mobile-actions">
-        <button type="button" class="btn-mobile-secondary" id="btn-mobile-resend" onclick="resendMobileOTP()" disabled>
-          Resend SMS 🔄
-        </button>
-        <button type="button" class="btn-mobile-secondary voice-btn" id="btn-mobile-call" onclick="callMobileOTP()" disabled>
-          📞 Call me with code
-        </button>
+      <div class="telegram-countdown-row">
+        <div class="otp-timer-badge">
+          <span>Resend in</span>
+          <strong id="mob-otp-timer-seconds">0:45</strong>
+        </div>
+        <div class="otp-action-buttons">
+          <button type="button" class="otp-pill-action" id="mob-btn-resend-sms" onclick="resendMobileOTP()" disabled>Resend SMS</button>
+        </div>
       </div>
     </div>
 
-    <!-- Screen 5: Profile Info (New User Registration) -->
+    <!-- Screen 3: Profile Registration -->
     <div id="screen-profile" class="onboarding-screen">
-      <div class="profile-setup-screen">
-        <div class="profile-avatar-large" id="mobile-avatar-circle">P</div>
-        <h3>Profile info</h3>
-        <p style="font-size: 13px; color: #64748b; margin-bottom: 20px;">Please provide your name to finish creating your PhoneMail account</p>
-        
-        <div class="profile-inputs-mobile">
-          <input type="text" id="mobile-first-name" class="profile-input-field" placeholder="Type your first name" autofocus oninput="updateMobileAvatarPreview()">
-          <input type="text" id="mobile-last-name" class="profile-input-field" placeholder="Last name (optional)" oninput="updateMobileAvatarPreview()">
-        </div>
-
-        <button class="btn-wa-green full-width" onclick="completeMobileProfile()">FINISH REGISTRATION ➔</button>
+      <div class="profile-card-header">
+        <div class="profile-avatar-circle" id="mob-profile-avatar-circle">P</div>
+        <h2 class="auth-title">Complete Your Profile</h2>
+        <p class="auth-subtitle">Enter your name to activate your unified INAI mailbox.</p>
       </div>
+
+      <div class="profile-inputs-mobile">
+        <input type="text" id="mobile-first-name" class="profile-input-field" placeholder="First name *" required autofocus oninput="updateMobileAvatarPreview()">
+        <input type="text" id="mobile-last-name" class="profile-input-field" placeholder="Last name (optional)" oninput="updateMobileAvatarPreview()">
+      </div>
+
+      <button class="btn-primary-mobile full-width" onclick="completeMobileProfile()">
+        <span>Complete Registration & Open Inbox</span>
+        <span class="btn-arrow">→</span>
+      </button>
     </div>
 
   </div>
 
-  <!-- ==================== MAIN SPIKE MAIL CONVERSATIONAL APP ==================== -->
-  <div id="app-container" class="app-wrapper">
+  <!-- ==================== MAIN INAI MOBILE WEBAPP ==================== -->
+  <div id="app-container" class="app-wrapper" style="display: none;">
 
-    <!-- Top WhatsApp Header -->
-    <div class="app-header">
+    <!-- Top Navigation App Bar (Desktop-Grade Polish) -->
+    <header class="app-header">
       <div class="header-left">
-        <button class="icon-btn" onclick="toggleDrawer()" aria-label="Menu">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        <button class="icon-btn" onclick="toggleDrawer()" aria-label="Menu" title="Menu">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        <span class="app-title">PhoneMail</span>
+        <div class="brand-cluster">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <span class="app-brand-name"><span class="saffron-text">IN</span><span class="green-text">AI</span></span>
+          <span class="tiranga-tag-mini">🇮🇳</span>
+        </div>
       </div>
-      <div class="header-right">
-        <button class="icon-btn" onclick="openProfileModal()" aria-label="Profile">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </button>
-      </div>
-    </div>
 
-    <!-- Search Bar & Filter Chips (Spike Mail Style) -->
+      <div class="header-right">
+        <!-- Real-Time Language Selector Dropdown -->
+        <div class="lang-dropdown-wrapper" style="position: relative;">
+          <button class="icon-btn" id="mob-lang-btn" onclick="toggleMobLangMenu(event)" title="Language & Translation">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span class="lang-pill" id="mob-current-lang-code">EN</span>
+          </button>
+          <div class="inai-lang-menu mob-lang-menu" id="mob-lang-menu" style="display: none;">
+            <button type="button" class="lang-menu-opt active" onclick="setInaiLanguage('en')">🇬🇧 English</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('hi')">🇮🇳 हिन्दी (Hindi)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('ta')">🇮🇳 தமிழ் (Tamil)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('te')">🇮🇳 తెలుగు (Telugu)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('kn')">🇮🇳 ಕನ್ನಡ (Kannada)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('bn')">🇮🇳 বাংলা (Bengali)</button>
+            <button type="button" class="lang-menu-opt" onclick="setInaiLanguage('es')">🇪🇸 Español</button>
+          </div>
+        </div>
+
+        <!-- Digital ID Card & Dynamic QR Modal Trigger -->
+        <button class="icon-btn" onclick="openDigitalIdModal()" title="Digital ID Card & QR Code" aria-label="Digital ID">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="17" y1="7" x2="17.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/><line x1="17" y1="17" x2="17.01" y2="17"/></svg>
+        </button>
+
+        <!-- User Profile Avatar Pill -->
+        <div class="user-avatar-small" onclick="toggleDrawer()" id="mob-user-avatar">
+          S
+        </div>
+      </div>
+    </header>
+
+    <!-- Search Bar & Mailbox Classification Tabs -->
     <div class="search-filter-section">
       <div class="search-bar-row">
         <span class="search-icon">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         </span>
-        <input type="text" id="chat-search" placeholder="Search phone number or email..." oninput="onSearchInput(this.value)">
+        <input type="text" id="chat-search" placeholder="Search phone numbers, contacts, subjects..." oninput="onSearchInput(this.value)">
       </div>
 
-      <!-- TWO TABS: Same App (PhoneMail) vs Another App (Gmail, Rediff, etc.) -->
+      <!-- Current Folder Heading & Floating Bulk Actions -->
+      <div class="mobile-subbar">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <label class="custom-checkbox" title="Select All">
+            <input type="checkbox" id="mob-select-all-check" onchange="toggleSelectAll(this)">
+            <span class="checkmark"></span>
+          </label>
+          <h2 class="mobile-folder-title" id="mob-folder-title">All Mail</h2>
+        </div>
+        <span class="mob-message-counter" id="mob-count-indicator">0 messages</span>
+      </div>
+
+      <!-- FLOATING BULK ACTIONS TOOLBAR ON MOBILE -->
+      <div class="bulk-actions-toolbar" id="mob-bulk-toolbar" style="display: none; margin: 4px 12px 8px;">
+        <span class="bulk-count-badge" id="mob-bulk-count-badge">0 selected</span>
+        <button type="button" class="bulk-act-btn" onclick="executeBulkAction('read')" title="Read">Read</button>
+        <button type="button" class="bulk-act-btn" onclick="executeBulkAction('important')" title="Important">⭐ Imp</button>
+        <button type="button" class="bulk-act-btn" onclick="executeBulkAction('archive')" title="Archive">Archive</button>
+        <button type="button" class="bulk-act-btn danger" onclick="executeBulkAction('delete')" title="Delete">Trash</button>
+        <button type="button" class="bulk-act-close" onclick="clearEmailSelection()">✕</button>
+      </div>
+
+      <!-- TWO TABS: Same App (INAI) vs Another App (Gmail, etc.) -->
       <div class="mobile-source-tabs">
         <button class="mob-source-tab active" id="mob-source-all" onclick="setMobileSourceFilter('all')">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          <span>All</span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span data-i18n="source_all">All Mail</span>
           <span class="mob-tab-badge" id="mob-count-all">0</span>
         </button>
         <button class="mob-source-tab" id="mob-source-phonemail" onclick="setMobileSourceFilter('phonemail')">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span>PhoneMail</span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span data-i18n="source_inai">INAI Network</span>
           <span class="mob-tab-badge mob-pm" id="mob-count-phonemail">0</span>
         </button>
         <button class="mob-source-tab" id="mob-source-external" onclick="setMobileSourceFilter('external')">
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-          <span>External (Gmail...)</span>
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span data-i18n="source_external">External (Gmail...)</span>
           <span class="mob-tab-badge mob-ext" id="mob-count-external">0</span>
         </button>
       </div>
-
-      <div class="filter-chips">
-        <button class="chip active" onclick="setFilter('all', this)">All</button>
-        <button class="chip" onclick="setFilter('unread', this)">Unread</button>
-        <button class="chip" onclick="setFilter('attachments', this)">Attachments</button>
-        <button class="chip" onclick="setFilter('starred', this)">Favorites</button>
-      </div>
     </div>
 
-    <!-- Unified Chat / Conversations List (Spike Mail) -->
+    <!-- Email List Stream (Grouped & Swipeable) -->
     <div class="chat-list" id="conversations-list">
-      <!-- Conversation items render here -->
+      <!-- Cards render dynamically via app.js -->
     </div>
 
-    <!-- Floating Action Button for Traditional Compose -->
+    <!-- Floating Action Button for Compose -->
     <button class="fab-compose" title="Compose New Email" onclick="openTraditionalCompose()">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
     </button>
 
   </div>
 
-  <!-- ==================== INSIDE CHAT / CONVERSATION VIEW (SPIKE MAIL) ==================== -->
-  <div id="chat-view-container" class="chat-view-wrapper">
+  <!-- ==================== MOBILE READING PANE VIEW ==================== -->
+  <div id="reading-pane" class="chat-view-wrapper" style="display: none;">
     <div class="chat-header">
-      <button class="icon-btn back-btn" onclick="closeChatView()" aria-label="Back">
+      <button class="icon-btn back-btn" onclick="closeReadingPane()" aria-label="Back">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       </button>
       <div class="chat-contact-info">
-        <div class="contact-name" id="chat-contact-name">+91 98765 43210</div>
-        <div class="contact-status" id="chat-contact-status">⚡ PhoneMail Verified</div>
+        <div class="contact-name" id="mob-read-sender">+91 98765 43210</div>
+        <div class="contact-status" id="mob-read-status">⚡ INAI Verified</div>
       </div>
       <div class="chat-header-actions">
-        <!-- WhatsApp Camera Slot used for Traditional Email Mode toggle -->
-        <button class="icon-btn camera-tab-toggle" title="Traditional Email Mode" onclick="toggleTraditionalInChat()">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <!-- AI Real-Time Translation -->
+        <button class="icon-btn" onclick="toggleMessageTranslation()" title="AI Real-Time Translation">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </button>
+        <!-- Mark as Important -->
+        <button class="icon-btn" id="mob-pane-important-btn" onclick="toggleCurrentImportant()" title="Mark Important">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+        <!-- Star Toggle -->
+        <button class="icon-btn" id="mob-pane-star-btn" onclick="toggleCurrentStar()" title="Star">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+        <!-- Delete -->
+        <button class="icon-btn danger" onclick="deleteCurrentEmail()" title="Move to Trash">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </button>
       </div>
     </div>
 
-    <!-- Compact Subject Bar right above messages -->
-    <div class="chat-subject-bar" id="chat-subject-bar">
-      <span>Subject:</span> <strong id="chat-subject-text">Welcome to AlphaStack!</strong>
+    <!-- Subject Banner -->
+    <div class="chat-subject-bar">
+      <span>Subject:</span> <strong id="mob-read-subject">Message Subject</strong>
     </div>
 
-    <!-- Chat Message Stream -->
-    <div class="chat-messages-stream" id="chat-messages-stream">
-      <!-- Bubbles render here -->
+    <!-- Reading Content Area -->
+    <div class="mobile-reading-card" id="mob-read-body-container">
+      <div class="reading-meta-row">
+        <div class="reading-avatar-pill" id="mob-read-avatar">U</div>
+        <div class="reading-meta-text">
+          <div class="reading-sender-name" id="mob-read-sender-full">Sender</div>
+          <div class="reading-date-line" id="mob-read-date">Today at 12:30 PM</div>
+        </div>
+      </div>
+      <div class="mobile-body-content" id="mob-read-body">
+        Email contents will be displayed here...
+      </div>
     </div>
 
-    <!-- Quoted Message Preview Bar (Swipe right reply) -->
-    <div class="quote-preview-bar" id="quote-preview-bar" style="display: none;">
-      <div class="quote-content" id="quote-preview-text">Replying to message...</div>
-      <button class="close-quote-btn" onclick="cancelQuote()">✕</button>
-    </div>
-
-    <!-- Message Input Box with Compact Subject Field -->
+    <!-- Quick Action Dock (Reply / Forward) -->
     <div class="chat-input-bar">
-      <input type="text" id="chat-message-input" placeholder="Type a message..." onkeydown="if(event.key==='Enter') sendChatMessage()">
-      <button class="send-btn" onclick="sendChatMessage()" aria-label="Send">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      <button type="button" class="btn-dock-mob" onclick="openReplyCompose()">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+        <span>Reply</span>
+      </button>
+      <button type="button" class="btn-dock-mob" onclick="openReplyCompose(true)">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+        <span>Forward</span>
+      </button>
+      <button type="button" class="btn-dock-mob" onclick="archiveCurrentEmail()">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        <span>Archive</span>
       </button>
     </div>
   </div>
 
-  <!-- ==================== TRADITIONAL COMPOSE MODAL ==================== -->
-  <div id="traditional-modal" class="modal-wrapper">
+  <!-- ==================== COMPOSE MODAL (STANDALONE CONTACT FETCH) ==================== -->
+  <div id="traditional-modal" class="modal-wrapper" style="display: none;">
     <div class="modal-card">
       <div class="modal-header">
-        <h3 id="trad-modal-title">New Email</h3>
+        <h3 id="trad-modal-title">New Message</h3>
         <button class="close-modal-btn" onclick="closeTraditionalCompose()">✕</button>
       </div>
       <div class="modal-body">
         <div class="trad-field" style="position: relative;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-            <label style="margin-bottom: 0;">To:</label>
-            <button type="button" id="mob-pick-contacts-btn" onclick="pickMobileDeviceContacts()" style="font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 6px; border: 1px solid #cbd5e1; background: #f8fafc; color: #334155; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Automatically fetch or sync contacts from your device">
-              <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              <span>Sync Contacts</span>
-            </button>
-          </div>
-          <input type="text" id="trad-to" placeholder="Phone number (e.g. 9845012345) or email" autocomplete="off">
+          <label style="margin-bottom: 5px; font-size: 11px; font-weight: 700; color: #64748b;">TO (RECIPIENT)</label>
+          <input type="text" id="trad-to" placeholder="Type phone number or email (e.g. user@gmail.com)" autocomplete="off">
           <div id="mobile-contacts-picker" class="mobile-contacts-picker" style="display: none;"></div>
         </div>
         <div class="trad-field">
-          <label>Subject:</label>
+          <label style="margin-bottom: 5px; font-size: 11px; font-weight: 700; color: #64748b;">SUBJECT</label>
           <input type="text" id="trad-subject" placeholder="Subject">
         </div>
         <div class="trad-field">
-          <textarea id="trad-body" rows="6" placeholder="Compose email..."></textarea>
+          <textarea id="trad-body" rows="6" placeholder="Type your message here..."></textarea>
         </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeTraditionalCompose()">Discard</button>
-        <button class="btn-wa-green" onclick="submitTraditionalCompose()">Send Email</button>
+        <button class="btn-primary-mobile" onclick="submitTraditionalCompose()">Send Message</button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== PROFILE & ALIASES MODAL ==================== -->
-  <div id="profile-modal" class="modal-wrapper">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3>Account & Alias Settings</h3>
-        <button class="close-modal-btn" onclick="closeProfileModal()">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="profile-hero">
-          <div class="profile-avatar-large">
-            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <h4 id="profile-name">Soumith V</h4>
-          <p id="profile-email">+91 98765 43210</p>
-        </div>
-
-        <!-- Digital ID QR Card for Village / Offline Users -->
-        <div class="qr-card-box">
-          <div class="qr-header">Digital PhoneMail ID Card</div>
-          <div class="qr-code-placeholder">
-            <div style="font-size: 28px;">
-              <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            </div>
-            <div style="font-weight: 700; margin-top: 4px;" id="mob-digital-phone">+91 98765 43210</div>
-            <div style="font-size: 11px; opacity: 0.8;">Scan or share at banks & govt offices</div>
-          </div>
-        </div>
-
-        <!-- Manage Alias IDs (Sub-Numbers) -->
-        <div class="aliases-section">
-          <h4>Manage Alias IDs (Sub-Numbers)</h4>
-          <p style="font-size: 12px; color: #667781; margin-bottom: 8px;">Create extensions for family members or work without extra phone numbers.</p>
-          <div id="aliases-list">
-            <!-- Aliases render here -->
-          </div>
-          <div class="add-alias-row">
-            <input type="text" id="new-alias-tag" placeholder="Tag (e.g. 1, son, work)">
-            <input type="text" id="new-alias-label" placeholder="Label">
-            <button class="btn-wa-green" style="padding: 8px 12px; font-size: 12px;" onclick="addAlias()">+ Add</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Left Drawer Navigation -->
+  <!-- ==================== SLIDING SIDEBAR DRAWER NAVIGATION ==================== -->
   <div id="drawer-menu" class="drawer-wrapper" onclick="toggleDrawer()">
     <div class="drawer-content" onclick="event.stopPropagation()">
       <div class="drawer-header">
-        <div class="profile-avatar-small">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        </div>
-        <div style="font-weight: 700;" id="drawer-username">Soumith V</div>
-        <div style="font-size: 12px; opacity: 0.8;" id="drawer-email">+91 98765 43210</div>
+        <div class="profile-avatar-small" id="mob-drawer-avatar">S</div>
+        <div style="font-weight: 800; font-size: 15px;" id="drawer-username">Soumith</div>
+        <div style="font-size: 12.5px; opacity: 0.9; font-family: monospace;" id="drawer-email">+91 98765 43210</div>
+        <div class="drawer-status-tag">⚡ INAI VERIFIED</div>
       </div>
+
       <div class="drawer-items">
-        <div class="drawer-item active" onclick="toggleDrawer()">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
-          Home (Unified Chats)
+        <div class="drawer-section-title" data-i18n="mailboxes">MAILBOXES</div>
+        
+        <div class="drawer-item active" onclick="switchMobileFolder('ALL', this)" id="mob-nav-all">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          <span data-i18n="all_mail">All Mail</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('INBOX', this)" id="mob-nav-inbox">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
+          <span data-i18n="inbox">Inbox</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('IMPORTANT', this)" id="mob-nav-important">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span data-i18n="important" style="color: #b45309; font-weight: 700;">Important</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('STARRED', this)" id="mob-nav-starred">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span data-i18n="starred">Starred</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('SENT', this)" id="mob-nav-sent">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          <span data-i18n="sent">Sent</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('DRAFTS', this)" id="mob-nav-drafts">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span data-i18n="drafts">Drafts</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('ARCHIVE', this)" id="mob-nav-archive">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          <span data-i18n="archive">Archive</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('SPAM', this)" id="mob-nav-spam">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span data-i18n="spam">Spam</span>
+        </div>
+        <div class="drawer-item" onclick="switchMobileFolder('TRASH', this)" id="mob-nav-trash">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+          <span data-i18n="trash">Trash</span>
+        </div>
+
+        <div class="drawer-divider"></div>
+        <div class="drawer-section-title">ACCOUNT & TOOLS</div>
+
+        <div class="drawer-item" onclick="openDigitalIdModal(); toggleDrawer();">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Digital ID Card & QR</span>
         </div>
         <a href="/desktop/" class="drawer-item" style="text-decoration: none; color: inherit;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          Desktop Webmail
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Switch to Desktop View</span>
         </a>
-        <div class="drawer-item" onclick="openProfileModal(); toggleDrawer();">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-          Settings & Sub-Numbers
+        <div class="drawer-item" onclick="logoutMobile(); toggleDrawer();" style="color: #ef4444;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign Out</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ONE-TIME CONTACT SYNC PERMISSION MODAL -->
-  <div id="contact-sync-modal" class="app-dialog-overlay" style="display: none;">
-    <div class="app-dialog-card" style="max-width: 360px; text-align: center; padding: 22px;">
-      <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(4, 106, 56, 0.12); color: #046A38; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
-        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  <!-- ==================== DIGITAL ID CARD & DYNAMIC QR MODAL ==================== -->
+  <div id="digital-id-modal" class="id-card-modal-overlay" style="display: none;" onclick="closeDigitalIdModal(event)">
+    <div class="id-card-dialog" onclick="event.stopPropagation()">
+      <div class="id-card-top-bar">
+        <div class="id-card-header-badge">
+          <span class="online-dot"></span>
+          <span>OFFICIAL INAI DIGITAL MAIL ID</span>
+        </div>
+        <button class="close-modal-btn" onclick="closeDigitalIdModal()">✕</button>
       </div>
-      <h3 style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">Real-Time Contact Sync</h3>
-      <p style="font-size: 13px; color: #64748b; line-height: 1.45; margin-bottom: 18px;">
-        Allow PhoneMail to discover your contacts on PhoneMail in real time. We will only ask for this permission once!
-      </p>
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <button type="button" class="btn-wa-green full-width" onclick="acceptOneTimeContactSync()" style="height: 42px; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>Allow & Sync Contacts</span>
+
+      <!-- Luxury Smart Mail Card -->
+      <div class="smart-mail-card" id="smart-mail-card">
+        <div class="smart-card-shimmer"></div>
+        <div class="smart-card-top">
+          <div class="chip-hologram">
+            <div class="chip-line"></div>
+          </div>
+          <div class="smart-card-brand">
+            <span class="saffron-text">IN</span><span class="green-text">AI</span>
+            <span class="country-tag">🇮🇳 BHARAT</span>
+          </div>
+        </div>
+
+        <div class="smart-card-middle">
+          <div class="smart-card-meta">
+            <div class="card-holder-name" id="id-card-name">Soumith</div>
+            <div class="card-holder-phone" id="id-card-phone">+91 93815 64959</div>
+            <div class="card-holder-email" id="id-card-email">9381564959@alphastack.wwisvnr.com</div>
+          </div>
+          <div class="smart-card-qr-box">
+            <img id="id-card-qr-img" src="" alt="Scan to send email" width="95" height="95">
+          </div>
+        </div>
+
+        <div class="smart-card-bottom">
+          <div class="card-protocol-text">SECURE PHONE-POWERED PROTOCOL</div>
+          <div class="card-status-verified">⚡ 100% VERIFIED IDENTITY</div>
+        </div>
+      </div>
+
+      <div class="id-card-actions-row">
+        <button type="button" class="btn-primary-mobile full-width" onclick="copyIdCardEmail()" id="btn-copy-id">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="btn-copy-id-text">Copy Mail ID</span>
         </button>
-        <button type="button" class="action-btn" onclick="declineOneTimeContactSync()" style="height: 36px; color: #64748b; justify-content: center; border: none; background: transparent; font-size: 13px;">
-          <span>Maybe Later</span>
+        <button type="button" class="btn-dock-mob share-btn" onclick="shareDigitalIdCard()" id="btn-share-id" title="Share your INAI Card">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          <span>Share</span>
         </button>
       </div>
     </div>

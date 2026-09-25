@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS emails (
   has_replied INT DEFAULT 0,
   is_read INT DEFAULT 0,
   is_starred INT DEFAULT 0,
+  is_important INT DEFAULT 0,
   folder VARCHAR(32) DEFAULT 'INBOX',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE

@@ -82,38 +82,64 @@ router.get('/conversations/:id', async (req, res) => {
  */
 router.get('/emails', async (req, res) => {
   try {
-    const folder = req.query.folder || 'INBOX';
+    const folder = (req.query.folder || 'INBOX').toUpperCase();
     const userPhone = req.query.phone;
     if (!userPhone) return res.json({ emails: [] });
     const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
 
     let emails;
-    if (folder.toUpperCase() === 'SENT') {
+    if (folder === 'ALL') {
+      // Show ALL emails: inbound, outbound sent, and alias/sub-number mails
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
-        WHERE sender_email LIKE ? AND folder != 'TRASH'
+        WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) AND folder != 'TRASH'
+        ORDER BY is_important DESC, created_at DESC
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    } else if (folder === 'IMPORTANT') {
+      emails = await dbOps.queryAll(`
+        SELECT * FROM emails 
+        WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+          AND is_important = 1 AND folder != 'TRASH'
         ORDER BY created_at DESC
-      `, [`%${cleanPhone}%`]);
-    } else if (folder.toUpperCase() === 'STARRED') {
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    } else if (folder === 'STARRED') {
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
         WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
           AND is_starred = 1 AND folder != 'TRASH'
         ORDER BY created_at DESC
       `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
-    } else if (folder.toUpperCase() === 'TRASH' || folder.toUpperCase() === 'SPAM') {
+    } else if (folder === 'SENT') {
+      emails = await dbOps.queryAll(`
+        SELECT * FROM emails 
+        WHERE sender_email LIKE ? AND folder != 'TRASH'
+        ORDER BY created_at DESC
+      `, [`%${cleanPhone}%`]);
+    } else if (folder === 'DRAFTS') {
+      emails = await dbOps.queryAll(`
+        SELECT * FROM emails 
+        WHERE (sender_email LIKE ? OR recipient_emails LIKE ?) AND folder = 'DRAFTS'
+        ORDER BY created_at DESC
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    } else if (folder === 'ARCHIVE') {
+      emails = await dbOps.queryAll(`
+        SELECT * FROM emails 
+        WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) AND folder = 'ARCHIVE'
+        ORDER BY created_at DESC
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    } else if (folder === 'TRASH' || folder === 'SPAM') {
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
         WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
           AND folder = ? 
         ORDER BY created_at DESC
-      `, [`%${cleanPhone}%`, `%${cleanPhone}%`, folder.toUpperCase()]);
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`, folder]);
     } else {
-      // INBOX
+      // Default: INBOX (prioritize important items)
       emails = await dbOps.queryAll(`
         SELECT * FROM emails 
-        WHERE recipient_emails LIKE ? AND folder = 'INBOX'
-        ORDER BY created_at DESC
+        WHERE recipient_emails LIKE ? AND (folder = 'INBOX' OR folder IS NULL)
+        ORDER BY is_important DESC, created_at DESC
       `, [`%${cleanPhone}%`]);
     }
 
@@ -160,6 +186,55 @@ router.post('/emails/:id/star', async (req, res) => {
     const newStarred = email.is_starred === 1 ? 0 : 1;
     await dbOps.execute('UPDATE emails SET is_starred = ? WHERE id = ?', [newStarred, id]);
     res.json({ success: true, is_starred: newStarred });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Toggle Important / Priority
+ */
+router.post('/emails/:id/important', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const email = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [id]);
+    if (!email) return res.status(404).json({ error: 'Email not found' });
+
+    const newImportant = email.is_important === 1 ? 0 : 1;
+    await dbOps.execute('UPDATE emails SET is_important = ? WHERE id = ?', [newImportant, id]);
+    res.json({ success: true, is_important: newImportant });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Bulk action on emails (delete, archive, read, unread, star, important, move)
+ */
+router.post('/emails/bulk', async (req, res) => {
+  try {
+    const { ids, action, targetFolder } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'Email IDs required' });
+    }
+    const placeholders = ids.map(() => '?').join(',');
+
+    if (action === 'delete') {
+      await dbOps.execute(`UPDATE emails SET folder = 'TRASH' WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'archive') {
+      await dbOps.execute(`UPDATE emails SET folder = 'ARCHIVE' WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'read') {
+      await dbOps.execute(`UPDATE emails SET is_read = 1 WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'unread') {
+      await dbOps.execute(`UPDATE emails SET is_read = 0 WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'star') {
+      await dbOps.execute(`UPDATE emails SET is_starred = 1 WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'important') {
+      await dbOps.execute(`UPDATE emails SET is_important = 1 WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'move' && targetFolder) {
+      await dbOps.execute(`UPDATE emails SET folder = ? WHERE id IN (${placeholders})`, [targetFolder.toUpperCase(), ...ids]);
+    }
+    res.json({ success: true, count: ids.length, action });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

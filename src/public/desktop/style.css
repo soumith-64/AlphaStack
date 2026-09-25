@@ -1311,24 +1311,75 @@ button {
 
 .custom-checkbox {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
+  width: 18px;
+  height: 18px;
+  user-select: none;
 }
 
-.custom-checkbox input { opacity: 0; position: absolute; }
+.custom-checkbox input {
+  opacity: 0;
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 .checkmark {
   display: inline-block;
+  position: relative;
   width: 17px;
   height: 17px;
-  border: 1.5px solid var(--text-dim);
+  border: 1.8px solid var(--text-dim, #94a3b8);
   border-radius: 4px;
-  background: var(--bg-surface);
+  background: var(--bg-surface, #ffffff);
   transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.custom-checkbox:hover .checkmark {
+  border-color: var(--green-main, #046A38);
 }
 
 .custom-checkbox input:checked ~ .checkmark {
-  background: var(--green-main);
-  border-color: var(--green-main);
+  background: var(--green-main, #046A38);
+  border-color: var(--green-main, #046A38);
+}
+
+.checkmark::after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border: solid #ffffff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.custom-checkbox input:checked ~ .checkmark::after {
+  display: block;
+}
+
+.custom-checkbox input:indeterminate ~ .checkmark {
+  background: var(--green-main, #046A38);
+  border-color: var(--green-main, #046A38);
+}
+
+.custom-checkbox input:indeterminate ~ .checkmark::after {
+  display: block;
+  left: 3px;
+  top: 6px;
+  width: 8px;
+  height: 0px;
+  border: solid #ffffff;
+  border-width: 0 0 2px 0;
+  transform: none;
 }
 
 .folder-header-title {
@@ -2076,6 +2127,33 @@ button {
 .sidebar-backdrop.active {
   display: block;
 }
+/* Desktop Sidebar Collapse */
+@media (min-width: 901px) {
+  .sidebar-panel.collapsed {
+    width: 72px;
+    min-width: 72px;
+  }
+  .sidebar-panel.collapsed .compose-text,
+  .sidebar-panel.collapsed .compose-kbd,
+  .sidebar-panel.collapsed .sidebar-group-title,
+  .sidebar-panel.collapsed .nav-label,
+  .sidebar-panel.collapsed .nav-badge,
+  .sidebar-panel.collapsed .alias-chips-container {
+    display: none !important;
+  }
+  .sidebar-panel.collapsed .btn-compose {
+    padding: 0;
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+    border-radius: 50%;
+    margin: 0 auto 12px;
+  }
+  .sidebar-panel.collapsed .nav-item {
+    justify-content: center;
+    padding: 10px 0;
+  }
+}
 
 /* Tablet & Mobile Screens (<= 900px) */
 @media (max-width: 900px) {
@@ -2592,4 +2670,497 @@ button {
   padding: 6px 12px;
   border-radius: 20px;
 }
+
+/* ==================== BULK ACTIONS FLOATING TOOLBAR ==================== */
+.bulk-actions-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-surface, #ffffff);
+  border: 1.5px solid var(--green-main, #046A38);
+  border-radius: 12px;
+  padding: 4px 10px;
+  box-shadow: 0 4px 16px rgba(4, 106, 56, 0.18);
+  animation: slideDownBulk 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+}
+
+@keyframes slideDownBulk {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bulk-count-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--green-main, #046A38);
+  background: rgba(4, 106, 56, 0.1);
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.bulk-act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-subtle, #f8fafc);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bulk-act-btn:hover {
+  background: var(--border-light, #e2e8f0);
+}
+
+.bulk-act-btn.danger {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.bulk-act-btn.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.bulk-act-close {
+  background: none;
+  border: none;
+  color: var(--text-dim, #94a3b8);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.bulk-act-close:hover {
+  color: var(--text-main, #0f172a);
+  background: var(--bg-subtle, #f8fafc);
+}
+
+/* ==================== DATE GROUPING HEADERS ==================== */
+.email-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 16px;
+  background: var(--bg-subtle, #f8fafc);
+  border-top: 1px solid var(--border-light, #e2e8f0);
+  border-bottom: 1px solid var(--border-light, #e2e8f0);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted, #64748b);
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.email-group-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.email-group-count {
+  font-size: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+/* ==================== SWIPE & HOVER ROW ACTIONS ==================== */
+.email-card-item {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
+}
+
+.email-card-item.selected {
+  background-color: rgba(4, 106, 56, 0.08) !important;
+}
+
+.email-card-item.is-important {
+  border-left: 3.5px solid #eab308 !important;
+}
+
+.email-checkbox-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.item-important-icon {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  color: var(--text-dim, #94a3b8);
+  display: inline-flex;
+  align-items: center;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.item-important-icon:hover {
+  transform: scale(1.18);
+  color: #eab308;
+}
+
+.item-important-icon.important {
+  color: #eab308 !important;
+}
+
+/* Row Hover Action Buttons on Desktop */
+.row-quick-actions {
+  display: none;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface, #ffffff);
+  padding: 3px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-light, #e2e8f0);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  z-index: 5;
+}
+
+.email-card-item:hover .row-quick-actions {
+  display: flex;
+}
+
+.quick-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.quick-action-btn:hover {
+  background: var(--bg-subtle, #f8fafc);
+  color: var(--text-main, #0f172a);
+}
+
+.quick-action-btn.danger:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Touch Swipe Action Containers underneath row */
+.swipe-actions-container {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  pointer-events: none;
+}
+
+.swipe-left-reveal {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.swipe-right-reveal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.swipe-btn {
+  width: 58px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  gap: 2px;
+  border: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.swipe-btn.archive { background: #046A38; }
+.swipe-btn.delete { background: #ef4444; }
+.swipe-btn.important { background: #eab308; }
+.swipe-btn.star { background: #f59e0b; }
+
+/* ==================== LANGUAGE SELECTOR DROPDOWN ==================== */
+.lang-dropdown-wrapper {
+  position: relative;
+}
+
+.lang-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.lang-code-pill {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--green-main, #046A38);
+  background: rgba(4, 106, 56, 0.1);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.inai-lang-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  background: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-light, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.12);
+  min-width: 175px;
+  padding: 6px;
+  z-index: 1000;
+  animation: popInLang 0.15s ease;
+}
+
+@keyframes popInLang {
+  from { opacity: 0; transform: translateY(-5px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.lang-menu-opt {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-main, #0f172a);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.12s ease;
+}
+
+.lang-menu-opt:hover {
+  background: var(--bg-subtle, #f8fafc);
+  color: var(--green-main, #046A38);
+}
+
+.lang-menu-opt.active {
+  background: rgba(4, 106, 56, 0.08);
+  color: var(--green-main, #046A38);
+  font-weight: 700;
+}
+
+/* ==================== DIGITAL ID CARD MODAL ==================== */
+.id-card-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+}
+
+.id-card-dialog {
+  background: var(--bg-surface, #ffffff);
+  border-radius: 24px;
+  border: 1px solid var(--border-light, #e2e8f0);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+  max-width: 440px;
+  width: 100%;
+  padding: 24px;
+  animation: popCard 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popCard {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.id-card-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.id-card-header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: var(--green-main, #046A38);
+}
+
+/* Realistic Plastic Smart ID Card */
+.smart-mail-card {
+  position: relative;
+  background: linear-gradient(135deg, #064e2e 0%, #032a18 55%, #0f172a 100%);
+  color: #ffffff;
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: 0 16px 36px rgba(4, 106, 56, 0.3), inset 0 1px 1px rgba(255,255,255,0.25);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.smart-card-shimmer {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.08) 50%, transparent 60%);
+  pointer-events: none;
+}
+
+.smart-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.chip-hologram {
+  width: 38px;
+  height: 28px;
+  background: linear-gradient(135deg, #d4af37, #f7e28b, #b8860b);
+  border-radius: 6px;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.chip-line {
+  position: absolute;
+  background: rgba(0,0,0,0.2);
+  width: 100%;
+  height: 1px;
+  top: 14px;
+}
+
+.smart-card-brand {
+  font-size: 17px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.smart-card-brand .country-tag {
+  font-size: 10px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.smart-card-middle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.smart-card-meta {
+  flex: 1;
+}
+
+.card-holder-name {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.card-holder-phone {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #ff9933;
+  margin-bottom: 4px;
+  font-family: monospace;
+}
+
+.card-holder-email {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.85);
+  word-break: break-all;
+  font-family: monospace;
+}
+
+.smart-card-qr-box {
+  background: #ffffff;
+  padding: 6px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  flex-shrink: 0;
+}
+
+.smart-card-qr-box img {
+  border-radius: 6px;
+  display: block;
+}
+
+.smart-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: rgba(255, 255, 255, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: 12px;
+}
+
+.id-card-actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
 
