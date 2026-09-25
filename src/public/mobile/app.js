@@ -37,6 +37,7 @@ function saveMobileSession(user) {
   if (remember) {
     localStorage.setItem('phonemail-mobile-user', str);
     localStorage.setItem('phonemail-user', str);
+    if (user.phone) localStorage.setItem('phonemail_saved_phone', user.phone);
   }
   sessionStorage.setItem('phonemail-mobile-user', str);
 }
@@ -265,6 +266,7 @@ window.phoneEmailListener = async (userObj) => {
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
       showNotify.success(`Welcome to PhoneMail, ${currentUser.name}!`, 'Signed In');
+      checkOneTimeContactSyncPrompt();
     } else {
       showNotify.error(data.error || 'Failed to authenticate phone number with Phone.Email', 'Auth Error');
     }
@@ -335,6 +337,65 @@ window.addEventListener('message', (event) => {
 let mobileCountdownTimer = null;
 let mobileCountdownSeconds = 45;
 let mobileLiveOtp = '';
+let mobileWebOtpAbortController = null;
+
+// Phone number auto-detection for simple mobile login
+function autoDetectMobilePhone() {
+  const phoneInput = document.getElementById('mobile-phone-input');
+  if (!phoneInput) return;
+
+  const savedPhone = localStorage.getItem('phonemail_saved_phone') || (currentUser && currentUser.phone);
+  if (savedPhone) {
+    const clean = savedPhone.replace(/\D/g, '').slice(-10);
+    phoneInput.value = clean;
+    showNotify.info(`Auto-detected phone number: +91 ${clean}`, 'Number Detected');
+    phoneInput.focus();
+  }
+}
+
+// WebOTP API: Automatic SMS OTP detection for mobile devices
+async function startWebOtpDetection(onOtpReceived) {
+  if (!('OTPCredential' in window) && !('credentials' in navigator)) {
+    console.log('WebOTP not natively supported on this browser');
+    return;
+  }
+
+  try {
+    if (mobileWebOtpAbortController) {
+      mobileWebOtpAbortController.abort();
+    }
+    mobileWebOtpAbortController = new AbortController();
+
+    const badge = document.getElementById('mob-webotp-badge');
+    if (badge) badge.style.display = 'flex';
+
+    const content = await navigator.credentials.get({
+      otp: { transport: ['sms'] },
+      signal: mobileWebOtpAbortController.signal
+    });
+
+    if (content && content.code) {
+      console.log('⚡ [WebOTP] Mobile intercepted OTP code:', content.code);
+      const cleanCode = content.code.replace(/\D/g, '').slice(0, 6);
+      if (cleanCode.length === 6) {
+        showNotify.success('OTP code detected automatically from SMS!', 'WebOTP Auto-Detected');
+        const cells = document.querySelectorAll('.otp-digit');
+        cleanCode.split('').forEach((d, i) => {
+          if (cells[i]) {
+            cells[i].value = d;
+            cells[i].classList.add('filled');
+            cells[i].classList.remove('error');
+          }
+        });
+        if (onOtpReceived) onOtpReceived(cleanCode);
+      }
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.log('WebOTP mobile listener notice:', err.message);
+    }
+  }
+}
 
 function initMobileOtpInputs() {
   const cells = document.querySelectorAll('.otp-digit');
@@ -342,8 +403,24 @@ function initMobileOtpInputs() {
 
   cells.forEach((cell, idx) => {
     cell.addEventListener('input', (e) => {
-      const val = cell.value.replace(/\D/g, '');
-      cell.value = val ? val.slice(-1) : '';
+      const rawVal = cell.value.replace(/\D/g, '');
+
+      // Single-cell full 6-digit autofill (iOS QuickType / Android autofill)
+      if (rawVal.length === 6) {
+        rawVal.split('').forEach((d, i) => {
+          if (cells[i]) {
+            cells[i].value = d;
+            cells[i].classList.add('filled');
+            cells[i].classList.remove('error');
+          }
+        });
+        cells[5].focus();
+        verifyOTP(rawVal);
+        return;
+      }
+
+      const val = rawVal ? rawVal.slice(-1) : '';
+      cell.value = val;
 
       if (cell.value) {
         cell.classList.add('filled');
@@ -431,6 +508,7 @@ async function requestOTP() {
       }
       clearMobileOtp();
       startMobileTimer();
+      startWebOtpDetection(verifyOTP);
     } else {
       showNotify.error(data.error || 'Failed to dispatch verification code', 'OTP Error');
     }
@@ -562,6 +640,9 @@ async function verifyOTP(otp) {
 
     if (res.ok && data.success) {
       if (mobileCountdownTimer) clearInterval(mobileCountdownTimer);
+      if (mobileWebOtpAbortController) {
+        try { mobileWebOtpAbortController.abort(); } catch (e) {}
+      }
 
       currentUser = {
         phone: data.user.phone_number,
@@ -578,6 +659,7 @@ async function verifyOTP(otp) {
         saveMobileSession(currentUser);
         document.getElementById('onboarding-container').style.display = 'none';
         initMainApp();
+        checkOneTimeContactSyncPrompt();
       }
     } else {
       triggerMobileShake(data.error || 'Invalid verification code');
@@ -648,11 +730,129 @@ async function completeMobileProfile() {
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
       showNotify.success(`Welcome to PhoneMail, ${currentUser.name}!`, 'Registered');
+      checkOneTimeContactSyncPrompt();
     } else {
       showNotify.error(data.error || 'Failed to complete profile', 'Registration Error');
     }
   } catch (err) {
     showNotify.error('Error saving profile: ' + err.message, 'Server Error');
+  }
+}
+
+// ==================== ONE-TIME CONTACT SYNC & REAL-TIME DISCOVERY (MOBILE) ====================
+let mobileRealtimeSyncInterval = null;
+
+function checkOneTimeContactSyncPrompt() {
+  const perm = localStorage.getItem('phonemail_contact_sync_permission');
+  if (perm === 'granted') {
+    startRealtimeContactSync();
+    return;
+  }
+  if (perm === 'declined') {
+    return;
+  }
+
+  const modal = document.getElementById('contact-sync-modal');
+  if (modal) {
+    modal.style.display = 'flex';
+  }
+}
+
+async function acceptOneTimeContactSync() {
+  const modal = document.getElementById('contact-sync-modal');
+  if (modal) modal.style.display = 'none';
+
+  localStorage.setItem('phonemail_contact_sync_permission', 'granted');
+
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const selected = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+      if (selected && selected.length > 0) {
+        const rawPhones = [];
+        const namesMap = {};
+        selected.forEach(c => {
+          const name = Array.isArray(c.name) ? c.name[0] : (c.name || '');
+          if (c.tel) {
+            c.tel.forEach(t => {
+              const clean = String(t).replace(/\D/g, '').slice(-10);
+              if (clean.length === 10) {
+                rawPhones.push(clean);
+                if (name) namesMap[clean] = name;
+              }
+            });
+          }
+        });
+
+        localStorage.setItem('phonemail_raw_device_numbers', JSON.stringify(rawPhones));
+        localStorage.setItem('phonemail_cached_device_names', JSON.stringify(namesMap));
+        showNotify.success('Contacts synced! Real-time contact discovery active.', 'Sync Enabled');
+      }
+    } catch (err) {
+      console.log('Mobile contact selection error:', err.message);
+    }
+  } else {
+    showNotify.info('Real-time contact discovery activated for registered PhoneMail users.', 'Sync Enabled');
+  }
+
+  startRealtimeContactSync();
+  await syncContactsRealtime(false);
+}
+
+function declineOneTimeContactSync() {
+  const modal = document.getElementById('contact-sync-modal');
+  if (modal) modal.style.display = 'none';
+  localStorage.setItem('phonemail_contact_sync_permission', 'declined');
+}
+
+function startRealtimeContactSync() {
+  if (mobileRealtimeSyncInterval) clearInterval(mobileRealtimeSyncInterval);
+  syncContactsRealtime(true);
+  mobileRealtimeSyncInterval = setInterval(() => {
+    syncContactsRealtime(true);
+  }, 45000);
+}
+
+async function syncContactsRealtime(silent = true) {
+  const perm = localStorage.getItem('phonemail_contact_sync_permission');
+  if (perm !== 'granted') return;
+
+  let rawPhones = [];
+  try {
+    rawPhones = JSON.parse(localStorage.getItem('phonemail_raw_device_numbers') || '[]');
+  } catch (e) {}
+
+  let namesMap = {};
+  try {
+    namesMap = JSON.parse(localStorage.getItem('phonemail_cached_device_names') || '{}');
+  } catch (e) {}
+
+  if (rawPhones.length === 0) return;
+
+  try {
+    const res = await fetch('/api/contacts/filter-phonemail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumbers: rawPhones })
+    });
+    const data = await res.json();
+    const registered = data.registeredContacts || [];
+
+    registered.forEach(r => {
+      if (namesMap[r.phone_number] && (!r.display_name || r.display_name.startsWith('User '))) {
+        r.device_name = namesMap[r.phone_number];
+      }
+    });
+
+    const previousCount = cachedDeviceContacts.length;
+    cachedDeviceContacts = registered;
+    localStorage.setItem('phonemail_cached_device_contacts', JSON.stringify(registered));
+
+    if (!silent && registered.length > previousCount && previousCount > 0) {
+      const diff = registered.length - previousCount;
+      showNotify.info(`Found ${diff} new contact(s) on PhoneMail!`, 'Real-time Contact Sync');
+    }
+  } catch (err) {
+    console.log('Mobile real-time contact sync check:', err.message);
   }
 }
 
@@ -668,6 +868,7 @@ function loadPhoneEmailScript() {
 document.addEventListener('DOMContentLoaded', () => {
   loadPhoneEmailScript();
   initMobileOtpInputs();
+  autoDetectMobilePhone();
 });
 
 // ==================== NOTIFICATION CHIME & TOAST ====================
@@ -743,12 +944,24 @@ function initMainApp() {
         openConversation(activeConversation.id);
       }
     });
+
+    socket.on('contacts:sync', () => {
+      syncContactsRealtime(true);
+    });
   } catch (e) {
     console.warn('Socket init notice:', e);
   }
 
   setupMobileContactsPicker();
   loadConversations();
+
+  // Initialize Real-Time Contact Sync
+  const perm = localStorage.getItem('phonemail_contact_sync_permission');
+  if (perm === 'granted') {
+    startRealtimeContactSync();
+  } else if (!perm) {
+    setTimeout(checkOneTimeContactSyncPrompt, 1500);
+  }
 }
 
 async function loadConversations() {
@@ -1051,9 +1264,13 @@ async function pickMobileDeviceContacts() {
         if (registered.length === 0) {
           showNotify.info('None of the selected device contacts are registered on PhoneMail yet.', 'No Matches');
         } else {
+          // Cache in localStorage for automatic future auto-completion & real-time sync
           try {
             localStorage.setItem('phonemail_cached_device_contacts', JSON.stringify(registered));
+            localStorage.setItem('phonemail_contact_sync_permission', 'granted');
+            localStorage.setItem('phonemail_raw_device_numbers', JSON.stringify(rawPhones));
             cachedDeviceContacts = registered;
+            startRealtimeContactSync();
           } catch (e) {}
 
           if (registered.length === 1) {

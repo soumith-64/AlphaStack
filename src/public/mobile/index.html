@@ -76,7 +76,30 @@
         <p>Sign in instantly with your verified phone number to access your unified PhoneMail inbox.</p>
       </div>
 
-      <div class="phonemail-hero-container" style="margin-top: 14px;">
+      <!-- Direct Phone Input with Auto-detection -->
+      <div class="mobile-phone-card" style="margin-top: 14px;">
+        <label class="mobile-phone-label" style="display: block; font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 6px; letter-spacing: 0.5px;">YOUR MOBILE NUMBER</label>
+        <div class="mobile-phone-input-row" style="display: flex; align-items: center; background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 4px 6px 4px 12px; gap: 8px;">
+          <span style="font-size: 14px; font-weight: 700; color: #0f172a; white-space: nowrap;">🇮🇳 +91</span>
+          <input type="tel" id="mobile-phone-input" style="flex: 1; border: none; background: transparent; font-size: 15px; font-weight: 600; color: #0f172a; outline: none; padding: 6px 0;" placeholder="Enter 10-digit number" autocomplete="tel" maxlength="10" inputmode="numeric">
+          <button type="button" id="mob-detect-btn" onclick="autoDetectMobilePhone()" style="display: inline-flex; align-items: center; gap: 4px; background: rgba(4, 106, 56, 0.08); border: 1px solid rgba(4, 106, 56, 0.2); color: #046A38; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px; cursor: pointer;" title="Auto-detect phone number">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Auto-fill</span>
+          </button>
+        </div>
+        <button type="button" class="btn-wa-green full-width" style="margin-top: 10px; height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;" onclick="requestOTP()">
+          <span>Continue with Real-Time OTP</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </div>
+
+      <div class="auth-or-separator" style="display: flex; align-items: center; text-align: center; margin: 16px 0 12px; color: #94a3b8; font-size: 11px; font-weight: 700;">
+        <span style="flex: 1; border-bottom: 1px solid #e2e8f0;"></span>
+        <span style="padding: 0 10px;">OR ONE-TAP SIGN IN</span>
+        <span style="flex: 1; border-bottom: 1px solid #e2e8f0;"></span>
+      </div>
+
+      <div class="phonemail-hero-container">
         <div class="phonemail-status-pill">
           <span class="phonemail-pulse-ring"></span>
           <span>⚡ Real-Time SMS & WhatsApp OTP</span>
@@ -138,12 +161,18 @@
       </div>
 
       <div class="otp-inputs" id="mobile-otp-inputs">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="0" autocomplete="off" autofocus>
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="1" autocomplete="off">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="2" autocomplete="off">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="3" autocomplete="off">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="4" autocomplete="off">
-        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="5" autocomplete="off">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="0" autocomplete="one-time-code" autofocus>
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="1" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="2" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="3" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="4" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" class="otp-digit" maxlength="1" data-idx="5" autocomplete="one-time-code">
+      </div>
+
+      <!-- WebOTP Auto-detection badge -->
+      <div class="otp-autodetect-badge" id="mob-webotp-badge" style="display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; color: #046A38; margin: 8px 0; background: rgba(4, 106, 56, 0.08); padding: 6px 12px; border-radius: 20px;">
+        <span class="phonemail-pulse-ring" style="width: 8px; height: 8px; background: #046A38;"></span>
+        <span>Auto-detecting SMS OTP via WebOTP API...</span>
       </div>
 
       <p class="otp-hint" id="mobile-otp-hint" style="min-height: 20px;">Enter 6-digit code sent via SMS</p>
@@ -391,6 +420,28 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 8px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Settings & Sub-Numbers
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ONE-TIME CONTACT SYNC PERMISSION MODAL -->
+  <div id="contact-sync-modal" class="app-dialog-overlay" style="display: none;">
+    <div class="app-dialog-card" style="max-width: 360px; text-align: center; padding: 22px;">
+      <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(4, 106, 56, 0.12); color: #046A38; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h3 style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">Real-Time Contact Sync</h3>
+      <p style="font-size: 13px; color: #64748b; line-height: 1.45; margin-bottom: 18px;">
+        Allow PhoneMail to discover your contacts on PhoneMail in real time. We will only ask for this permission once!
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button type="button" class="btn-wa-green full-width" onclick="acceptOneTimeContactSync()" style="height: 42px; font-size: 13.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Allow & Sync Contacts</span>
+        </button>
+        <button type="button" class="action-btn" onclick="declineOneTimeContactSync()" style="height: 36px; color: #64748b; justify-content: center; border: none; background: transparent; font-size: 13px;">
+          <span>Maybe Later</span>
+        </button>
       </div>
     </div>
   </div>

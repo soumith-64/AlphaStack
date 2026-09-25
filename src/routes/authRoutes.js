@@ -35,11 +35,12 @@ router.post('/send-otp', async (req, res) => {
       try {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Messages.json`;
         const auth = Buffer.from(`${config.twilio.accountSid}:${config.twilio.authToken}`).toString('base64');
-        const formattedTo = cleanNumber.length === 10 ? `+91${cleanNumber}` : (cleanNumber.startsWith('+') ? cleanNumber : `+${cleanNumber}`);
+        const reqHost = (req.headers.host || config.domainName || 'alphastack.wwisvnr.com').split(':')[0];
+        const smsBody = `Your PhoneMail verification code is ${otp}. Valid for 10 minutes.\n\n@${reqHost} #${otp}`;
         const params = new URLSearchParams({
           To: formattedTo,
           From: config.twilio.phoneNumber,
-          Body: `Your PhoneMail verification code is ${otp}. Valid for 10 minutes. Do not share this with anyone.`
+          Body: smsBody
         });
         const twilioRes = await fetch(url, {
           method: 'POST',

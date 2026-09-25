@@ -31,6 +31,26 @@
       <h1 class="auth-title">Welcome to <span class="saffron-text">Phone</span><span class="green-text">Mail</span></h1>
       <p class="auth-subtitle">Sign in using your mobile number for real-time OTP verification & instant unified inbox access.</p>
 
+      <!-- SIMPLE DIRECT PHONE INPUT WITH AUTO-DETECTION -->
+      <form class="phone-direct-form" id="desktop-phone-form" onsubmit="handleDesktopPhoneSubmit(event)">
+        <div class="phone-input-field-wrap">
+          <span class="phone-country-prefix">🇮🇳 +91</span>
+          <input type="tel" id="desktop-phone-input" class="phone-field-input" placeholder="Enter mobile number" autocomplete="tel" maxlength="10" inputmode="numeric">
+          <button type="button" class="btn-detect-phone" id="desk-detect-btn" onclick="autoDetectDesktopPhone()" title="Auto-detect phone number">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>Auto-fill</span>
+          </button>
+        </div>
+        <button type="submit" class="btn-primary full-width" id="btn-phone-submit" style="margin-top: 10px; margin-bottom: 12px; height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span id="btn-phone-label">Continue with Real-Time OTP</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        </button>
+      </form>
+
+      <div class="auth-or-separator">
+        <span>OR ONE-CLICK SIGN IN</span>
+      </div>
+
       <!-- REDESIGNED ATTRACTIVE PHONEMAIL HERO BUTTON -->
       <div class="phonemail-hero-container">
         <div class="phonemail-status-pill">
@@ -121,13 +141,19 @@
 
       <!-- 6-CELL TELEGRAM DIGIT GRID -->
       <div class="telegram-otp-grid" id="desktop-otp-grid">
-        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="0" autocomplete="off">
-        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="1" autocomplete="off">
-        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="2" autocomplete="off">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="0" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="1" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="2" autocomplete="one-time-code">
         <span class="telegram-otp-divider">—</span>
-        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="3" autocomplete="off">
-        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="4" autocomplete="off">
-        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="5" autocomplete="off">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="3" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="4" autocomplete="one-time-code">
+        <input type="text" inputmode="numeric" pattern="[0-9]*" class="telegram-otp-cell" maxlength="1" data-idx="5" autocomplete="one-time-code">
+      </div>
+
+      <!-- WebOTP Auto-detection badge -->
+      <div class="otp-autodetect-badge" id="desk-webotp-badge" style="display: flex;">
+        <span class="phonemail-pulse-ring" style="width: 8px; height: 8px; background: var(--green-main); display: inline-block;"></span>
+        <span>Auto-detecting SMS OTP via WebOTP API...</span>
       </div>
 
       <!-- Real-time Status / Error Banner -->
@@ -544,6 +570,28 @@
             <button class="btn-primary" onclick="addDesktopAlias()">+ Add Alias</button>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== ONE-TIME CONTACT SYNC PERMISSION MODAL ==================== -->
+  <div id="contact-sync-modal" class="app-dialog-overlay" style="display: none;">
+    <div class="app-dialog-card" style="max-width: 440px; text-align: center; padding: 26px;">
+      <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(4, 106, 56, 0.12); color: var(--green-main); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
+        <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <h3 style="font-size: 19px; font-weight: 700; color: var(--text-main); margin-bottom: 8px;">Real-Time Contact Sync</h3>
+      <p style="font-size: 13.5px; color: var(--text-muted); line-height: 1.5; margin-bottom: 20px;">
+        Allow PhoneMail to automatically discover and sync your contacts who are on PhoneMail in real time. We will only ask for this permission once!
+      </p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <button type="button" class="btn-primary full-width" onclick="acceptOneTimeContactSync()" style="height: 44px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Allow & Sync Contacts (One-time)</span>
+        </button>
+        <button type="button" class="action-btn" onclick="declineOneTimeContactSync()" style="height: 38px; color: var(--text-muted); justify-content: center; border: none; background: transparent; font-size: 13px;">
+          <span>Maybe Later</span>
+        </button>
       </div>
     </div>
   </div>
