@@ -146,6 +146,65 @@ function loadPhoneEmailScript() {
   document.body.appendChild(script);
 }
 
+function triggerPhoneEmailLogin() {
+  const btn = document.getElementById('phonemail-hero-btn');
+  const peBtn = document.getElementById('btn_ph_login');
+
+  if (btn) {
+    btn.style.opacity = '0.75';
+    const subCaption = btn.querySelector('.btn-sub-caption');
+    if (subCaption) subCaption.innerText = 'Connecting to Phone.Email secure gateway...';
+  }
+
+  // If the Phone.Email SDK button is already generated, click it
+  if (peBtn) {
+    peBtn.click();
+    setTimeout(() => {
+      if (btn) {
+        btn.style.opacity = '1';
+        const subCaption = btn.querySelector('.btn-sub-caption');
+        if (subCaption) subCaption.innerText = 'Real-Time OTP via SMS & WhatsApp';
+      }
+    }, 2500);
+    return;
+  }
+
+  // Fallback: If SDK button is still loading into DOM, open official secure popup directly
+  const clientId = '13311688567845248231';
+  const currentOrigin = window.location.origin;
+  const w = 480, h = 640;
+  const left = (window.screen.width - w) / 2;
+  const top = (window.screen.height - h) / 2;
+  window.open(
+    `https://www.phone.email/sign-in?client_id=${clientId}&redirect_url=${encodeURIComponent(currentOrigin)}`,
+    'pe_auth_popup',
+    `toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=${w},height=${h},top=${top},left=${left}`
+  );
+
+  setTimeout(() => {
+    if (btn) {
+      btn.style.opacity = '1';
+      const subCaption = btn.querySelector('.btn-sub-caption');
+      if (subCaption) subCaption.innerText = 'Real-Time OTP via SMS & WhatsApp';
+    }
+  }, 2500);
+}
+
+// Universal fallback listener for popup postMessage
+window.addEventListener('message', (event) => {
+  if (!event || !event.data) return;
+  if (event.data.user_json_url) {
+    window.phoneEmailListener({ user_json_url: event.data.user_json_url });
+  } else if (typeof event.data === 'string' && event.data.includes('user_json_url')) {
+    try {
+      const parsed = JSON.parse(event.data);
+      if (parsed && parsed.user_json_url) {
+        window.phoneEmailListener({ user_json_url: parsed.user_json_url });
+      }
+    } catch (e) {}
+  }
+});
+
 // ==================== TELEGRAM-STYLE REAL-TIME AUTHENTICATION ====================
 let desktopPendingPhone = '';
 let desktopLiveOtp = '';

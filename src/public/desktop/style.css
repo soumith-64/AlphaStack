@@ -320,6 +320,263 @@ button {
   text-align: center;
 }
 
+/* ==================== PHONEMAIL REDESIGNED HERO AUTH BUTTON ==================== */
+.phonemail-hero-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: 6px 0 16px 0;
+}
+
+.phonemail-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
+  color: var(--green-dark);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  margin-bottom: 16px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 6px rgba(4, 106, 56, 0.08);
+}
+
+[data-theme="dark"] .phonemail-status-pill {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.phonemail-pulse-ring {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseEmerald 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+
+@keyframes pulseEmerald {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8); }
+  70% { box-shadow: 0 0 0 9px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.phonemail-hero-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 18px;
+  background: linear-gradient(135deg, #046A38 0%, #058245 45%, #024a27 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 
+    0 10px 25px -4px rgba(4, 106, 56, 0.45),
+    0 4px 12px -2px rgba(4, 106, 56, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  text-decoration: none;
+  user-select: none;
+}
+
+.phonemail-hero-btn:hover {
+  transform: translateY(-2px) scale(1.01);
+  background: linear-gradient(135deg, #058548 0%, #069c52 50%, #035a2f 100%);
+  box-shadow: 
+    0 16px 36px -4px rgba(4, 106, 56, 0.55),
+    0 8px 18px rgba(16, 185, 129, 0.35),
+    inset 0 1px 2px rgba(255, 255, 255, 0.55);
+}
+
+.phonemail-hero-btn:active {
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 
+    0 6px 16px -2px rgba(4, 106, 56, 0.4),
+    inset 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* Shimmer Light Bar Sweeping across button */
+.phonemail-hero-btn::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background: linear-gradient(
+    70deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 65%
+  );
+  transform: rotate(25deg);
+  animation: sweepLight 4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+@keyframes sweepLight {
+  0% { transform: translateX(-120%) rotate(25deg); }
+  25%, 100% { transform: translateX(120%) rotate(25deg); }
+}
+
+.btn-left-icon {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 14px;
+  backdrop-filter: blur(4px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.4);
+}
+
+.btn-left-icon svg {
+  width: 22px;
+  height: 22px;
+  stroke: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.25));
+}
+
+.btn-content-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 2px;
+}
+
+.btn-main-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+  line-height: 1.25;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+
+.btn-sub-caption {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  letter-spacing: 0.2px;
+  line-height: 1.2;
+}
+
+.btn-right-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+}
+
+.instant-chip {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.btn-arrow-svg {
+  width: 18px;
+  height: 18px;
+  stroke: #ffffff;
+  transition: transform 0.2s ease;
+}
+
+.phonemail-hero-btn:hover .btn-arrow-svg {
+  transform: translateX(4px);
+}
+
+/* Feature grid under the button */
+.phonemail-trust-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.trust-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.trust-item:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-focus);
+  color: var(--text-main);
+  transform: translateX(2px);
+}
+
+.trust-icon {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 8px;
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
+}
+
+.trust-item strong {
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+/* Native Phone.Email iframe/button styling integration */
+.pe_signin_button {
+  width: 100% !important;
+}
+
+.pe_signin_button #btn_ph_login {
+  width: 100% !important;
+  min-height: 60px !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, #046A38 0%, #058245 45%, #024a27 100%) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 10px 25px -4px rgba(4, 106, 56, 0.45) !important;
+  font-family: 'Outfit', sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+  transition: all 0.25s ease !important;
+}
+
 /* ==================== TELEGRAM-STYLE REAL-TIME OTP VERIFICATION ==================== */
 .telegram-card-header {
   text-align: center;

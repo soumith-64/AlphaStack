@@ -23,7 +23,7 @@
   <!-- ==================== TELEGRAM-STYLE AUTH SCREEN ==================== -->
   <div id="desktop-auth-container" class="auth-wrapper">
     
-    <!-- STEP 1: PHONE NUMBER INPUT -->
+    <!-- STEP 1: PHONEMAIL ONE-CLICK REAL-TIME AUTH CARD -->
     <div class="auth-card" id="desktop-card-phone">
       <div class="brand-badge">
         <span class="online-dot"></span> 🇮🇳 Bharat's Phone-Email Engine
@@ -31,41 +31,60 @@
       <h1 class="auth-title">Welcome to <span class="saffron-text">Phone</span><span class="green-text">Mail</span></h1>
       <p class="auth-subtitle">Sign in using your mobile number for real-time OTP verification & instant unified inbox access.</p>
 
-      <!-- OFFICIAL PHONE.EMAIL 100% LIVE VERIFICATION BUTTON -->
-      <div id="phone-email-btn-wrap" style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 20px; padding: 16px; background: var(--green-subtle); border: 1.5px solid var(--green-border); border-radius: 14px; text-align: center;">
-        <div style="font-size: 11.5px; font-weight: 700; color: var(--green-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;">
-          ⚡ Instant Real-Time OTP via Phone.Email (SMS & WhatsApp)
+      <!-- REDESIGNED ATTRACTIVE PHONEMAIL HERO BUTTON -->
+      <div class="phonemail-hero-container">
+        <div class="phonemail-status-pill">
+          <span class="phonemail-pulse-ring"></span>
+          <span>⚡ Instant Real-Time OTP (SMS & WhatsApp)</span>
         </div>
-        <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
-      </div>
 
-      <div style="display: flex; align-items: center; text-align: center; margin: 16px 0 20px;">
-        <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
-        <span style="padding: 0 10px; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase;">or sign in with direct otp</span>
-        <div style="flex: 1; border-bottom: 1px solid var(--border-light);"></div>
-      </div>
+        <button type="button" class="phonemail-hero-btn" id="phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with PhoneMail">
+          <div class="btn-left-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </div>
+          <div class="btn-content-text">
+            <span class="btn-main-title">Sign In with Phone Number</span>
+            <span class="btn-sub-caption">Real-Time OTP via SMS & WhatsApp</span>
+          </div>
+          <div class="btn-right-badge">
+            <span class="instant-chip">One-Tap</span>
+            <svg class="btn-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+        </button>
 
-      <form id="desktop-phone-form" onsubmit="handleDesktopPhoneSubmit(event)">
-        <div class="form-group">
-          <label for="desktop-phone-input">INDIAN MOBILE NUMBER</label>
-          <div class="input-box">
-            <span class="input-addon flag-addon">🇮🇳 +91</span>
-            <input type="tel" id="desktop-phone-input" placeholder="Enter 10-digit mobile number" maxlength="10" required autofocus autocomplete="tel-national">
+        <!-- Hidden official Phone.Email element for official SDK binding -->
+        <div class="pe-signin-embed" style="opacity: 0.001; position: absolute; pointer-events: none; width: 1px; height: 1px; overflow: hidden;">
+          <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
+        </div>
+
+        <!-- Trust Highlights Grid -->
+        <div class="phonemail-trust-grid">
+          <div class="trust-item">
+            <div class="trust-icon">💬</div>
+            <div><strong>Instant OTP Delivery</strong> — Real-time SMS & WhatsApp code</div>
+          </div>
+          <div class="trust-item">
+            <div class="trust-icon">📬</div>
+            <div><strong>Zero Setup Mailbox</strong> — Your phone number is your email address</div>
+          </div>
+          <div class="trust-item">
+            <div class="trust-icon">🔒</div>
+            <div><strong>Passwordless & Secure</strong> — 100% spam-free & verified</div>
           </div>
         </div>
+      </div>
 
-        <div class="terms-disclaimer">
-          By continuing, you agree to PhoneMail's <a href="#" onclick="alert('PhoneMail Terms & Privacy Policy'); return false;">Terms of Service</a> & real-time SMS delivery.
-        </div>
+      <div class="terms-disclaimer" style="margin-top: 18px; margin-bottom: 0;">
+        By continuing, you agree to PhoneMail's <a href="#" onclick="alert('PhoneMail Terms & Privacy Policy'); return false;">Terms of Service</a> & real-time verified delivery.
+      </div>
 
-        <button type="submit" class="btn-primary full-width" id="btn-phone-submit">
-          <span id="btn-phone-label">Send Real-Time OTP</span>
-          <span class="btn-arrow">→</span>
-        </button>
-      </form>
-
-      <div class="auth-footer-note">
-        ⚡ Twilio Live SMS & Voice IVR • Real-time Hostinger Engine
+      <div class="auth-footer-note" style="margin-top: 18px;">
+        ⚡ Powered by Phone.Email • Real-time Delivery • Hostinger Cloud
       </div>
     </div>
 

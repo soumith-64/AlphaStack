@@ -138,41 +138,169 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; colo
 .phone-verify-header h3 { font-size: 18px; color: var(--wa-teal-dark); margin-bottom: 8px; }
 .phone-verify-header p { font-size: 13px; color: var(--wa-gray); line-height: 1.5; }
 
-.country-picker {
+/* ==================== PHONEMAIL REDESIGNED HERO AUTH BUTTON (MOBILE) ==================== */
+.phonemail-hero-container {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.phonemail-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #046a38;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  margin-bottom: 14px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.phonemail-pulse-ring {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  animation: pulseEmeraldMobile 1.8s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+
+@keyframes pulseEmeraldMobile {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.8); }
+  70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+.phonemail-hero-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--wa-teal);
-  padding: 10px 0;
-  margin-bottom: 16px;
-  font-weight: 600;
+  width: 100%;
+  min-height: 58px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #046A38 0%, #058245 45%, #024a27 100%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: 0 8px 20px -3px rgba(4, 106, 56, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  transition: all 0.2s ease;
+  overflow: hidden;
+  user-select: none;
 }
 
-.phone-input-row {
+.phonemail-hero-btn:active {
+  transform: scale(0.98);
+}
+
+.phonemail-hero-btn::after {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background: linear-gradient(70deg, transparent 35%, rgba(255, 255, 255, 0.22) 50%, transparent 65%);
+  transform: rotate(25deg);
+  animation: sweepLightMobile 4s infinite cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+@keyframes sweepLightMobile {
+  0% { transform: translateX(-120%) rotate(25deg); }
+  25%, 100% { transform: translateX(120%) rotate(25deg); }
+}
+
+.phonemail-hero-btn .btn-left-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
   display: flex;
-  gap: 12px;
-  border-bottom: 1px solid var(--wa-teal);
-  padding: 8px 0;
-  font-size: 18px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
 }
 
-.country-code { font-weight: 600; color: #111b21; }
-#mobile-phone-input {
-  border: none;
-  outline: none;
-  font-size: 18px;
-  font-weight: 600;
+.phonemail-hero-btn .btn-left-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: #ffffff;
+}
+
+.phonemail-hero-btn .btn-content-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  gap: 2px;
+}
+
+.phonemail-hero-btn .btn-main-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.phonemail-hero-btn .btn-sub-caption {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.phonemail-hero-btn .btn-right-badge svg {
+  width: 18px;
+  height: 18px;
+  stroke: #ffffff;
+}
+
+.phonemail-trust-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
 }
 
-.sim-pill {
-  margin-top: 16px;
-  background: #f0f2f5;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  color: var(--wa-gray);
+.phonemail-trust-grid .trust-item {
   display: flex;
   align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.phonemail-trust-grid .trust-icon {
+  font-size: 14px;
+}
+
+/* Native Phone.Email iframe styling */
+.pe_signin_button {
+  width: 100% !important;
+}
+
+.pe_signin_button #btn_ph_login {
+  width: 100% !important;
+  min-height: 56px !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, #046A38 0%, #058245 45%, #024a27 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 8px 20px -3px rgba(4, 106, 56, 0.4) !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
 }
 
 /* OTP Screen */

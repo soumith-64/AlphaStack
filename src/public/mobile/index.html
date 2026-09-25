@@ -68,30 +68,57 @@
       </div>
     </div>
 
-    <!-- Screen 3: Phone Verification (SIM auto-detection) -->
+    <!-- Screen 3: Phone Verification (PhoneMail Official One-Click Sign-In) -->
     <div id="screen-phone" class="onboarding-screen">
       <div class="phone-verify-header">
-        <h3>Enter your phone number</h3>
-        <p>PhoneMail will send an SMS to verify your number. Carrier charges may apply.</p>
+        <div class="whatsapp-logo-icon" style="margin: 0 auto 10px; font-size: 32px; width: 60px; height: 60px; background: rgba(4, 106, 56, 0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">📱</div>
+        <h3>Verify Your Mobile Number</h3>
+        <p>Sign in instantly with your verified phone number to access your unified PhoneMail inbox.</p>
       </div>
 
-      <!-- Official Phone.Email One-Click Verified Button -->
-      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 14px 0; padding: 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; text-align: center;">
-        <span style="font-size: 11px; font-weight: 700; color: #046a38; margin-bottom: 8px;">⚡ Instant Real-Time OTP via Phone.Email</span>
-        <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
-      </div>
-      <div style="text-align: center; font-size: 11px; color: #94a3b8; margin-bottom: 12px; font-weight: 600;">— OR ENTER MOBILE NUMBER —</div>
+      <div class="phonemail-hero-container" style="margin-top: 14px;">
+        <div class="phonemail-status-pill">
+          <span class="phonemail-pulse-ring"></span>
+          <span>⚡ Real-Time SMS & WhatsApp OTP</span>
+        </div>
 
-      <div class="country-picker">
-        <span>India</span>
-        <span class="arrow">▼</span>
-      </div>
-      <div class="phone-input-row">
-        <div class="country-code">+91</div>
-        <input type="tel" id="mobile-phone-input" placeholder="Phone number" maxlength="10">
-      </div>
-      <div class="ob-footer">
-        <button class="btn-wa-green" onclick="requestOTP()">NEXT</button>
+        <button type="button" class="phonemail-hero-btn" id="mobile-phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with PhoneMail">
+          <div class="btn-left-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </div>
+          <div class="btn-content-text">
+            <span class="btn-main-title">Sign In with Phone</span>
+            <span class="btn-sub-caption">Real-Time OTP Verification</span>
+          </div>
+          <div class="btn-right-badge">
+            <svg class="btn-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+              <polyline points="12 5 19 12 12 19"></polyline>
+            </svg>
+          </div>
+        </button>
+
+        <!-- Hidden official Phone.Email element for official SDK binding -->
+        <div class="pe-signin-embed" style="opacity: 0.001; position: absolute; pointer-events: none; width: 1px; height: 1px; overflow: hidden;">
+          <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
+        </div>
+
+        <div class="phonemail-trust-grid" style="margin-top: 20px;">
+          <div class="trust-item">
+            <div class="trust-icon">💬</div>
+            <div><strong>Instant OTP</strong> via SMS & WhatsApp</div>
+          </div>
+          <div class="trust-item">
+            <div class="trust-icon">📬</div>
+            <div><strong>Zero Setup</strong> — Phone is your email</div>
+          </div>
+          <div class="trust-item">
+            <div class="trust-icon">🔒</div>
+            <div><strong>100% Free & Secure</strong> authentication</div>
+          </div>
+        </div>
       </div>
     </div>
 
