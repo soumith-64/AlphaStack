@@ -1814,6 +1814,7 @@ function createEmailRowElement(email) {
 }
 
 function switchFolder(folder, element) {
+  currentFolder = folder;
   document.querySelectorAll('.folder-nav .nav-item').forEach(i => i.classList.remove('active'));
   if (element) {
     element.classList.add('active');
@@ -1828,12 +1829,13 @@ function switchFolder(folder, element) {
   }
 
   closeMobileSidebar();
-  closeReadingPane();
+  closeReadingPane(false);
   loadEmails(folder);
 }
 
 // ==================== READING PANE VIEW ====================
 function openEmailDetails(email) {
+  if (!email) return;
   activeEmail = email;
   isMessageTranslated = false;
 
@@ -1843,9 +1845,10 @@ function openEmailDetails(email) {
     fetch(`/api/emails/${email.id}/read`, { method: 'POST' }).catch(() => {});
   }
 
-  document.getElementById('mail-list-pane').style.display = 'none';
+  const listPane = document.getElementById('mail-list-pane');
   const readingPane = document.getElementById('reading-pane');
-  readingPane.style.display = 'flex';
+  if (listPane) listPane.style.display = 'none';
+  if (readingPane) readingPane.style.display = 'flex';
 
   const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
   const recipientsDisplay = getRecipientsDisplay(email);
@@ -1858,10 +1861,15 @@ function openEmailDetails(email) {
   originalMessageSubject = email.subject || '(No Subject)';
   originalMessageBody = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
 
-  document.getElementById('full-subject').innerText = originalMessageSubject;
-  document.getElementById('full-sender').innerText = isSentByMe 
-    ? (currentUser.name ? `${currentUser.name} (+91 ${currentUser.phone})` : `+91 ${currentUser.phone}`) 
-    : formattedSenderClean;
+  const subjEl = document.getElementById('full-subject');
+  if (subjEl) subjEl.innerText = originalMessageSubject;
+
+  const senderEl = document.getElementById('full-sender');
+  if (senderEl) {
+    senderEl.innerText = isSentByMe 
+      ? (currentUser.name ? `${currentUser.name} (+91 ${currentUser.phone})` : `+91 ${currentUser.phone}`) 
+      : formattedSenderClean;
+  }
 
   const senderBadgeEl = document.getElementById('full-sender-badge');
   if (senderBadgeEl) {
@@ -1874,17 +1882,30 @@ function openEmailDetails(email) {
     }
   }
 
-  document.getElementById('full-avatar').innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : formattedSenderClean);
-  document.getElementById('full-to').innerText = isSentByMe 
-    ? (recipientsDisplay || 'Recipient') 
-    : (currentUser ? `${currentUser.name || 'me'} (+91 ${currentUser.phone})` : 'me');
-  document.getElementById('full-date').innerText = new Date(email.created_at).toLocaleString([], { 
-    dateStyle: 'medium', 
-    timeStyle: 'short' 
-  });
+  const avatarEl = document.getElementById('full-avatar');
+  if (avatarEl) {
+    avatarEl.innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : formattedSenderClean);
+  }
+
+  const toEl = document.getElementById('full-to');
+  if (toEl) {
+    toEl.innerText = isSentByMe 
+      ? (recipientsDisplay || 'Recipient') 
+      : (currentUser ? `${currentUser.name || 'me'} (+91 ${currentUser.phone})` : 'me');
+  }
+
+  const dateEl = document.getElementById('full-date');
+  if (dateEl) {
+    dateEl.innerText = new Date(email.created_at).toLocaleString([], { 
+      dateStyle: 'medium', 
+      timeStyle: 'short' 
+    });
+  }
 
   const bodyEl = document.getElementById('full-body');
-  bodyEl.innerHTML = originalMessageBody;
+  if (bodyEl) {
+    bodyEl.innerHTML = originalMessageBody;
+  }
 
   const starBtn = document.getElementById('pane-star-btn');
   if (starBtn) {
@@ -1902,7 +1923,7 @@ function openEmailDetails(email) {
   if (transLabel) transLabel.innerText = 'AI Translate';
 }
 
-function closeReadingPane() {
+function closeReadingPane(shouldReload = true) {
   const readingPane = document.getElementById('reading-pane');
   if (readingPane) readingPane.style.display = 'none';
   
@@ -1910,7 +1931,9 @@ function closeReadingPane() {
   if (mailList) mailList.style.display = 'flex';
   
   activeEmail = null;
-  loadEmails(currentFolder);
+  if (shouldReload) {
+    loadEmails(currentFolder);
+  }
 }
 
 // ==================== STAR & MOVE ACTIONS ====================
