@@ -15,6 +15,7 @@ import { imapSyncService } from './services/imapSyncService.js';
 import authRoutes from './routes/authRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
 import twilioRoutes from './routes/twilioRoutes.js';
+import { dbOps } from './database/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,6 +79,11 @@ if (config.enableSmtp || !config.isProduction) {
     console.warn('SMTP Server startup notice:', err.message);
   }
 }
+
+// Clean up any historical duplicate emails in database on startup
+dbOps.pruneDuplicateEmails().catch((err) => {
+  console.warn('Initial duplicate emails pruning note:', err.message);
+});
 
 // Start Hostinger IMAP Inbound Auto-Sync Worker (fetches incoming mail every 20s)
 try {

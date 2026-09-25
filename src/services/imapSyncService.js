@@ -78,10 +78,10 @@ export const imapSyncService = {
               continue;
             }
 
-            // Parse search all IDs
+            // Parse search all IDs - only inspect the 15 most recent messages
             if (line.startsWith('* SEARCH')) {
               const parts = line.replace('* SEARCH', '').trim().split(/\s+/).filter(Boolean);
-              messagesToFetch = parts;
+              messagesToFetch = parts.slice(-15);
               continue;
             }
 
@@ -140,11 +140,23 @@ export const imapSyncService = {
 
             const toAddress = parsed.to ? (Array.isArray(parsed.to) ? parsed.to[0].text : parsed.to.text) : '';
             const fromAddress = parsed.from ? (Array.isArray(parsed.from) ? parsed.from[0].text : parsed.from.text) : '';
+            const cleanFrom = (fromAddress || '').toLowerCase().trim();
+            const cleanSub = (parsed.subject || '(No Subject)').trim();
+            const cleanText = (parsed.text || '').trim();
+            const textSnippet = cleanText.substring(0, 50);
 
-            // Check if already in database
-            const existing = await dbOps.queryOne('SELECT id FROM emails WHERE subject = ? AND created_at = ?', 
-              [parsed.subject || '(No Subject)', parsed.date ? parsed.date.toISOString().slice(0, 19).replace('T', ' ') : '']);
-            if (existing) return;
+            // Robust database check: does this email already exist?
+            const existing = await dbOps.queryOne(`
+              SELECT id FROM emails 
+              WHERE sender_email LIKE ? 
+                AND subject = ? 
+                AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
+              LIMIT 1
+            `, [`%${cleanFrom.slice(-15)}%`, cleanSub, cleanText, textSnippet, `${textSnippet}%`]);
+
+            if (existing) {
+              return;
+            }
 
             console.log(`📥 [IMAP SYNC] Processing message: "${parsed.subject}" to "${toAddress}" from "${fromAddress}"`);
 

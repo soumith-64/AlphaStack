@@ -62,6 +62,14 @@
           <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
         </div>
 
+        <!-- Remember Me by Default Checkbox -->
+        <div class="remember-me-container" style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px 0 6px;">
+          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-muted); user-select: none;">
+            <input type="checkbox" id="auth-remember-me" checked style="accent-color: #046A38; width: 16px; height: 16px; cursor: pointer;">
+            <span>Keep me signed in (Remember login details)</span>
+          </label>
+        </div>
+
         <!-- Trust Highlights Grid -->
         <div class="phonemail-trust-grid">
           <div class="trust-item">
@@ -410,10 +418,14 @@
         <button class="close-btn" onclick="closeComposeModal()" aria-label="Close Compose">✕</button>
       </div>
 
-      <div class="compose-body">
         <div class="compose-field" style="position: relative;">
-          <label>To</label>
-          <input type="text" id="desk-compose-to" placeholder="Phone number (e.g. 9845012345) or email" autocomplete="off">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+            <label style="margin-bottom: 0;">To</label>
+            <button type="button" id="desk-pick-contacts-btn" onclick="pickDeviceContacts()" style="font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-hover); color: var(--text-main); cursor: pointer; display: inline-flex; align-items: center; gap: 4px;" title="Check contacts registered on PhoneMail">
+              <span>📇 Device Contacts</span>
+            </button>
+          </div>
+          <input type="text" id="desk-compose-to" placeholder="Search registered PhoneMail user or type email" autocomplete="off">
           <div id="desk-contacts-dropdown" class="contacts-autocomplete" style="display: none;"></div>
         </div>
         <div class="compose-field">

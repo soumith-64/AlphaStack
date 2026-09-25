@@ -130,6 +130,35 @@ export const dbOps = {
       [id, phoneNumber, type, content, provider, status]
     );
     return id;
+  },
+
+  async pruneDuplicateEmails() {
+    try {
+      const all = await this.queryAll('SELECT id, sender_email, subject, body_text FROM emails ORDER BY created_at ASC, id ASC');
+      const seen = new Set();
+      const duplicates = [];
+      for (const row of all) {
+        const sSub = String(row.subject || '').trim().toLowerCase();
+        const sBody = String(row.body_text || '').replace(/\s+/g, ' ').trim().toLowerCase().substring(0, 60);
+        const sSender = String(row.sender_email || '').trim().toLowerCase();
+        const key = `${sSender}___${sSub}___${sBody}`;
+        if (seen.has(key)) {
+          duplicates.push(row.id);
+        } else {
+          seen.add(key);
+        }
+      }
+      for (const dupId of duplicates) {
+        await this.execute('DELETE FROM emails WHERE id = ?', [dupId]);
+      }
+      if (duplicates.length > 0) {
+        console.log(`🧹 [CLEANUP] Pruned ${duplicates.length} duplicate email(s) from database.`);
+      }
+      return duplicates.length;
+    } catch (err) {
+      console.warn('Notice: Duplicate email pruning exception:', err.message);
+      return 0;
+    }
   }
 };
 

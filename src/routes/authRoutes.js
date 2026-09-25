@@ -115,11 +115,13 @@ router.post('/verify-otp', async (req, res) => {
     }
 
     otpStore.delete(cleanNumber);
+    const aliases = await dbOps.queryAll('SELECT * FROM aliases WHERE user_id = ?', [user.id]);
 
     res.json({
       success: true,
       isNewUser,
       user,
+      aliases,
       token: `token_${user.id}_${Date.now()}`
     });
   } catch (err) {
@@ -308,11 +310,13 @@ router.post('/phone-email-verify', async (req, res) => {
     }
 
     await dbOps.logTelephony(cleanNumber, 'PHONE_EMAIL_AUTH', `User verified via Phone.Email service: +91 ${cleanNumber}`, 'PHONE_EMAIL');
+    const aliases = await dbOps.queryAll('SELECT * FROM aliases WHERE user_id = ?', [user.id]);
 
     res.json({
       success: true,
       isNewUser,
       user,
+      aliases,
       token: `token_${user.id}_${Date.now()}`
     });
   } catch (err) {

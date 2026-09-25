@@ -131,6 +131,24 @@ export const emailService = {
         [conversationId, user.id, recipientPhone]);
     }
 
+    const cleanSubject = String(subject || '(No Subject)').trim();
+    const cleanText = String(text || '').trim();
+    const textSnippet = cleanText.substring(0, 50);
+
+    // Deduplication check: prevent identical emails from being re-inserted
+    const duplicate = await dbOps.queryOne(`
+      SELECT id FROM emails 
+      WHERE sender_email = ? 
+        AND subject = ? 
+        AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
+      LIMIT 1
+    `, [cleanSender, cleanSubject, cleanText, textSnippet, `${textSnippet}%`]);
+
+    if (duplicate) {
+      console.log(`⚠️ [INBOUND DEDUPLICATION] Email already exists in DB (${duplicate.id}). Skipping re-insertion.`);
+      return duplicate;
+    }
+
     // Insert email
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     await dbOps.execute(`
@@ -141,9 +159,9 @@ export const emailService = {
       conversationId,
       cleanSender,
       JSON.stringify([recipientParsed.full]),
-      subject || '(No Subject)',
-      text || '',
-      html || text || ''
+      cleanSubject,
+      cleanText,
+      html || cleanText || ''
     ]);
 
     const savedEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
@@ -274,28 +292,34 @@ export const emailService = {
       for (const extEmail of externalRecipients) {
         try {
           console.log(`🚀 [Hostinger SMTP] Transmitting live email to ${extEmail}...`);
+          const msgUniqueId = `${Date.now()}.${Math.random().toString(36).substring(2, 9)}@alphastack.wwisvnr.com`;
+          const emailSubject = subject && subject.trim() ? subject.trim() : `Message from ${senderDisplayName}`;
+          const cleanBody = bodyText || '';
+
           const info = await smtpTransporter.sendMail({
-            from: `"${senderDisplayName} via PhoneMail" <${smtpUser}>`,
+            from: `"${senderDisplayName}" <${smtpUser}>`,
             replyTo: `${cleanSenderPhone}@${config.domainName}`,
             to: extEmail,
-            subject: subject || 'Message from PhoneMail',
-            text: bodyText || '',
+            subject: emailSubject,
+            messageId: `<${msgUniqueId}>`,
+            headers: {
+              'X-Mailer': 'PhoneMail WebClient 1.0',
+              'Precedence': 'normal',
+              'Importance': 'normal'
+            },
+            text: cleanBody 
+              ? `${cleanBody}\n\n---\nSent by ${senderDisplayName} (+91 ${cleanSenderPhone}) via PhoneMail.\nReply directly to this email to reach my phone mailbox: ${cleanSenderPhone}@${config.domainName}`
+              : `Sent by ${senderDisplayName} via PhoneMail.`,
             html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff;">
-                <div style="border-bottom: 2px solid #046A38; padding-bottom: 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
-                  <div>
-                    <span style="font-size: 20px; font-weight: 800; color: #046A38;">Phone<span style="color: #FF671F;">Mail</span></span>
-                    <span style="font-size: 12px; color: #64748b; margin-left: 8px;">• 🇮🇳 Phone-Powered Email</span>
-                  </div>
-                  <div style="font-size: 11px; font-weight: 700; color: #046A38; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 3px 8px; border-radius: 6px;">
-                    ✓ Verified Sender
-                  </div>
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+                <div style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;">
+                  ${String(emailSubject).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                 </div>
-                <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 28px; white-space: pre-wrap;">${bodyText ? String(bodyText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</div>
-                <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; font-size: 12px; color: #64748b; line-height: 1.5;">
-                  Sent from <strong>+91 ${cleanSenderPhone}</strong> via <strong>PhoneMail</strong>.<br>
-                  Hit <strong>Reply</strong> in your email client to send an instant reply directly to this user's phone mailbox: 
-                  <a href="mailto:${cleanSenderPhone}@${config.domainName}" style="color: #046A38; font-weight: 600;">${cleanSenderPhone}@${config.domainName}</a>
+                <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 24px; white-space: pre-wrap;">${cleanBody ? String(cleanBody).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</div>
+                <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; font-size: 12px; color: #64748b; line-height: 1.6;">
+                  Sent by <strong>${senderDisplayName}</strong> (+91 ${cleanSenderPhone}) via PhoneMail.<br>
+                  Reply directly to this email to reach this user's PhoneMail inbox: 
+                  <a href="mailto:${cleanSenderPhone}@${config.domainName}" style="color: #046A38; font-weight: 600; text-decoration: none;">${cleanSenderPhone}@${config.domainName}</a>
                 </div>
               </div>
             `

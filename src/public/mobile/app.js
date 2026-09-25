@@ -15,6 +15,48 @@ function goToScreen(screenId) {
   if (target) target.classList.add('active');
 }
 
+// ==================== PERSISTENCE & FORMATTING HELPERS ====================
+function saveMobileSession(user) {
+  currentUser = user;
+  const remEl = document.getElementById('mobile-auth-remember-me');
+  const remember = remEl ? remEl.checked : true;
+  const str = JSON.stringify(user);
+  if (remember) {
+    localStorage.setItem('phonemail-mobile-user', str);
+    localStorage.setItem('phonemail-user', str);
+  }
+  sessionStorage.setItem('phonemail-mobile-user', str);
+}
+
+function formatSenderDisplay(rawSender, includeAddress = false) {
+  if (!rawSender) return 'Unknown';
+  let str = String(rawSender).trim();
+
+  const match = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
+  if (match) {
+    let name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    const email = (match[2] || '').trim();
+    if (name) {
+      name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      if (includeAddress) return `${name} <${email}>`;
+      return name;
+    }
+    return email;
+  }
+
+  const phoneEmailMatch = str.match(/^(\d{10})@/);
+  if (phoneEmailMatch) {
+    const p = phoneEmailMatch[1];
+    return `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+  }
+
+  if (/^\d{10}$/.test(str)) {
+    return `+91 ${str.slice(0, 5)} ${str.slice(5)}`;
+  }
+
+  return str.replace(/^[<"']+|[>"']+$/g, '').trim();
+}
+
 // ==================== PHONE.EMAIL OFFICIAL LISTENER (MOBILE) ====================
 window.phoneEmailListener = async (userObj) => {
   if (!userObj || !userObj.user_json_url) return;
@@ -32,7 +74,7 @@ window.phoneEmailListener = async (userObj) => {
         name: data.user.display_name || `User ${data.user.phone_number}`,
         email: data.user.email_address
       };
-      sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
+      saveMobileSession(currentUser);
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
     } else {
@@ -345,7 +387,7 @@ async function verifyOTP(otp) {
         const first = document.getElementById('mobile-first-name');
         if (first) first.focus();
       } else {
-        sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
+        saveMobileSession(currentUser);
         document.getElementById('onboarding-container').style.display = 'none';
         initMainApp();
       }
@@ -414,7 +456,7 @@ async function completeMobileProfile() {
         name: data.user.display_name,
         email: data.user.email_address
       };
-      sessionStorage.setItem('phonemail-mobile-user', JSON.stringify(currentUser));
+      saveMobileSession(currentUser);
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
     } else {
@@ -581,7 +623,7 @@ function renderConversations(conversations) {
       <div class="chat-avatar">${conv.is_group === 1 ? '👥' : initial}</div>
       <div class="chat-details">
         <div class="chat-top-row">
-          <div class="chat-sender-name">${conv.is_group === 1 ? '👥 ' + conv.subject : conv.participant_phone}</div>
+          <div class="chat-sender-name">${conv.is_group === 1 ? '👥 ' + conv.subject : formatSenderDisplay(conv.participant_phone)}</div>
           <div class="chat-timestamp">${timeDisplay}</div>
         </div>
         <div class="chat-bottom-row">
@@ -622,7 +664,7 @@ async function openConversation(convId) {
 
     document.getElementById('chat-contact-name').innerText = activeConversation.is_group === 1
       ? `👥 ${activeConversation.subject}`
-      : activeConversation.participant_phone;
+      : formatSenderDisplay(activeConversation.participant_phone);
 
     document.getElementById('chat-subject-text').innerText = activeConversation.subject || '(No Subject)';
     
@@ -745,62 +787,91 @@ async function sendChatMessage() {
 }
 
 // ==================== TRADITIONAL COMPOSE & CONTACTS PICKER ====================
-let mobileCachedContacts = [];
-
 function setupMobileContactsPicker() {
   const input = document.getElementById('trad-to');
   const picker = document.getElementById('mobile-contacts-picker');
   if (!input || !picker) return;
 
+  let debounceTimer = null;
+
   async function fetchAndRender(query = '') {
     if (input.disabled) return;
     try {
       if (!currentUser) return;
-      if (mobileCachedContacts.length === 0) {
-        const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
+      const q = query.trim();
+
+      if (q.length >= 2) {
+        if (q.includes('@') && (q.endsWith('.com') || q.endsWith('.net') || q.endsWith('.org') || q.endsWith('.in'))) {
+          picker.style.display = 'none';
+          return;
+        }
+
+        const res = await fetch(`/api/contacts?phone=${currentUser.phone}&q=${encodeURIComponent(q)}`);
         const data = await res.json();
-        mobileCachedContacts = data.contacts || [];
+        const matches = data.contacts || [];
+
+        if (matches.length === 0) {
+          picker.innerHTML = `
+            <div style="padding: 10px; font-size: 11px; color: #64748b;">
+              No registered PhoneMail user for "${q}". External emails (e.g. Gmail) can be entered directly.
+            </div>
+          `;
+          picker.style.display = 'block';
+          return;
+        }
+
+        renderMobileContacts(matches, picker, input);
+        return;
       }
-      const q = query.trim().toLowerCase();
-      const matches = mobileCachedContacts.filter(c => 
-        !q ||
-        (c.display_name && c.display_name.toLowerCase().includes(q)) ||
-        (c.phone_number && c.phone_number.includes(q)) ||
-        (c.email_address && c.email_address.toLowerCase().includes(q))
-      );
-      if (matches.length === 0) {
+
+      // Empty query: only show recent contacts
+      const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
+      const data = await res.json();
+      const recent = data.contacts || [];
+      if (recent.length === 0) {
         picker.style.display = 'none';
         return;
       }
-      picker.innerHTML = '';
-      matches.slice(0, 5).forEach(c => {
-        const item = document.createElement('div');
-        item.className = 'mobile-contact-item';
-        item.innerHTML = `
-          <div class="mobile-contact-avatar">${(c.display_name || c.phone_number || 'P').charAt(0).toUpperCase()}</div>
-          <div class="mobile-contact-info">
-            <div class="mobile-contact-name">${c.display_name || `User ${c.phone_number}`}</div>
-            <div class="mobile-contact-phone">📞 +91 ${c.phone_number}</div>
-          </div>
-        `;
-        item.onmousedown = (e) => {
-          e.preventDefault();
-          input.value = c.phone_number;
-          picker.style.display = 'none';
-          document.getElementById('trad-subject').focus();
-        };
-        picker.appendChild(item);
-      });
-      picker.style.display = 'block';
+
+      renderMobileContacts(recent, picker, input);
     } catch (e) {
       console.warn('Contacts picker error:', e);
     }
   }
 
-  input.addEventListener('input', () => fetchAndRender(input.value));
-  input.addEventListener('focus', () => fetchAndRender(input.value));
+  function renderMobileContacts(matches, container, targetInput) {
+    container.innerHTML = '';
+    matches.slice(0, 5).forEach(c => {
+      const item = document.createElement('div');
+      item.className = 'mobile-contact-item';
+      item.innerHTML = `
+        <div class="mobile-contact-avatar">${(c.display_name || c.phone_number || 'P').charAt(0).toUpperCase()}</div>
+        <div class="mobile-contact-info">
+          <div class="mobile-contact-name">${c.display_name || `User ${c.phone_number}`} <span style="font-size:10px; color:#046A38; font-weight:700;">✓ PhoneMail</span></div>
+          <div class="mobile-contact-phone">📞 +91 ${c.phone_number}</div>
+        </div>
+      `;
+      item.onmousedown = (e) => {
+        e.preventDefault();
+        targetInput.value = c.phone_number;
+        container.style.display = 'none';
+        const subj = document.getElementById('trad-subject');
+        if (subj) subj.focus();
+      };
+      container.appendChild(item);
+    });
+    container.style.display = 'block';
+  }
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => fetchAndRender(input.value), 250);
+  });
+  input.addEventListener('focus', () => {
+    if (!input.value.trim()) fetchAndRender('');
+  });
   input.addEventListener('blur', () => {
-    setTimeout(() => { picker.style.display = 'none'; }, 200);
+    setTimeout(() => { picker.style.display = 'none'; }, 250);
   });
 }
 
@@ -948,13 +1019,36 @@ function toggleDrawer() {
 
 // Initialize on page load
 window.addEventListener('DOMContentLoaded', () => {
-  const saved = sessionStorage.getItem('phonemail-mobile-user');
+  const saved = localStorage.getItem('phonemail-mobile-user') || localStorage.getItem('phonemail-user') || sessionStorage.getItem('phonemail-mobile-user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
       document.getElementById('onboarding-container').style.display = 'none';
       initMainApp();
+
+      // Cross-device sync: fetch latest profile & aliases
+      if (currentUser && currentUser.phone) {
+        fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.user) {
+              currentUser.name = data.user.display_name || currentUser.name;
+              currentUser.email = data.user.email_address || currentUser.email;
+              saveMobileSession(currentUser);
+              const dU = document.getElementById('drawer-username');
+              if (dU) dU.innerText = currentUser.name;
+              const dE = document.getElementById('drawer-email');
+              if (dE) dE.innerText = currentUser.email;
+              const pN = document.getElementById('profile-name');
+              if (pN) pN.innerText = currentUser.name;
+              const pE = document.getElementById('profile-email');
+              if (pE) pE.innerText = currentUser.email;
+            }
+          })
+          .catch(() => {});
+      }
     } catch (e) {
+      localStorage.removeItem('phonemail-mobile-user');
       sessionStorage.removeItem('phonemail-mobile-user');
     }
   }

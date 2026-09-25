@@ -57,9 +57,47 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+function formatSenderDisplay(rawSender, includeAddress = false) {
+  if (!rawSender) return 'Unknown';
+  let str = String(rawSender).trim();
+
+  // Pattern: "Soumith JV" <soumithjv10@gmail.com> or 'Soumith JV' <...> or Soumith JV <...>
+  const match = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
+  if (match) {
+    let name = (match[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    const email = (match[2] || '').trim();
+    if (name) {
+      // Clean up and format name in title case
+      name = name.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      if (includeAddress) {
+        return `${name} <${email}>`;
+      }
+      return name;
+    }
+    return email;
+  }
+
+  // Pattern: 9876543210@alphastack.wwisvnr.com or 9876543210@...
+  const phoneEmailMatch = str.match(/^(\d{10})@/);
+  if (phoneEmailMatch) {
+    const p = phoneEmailMatch[1];
+    return `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
+  }
+
+  // Pattern: raw 10-digit phone
+  if (/^\d{10}$/.test(str)) {
+    return `+91 ${str.slice(0, 5)} ${str.slice(5)}`;
+  }
+
+  // Clean off quotes or angle brackets
+  str = str.replace(/^[<"']+|[>"']+$/g, '').trim();
+  return str;
+}
+
 function getInitials(nameOrEmail) {
   if (!nameOrEmail) return 'P';
-  const clean = nameOrEmail.replace(/[@<>\"]/g, '').trim();
+  const display = formatSenderDisplay(nameOrEmail);
+  const clean = display.replace(/[^a-zA-Z0-9]/g, '').trim();
   return clean.charAt(0).toUpperCase() || 'P';
 }
 
@@ -119,7 +157,18 @@ function toggleTheme() {
 // Auto-run theme initialization immediately
 initTheme();
 
-// ==================== PHONE.EMAIL OFFICIAL LISTENER ====================
+// ==================== SESSION PERSISTENCE & PHONE.EMAIL LISTENER ====================
+function saveDesktopSession(user) {
+  currentUser = user;
+  const remEl = document.getElementById('auth-remember-me');
+  const remember = remEl ? remEl.checked : true;
+  const str = JSON.stringify(user);
+  if (remember) {
+    localStorage.setItem('phonemail-user', str);
+  }
+  sessionStorage.setItem('phonemail-user', str);
+}
+
 window.phoneEmailListener = async (userObj) => {
   if (!userObj || !userObj.user_json_url) return;
   const { user_json_url } = userObj;
@@ -141,7 +190,7 @@ window.phoneEmailListener = async (userObj) => {
         email: data.user.email_address
       };
 
-      sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+      saveDesktopSession(currentUser);
       document.getElementById('desktop-auth-container').style.display = 'none';
       document.getElementById('desktop-main-container').style.display = 'flex';
       playNotificationChime();
@@ -441,7 +490,7 @@ async function verifyDesktopOTP(otp) {
         }, 400);
       } else {
         // Existing user -> Immediately launch inbox!
-        sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+        saveDesktopSession(currentUser);
         setTimeout(() => {
           document.getElementById('desktop-auth-container').style.display = 'none';
           document.getElementById('desktop-main-container').style.display = 'flex';
@@ -675,7 +724,7 @@ async function handleDesktopProfileSubmit(event) {
         email: data.user.email_address
       };
 
-      sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+      saveDesktopSession(currentUser);
 
       document.getElementById('desktop-auth-container').style.display = 'none';
       document.getElementById('desktop-main-container').style.display = 'flex';
@@ -700,15 +749,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // ==================== WORKSPACE INITIALIZATION ====================
-function initDesktopApp() {
-  document.getElementById('user-avatar-badge').innerText = getInitials(currentUser.name);
-  document.getElementById('settings-phone').innerText = currentUser.phone;
-  document.getElementById('settings-email').innerText = currentUser.email;
+function updateProfileDisplay() {
+  if (!currentUser) return;
+  const avatarBadge = document.getElementById('user-avatar-badge');
+  if (avatarBadge) avatarBadge.innerText = getInitials(currentUser.name);
+  const sPhone = document.getElementById('settings-phone');
+  if (sPhone) sPhone.innerText = currentUser.phone;
+  const sEmail = document.getElementById('settings-email');
+  if (sEmail) sEmail.innerText = currentUser.email;
 
   const topPhoneChip = document.getElementById('top-phone-chip');
   if (topPhoneChip) {
     topPhoneChip.innerText = `📞 +91 ${currentUser.phone}`;
   }
+}
+
+function initDesktopApp() {
+  updateProfileDisplay();
 
   // Socket.io Push with targeted personal rooms
   try {
@@ -905,11 +962,11 @@ function renderEmailList(emails) {
     const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
     const recipientsDisplay = getRecipientsDisplay(email);
 
-    const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : email.sender_email);
-    const cleanSender = email.sender_email.replace(/@phonemail\.com$/i, ' (PhoneMail)');
+    const formattedSender = formatSenderDisplay(email.sender_email);
+    const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
     const displaySender = (isSentFolder || isSentByMe) 
       ? `To: ${recipientsDisplay || 'Recipient'}` 
-      : cleanSender;
+      : formattedSender;
     const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
 
     row.innerHTML = `
@@ -921,7 +978,7 @@ function renderEmailList(emails) {
         ${isStarred ? '★' : '☆'}
       </span>
       <div class="item-avatar-circle">${avatarInitial}</div>
-      <div class="item-sender-col" title="${escapeHtml(isSentFolder ? recipientsDisplay : email.sender_email)}">${escapeHtml(displaySender)}</div>
+      <div class="item-sender-col" title="${escapeHtml(isSentFolder ? (recipientsDisplay || 'Recipient') : formatSenderDisplay(email.sender_email, true))}">${escapeHtml(displaySender)}</div>
       <div class="item-content-preview">
         <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
         <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
@@ -963,15 +1020,16 @@ function openEmailDetails(email) {
 
   const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
   const recipientsDisplay = getRecipientsDisplay(email);
+  const formattedSenderWithAddr = formatSenderDisplay(email.sender_email, true);
 
   document.getElementById('full-subject').innerText = email.subject || '(No Subject)';
   document.getElementById('full-sender').innerText = isSentByMe 
     ? (currentUser.name ? `${currentUser.name} <${email.sender_email}>` : email.sender_email) 
-    : email.sender_email;
+    : formattedSenderWithAddr;
   document.getElementById('full-avatar').innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : email.sender_email);
   document.getElementById('full-to').innerText = isSentByMe 
     ? (recipientsDisplay || 'Recipient') 
-    : `me (${currentUser.email})`;
+    : (currentUser ? `${currentUser.name || 'me'} (${currentUser.email || currentUser.phone})` : 'me');
   document.getElementById('full-date').innerText = new Date(email.created_at).toLocaleString([], { 
     dateStyle: 'medium', 
     timeStyle: 'short' 
@@ -1067,67 +1125,173 @@ function toggleSelectAll(masterCheckbox) {
 }
 
 // ==================== COMPOSE MODAL & CONTACTS AUTOCOMPLETE ====================
+function renderContactsDropdown(contacts, headerTitle = 'Registered PhoneMail Users') {
+  const input = document.getElementById('desk-compose-to');
+  const dropdown = document.getElementById('desk-contacts-dropdown');
+  if (!dropdown || !input) return;
+
+  if (!contacts || contacts.length === 0) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  dropdown.innerHTML = `<div class="contacts-autocomplete-header">${escapeHtml(headerTitle)}</div>`;
+  contacts.slice(0, 6).forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'contact-autocomplete-item';
+    const initial = getInitials(c.display_name || c.phone_number);
+    item.innerHTML = `
+      <div class="contact-item-avatar">${initial}</div>
+      <div class="contact-item-info">
+        <div class="contact-item-name">${escapeHtml(c.display_name || `User ${c.phone_number}`)}</div>
+        <div class="contact-item-meta">
+          <span>📞 +91 ${escapeHtml(c.phone_number)}</span>
+          <span class="contact-item-badge" style="background: rgba(4, 106, 56, 0.12); color: #046A38; border: 1px solid rgba(4, 106, 56, 0.3);">✓ PhoneMail</span>
+        </div>
+      </div>
+    `;
+    item.onmousedown = (e) => {
+      e.preventDefault();
+      input.value = c.phone_number;
+      dropdown.style.display = 'none';
+      document.getElementById('desk-compose-subject').focus();
+    };
+    dropdown.appendChild(item);
+  });
+  dropdown.style.display = 'block';
+}
+
+async function pickDeviceContacts() {
+  const input = document.getElementById('desk-compose-to');
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const selected = await navigator.contacts.select(['name', 'tel'], { multiple: true });
+      if (selected && selected.length > 0) {
+        const rawPhones = [];
+        selected.forEach(c => {
+          if (c.tel) c.tel.forEach(t => rawPhones.push(t));
+        });
+
+        if (rawPhones.length === 0) {
+          showToastNotification('No telephone numbers found in selected contacts.');
+          return;
+        }
+
+        showToastNotification('Checking which contacts are registered on PhoneMail...');
+        const res = await fetch('/api/contacts/filter-phonemail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phoneNumbers: rawPhones })
+        });
+        const data = await res.json();
+        const registered = data.registeredContacts || [];
+
+        if (registered.length === 0) {
+          showToastNotification('None of the selected device contacts are registered on PhoneMail yet.');
+        } else if (registered.length === 1) {
+          if (input) input.value = registered[0].phone_number;
+          showToastNotification(`Selected: ${registered[0].display_name} (+91 ${registered[0].phone_number})`);
+        } else {
+          renderContactsDropdown(registered, 'Device Contacts Registered with PhoneMail');
+        }
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        showToastNotification('Device contact picker cancelled.');
+      }
+    }
+  } else {
+    // Desktop prompt fallback
+    const query = prompt('Enter a 10-digit phone number or name to search registered PhoneMail users:');
+    if (query && query.trim()) {
+      const q = query.trim();
+      try {
+        const res = await fetch(`/api/contacts?phone=${currentUser ? currentUser.phone : ''}&q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const list = data.contacts || [];
+        if (list.length === 0) {
+          showToastNotification(`No registered PhoneMail user found for "${q}".`);
+        } else if (list.length === 1) {
+          if (input) input.value = list[0].phone_number;
+          showToastNotification(`Found registered user: ${list[0].display_name} (+91 ${list[0].phone_number})`);
+        } else {
+          renderContactsDropdown(list, `Matching Registered Users for "${q}"`);
+        }
+      } catch (err) {
+        showToastNotification('Failed to search contacts: ' + err.message);
+      }
+    }
+  }
+}
+
 function setupContactsAutocomplete() {
   const input = document.getElementById('desk-compose-to');
   const dropdown = document.getElementById('desk-contacts-dropdown');
   if (!input || !dropdown) return;
 
+  let debounceTimer = null;
+
   async function fetchAndRender(query = '') {
     try {
       if (!currentUser) return;
-      if (cachedContacts.length === 0) {
-        const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
-        const data = await res.json();
-        cachedContacts = data.contacts || [];
-      }
-      
-      const q = query.trim().toLowerCase();
-      const matches = cachedContacts.filter(c => 
-        !q || 
-        (c.display_name && c.display_name.toLowerCase().includes(q)) ||
-        (c.phone_number && c.phone_number.includes(q)) ||
-        (c.email_address && c.email_address.toLowerCase().includes(q))
-      );
+      const q = query.trim();
 
-      if (matches.length === 0) {
+      // If search query is >= 2 characters, search registered users
+      if (q.length >= 2) {
+        // If it's a full email address (e.g. gmail), no need to search phone numbers
+        if (q.includes('@') && (q.endsWith('.com') || q.endsWith('.net') || q.endsWith('.org') || q.endsWith('.in'))) {
+          dropdown.style.display = 'none';
+          return;
+        }
+
+        const res = await fetch(`/api/contacts?phone=${currentUser.phone}&q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const matches = data.contacts || [];
+
+        if (matches.length === 0) {
+          dropdown.innerHTML = `
+            <div class="contacts-autocomplete-header" style="color: var(--text-dim); font-size: 11px; font-weight: normal; padding: 10px;">
+              No registered PhoneMail users matching "${escapeHtml(q)}".<br>
+              <span style="color: var(--accent-green); font-size: 11px;">External emails (e.g. @gmail.com) can be entered directly.</span>
+            </div>
+          `;
+          dropdown.style.display = 'block';
+          return;
+        }
+
+        renderContactsDropdown(matches, 'Registered PhoneMail Users');
+        return;
+      }
+
+      // If query is empty: ONLY show recent conversation contacts (people this user actually communicated with)
+      const res = await fetch(`/api/contacts?phone=${currentUser.phone}`);
+      const data = await res.json();
+      const recentContacts = data.contacts || [];
+
+      if (recentContacts.length === 0) {
         dropdown.style.display = 'none';
         return;
       }
 
-      dropdown.innerHTML = `
-        <div class="contacts-autocomplete-header">PhoneMail Network Users</div>
-      `;
-      matches.slice(0, 6).forEach(c => {
-        const item = document.createElement('div');
-        item.className = 'contact-autocomplete-item';
-        item.innerHTML = `
-          <div class="contact-item-avatar">${getInitials(c.display_name || c.phone_number)}</div>
-          <div class="contact-item-info">
-            <div class="contact-item-name">${escapeHtml(c.display_name || `User ${c.phone_number}`)}</div>
-            <div class="contact-item-meta">
-              <span>📞 +91 ${escapeHtml(c.phone_number)}</span>
-              <span class="contact-item-badge">Instant</span>
-            </div>
-          </div>
-        `;
-        item.onmousedown = (e) => {
-          e.preventDefault();
-          input.value = c.phone_number;
-          dropdown.style.display = 'none';
-          document.getElementById('desk-compose-subject').focus();
-        };
-        dropdown.appendChild(item);
-      });
-      dropdown.style.display = 'block';
+      renderContactsDropdown(recentContacts, 'Recent Contacts (PhoneMail)');
     } catch (err) {
       console.warn('Failed to load contacts for autocomplete:', err);
     }
   }
 
-  input.addEventListener('input', () => fetchAndRender(input.value));
-  input.addEventListener('focus', () => fetchAndRender(input.value));
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => fetchAndRender(input.value), 250);
+  });
+
+  input.addEventListener('focus', () => {
+    if (!input.value.trim()) {
+      fetchAndRender('');
+    }
+  });
+
   input.addEventListener('blur', () => {
-    setTimeout(() => { dropdown.style.display = 'none'; }, 200);
+    setTimeout(() => { dropdown.style.display = 'none'; }, 250);
   });
 }
 
@@ -1340,7 +1504,7 @@ function showToastNotification(msg) {
 
 // ==================== SESSION RESTORATION & LOGOUT ====================
 function restoreSession() {
-  const saved = sessionStorage.getItem('phonemail-user');
+  const saved = localStorage.getItem('phonemail-user') || sessionStorage.getItem('phonemail-user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
@@ -1350,8 +1514,25 @@ function restoreSession() {
         auth.style.display = 'none';
         main.style.display = 'flex';
         initDesktopApp();
+
+        // Cross-device profile sync: fetch latest profile & aliases from database
+        if (currentUser && currentUser.phone) {
+          fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.user) {
+                currentUser.name = data.user.display_name || currentUser.name;
+                currentUser.email = data.user.email_address || currentUser.email;
+                localStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                updateProfileDisplay();
+              }
+            })
+            .catch(() => {});
+        }
       }
     } catch (e) {
+      localStorage.removeItem('phonemail-user');
       sessionStorage.removeItem('phonemail-user');
       currentUser = null;
     }
@@ -1359,6 +1540,7 @@ function restoreSession() {
 }
 
 function logoutDesktop() {
+  localStorage.removeItem('phonemail-user');
   sessionStorage.removeItem('phonemail-user');
   currentUser = null;
   const auth = document.getElementById('desktop-auth-container');

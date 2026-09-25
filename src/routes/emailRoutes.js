@@ -219,19 +219,81 @@ router.post('/emails/sync', async (req, res) => {
 });
 
 /**
- * User Network Contacts (for quick autocomplete in Compose & Chat)
+ * User Network Contacts (Only returns user's actual conversation contacts or searched registered PhoneMail users)
  */
 router.get('/contacts', async (req, res) => {
   try {
     const currentPhone = req.query.phone || '';
     const cleanPhone = String(currentPhone).replace(/\D/g, '').slice(-10);
+    const q = (req.query.q || '').trim();
+
+    if (q.length >= 2) {
+      // User is actively searching by phone or name
+      const searchPattern = `%${q}%`;
+      const contacts = await dbOps.queryAll(`
+        SELECT id, phone_number, email_address, display_name, registration_channel
+        FROM users 
+        WHERE phone_number != ? 
+          AND (phone_number LIKE ? OR display_name LIKE ?)
+          AND registration_channel IN ('PHONE_EMAIL', 'WEB_CLIENT', 'MOBILE_APP', 'TELEGRAM', 'WEB_PORTAL')
+        ORDER BY created_at DESC LIMIT 8
+      `, [cleanPhone, searchPattern, searchPattern]);
+
+      return res.json({ contacts, isSearch: true });
+    }
+
+    // Default when opening compose: ONLY return people this user has communicated with
+    if (!cleanPhone) {
+      return res.json({ contacts: [], isRecent: true });
+    }
+
     const contacts = await dbOps.queryAll(`
-      SELECT id, phone_number, email_address, display_name 
+      SELECT DISTINCT u.id, u.phone_number, u.email_address, u.display_name, u.registration_channel
+      FROM users u
+      JOIN conversation_participants cp ON u.phone_number = cp.phone_number
+      JOIN conversation_participants my_cp ON cp.conversation_id = my_cp.conversation_id
+      WHERE my_cp.phone_number = ? 
+        AND u.phone_number != ?
+        AND u.registration_channel IN ('PHONE_EMAIL', 'WEB_CLIENT', 'MOBILE_APP', 'TELEGRAM', 'WEB_PORTAL')
+      ORDER BY u.created_at DESC LIMIT 15
+    `, [cleanPhone, cleanPhone]);
+
+    res.json({ contacts, isRecent: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Filter device contact numbers to return ONLY those registered with PhoneMail
+ */
+router.post('/contacts/filter-phonemail', async (req, res) => {
+  try {
+    const { phoneNumbers = [] } = req.body;
+    if (!Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+      return res.json({ registeredContacts: [] });
+    }
+
+    const cleanNumbers = phoneNumbers
+      .map(p => String(p).replace(/\D/g, '').slice(-10))
+      .filter(p => p.length === 10);
+
+    if (cleanNumbers.length === 0) {
+      return res.json({ registeredContacts: [] });
+    }
+
+    // De-duplicate queried numbers
+    const uniqueNumbers = Array.from(new Set(cleanNumbers));
+    const placeholders = uniqueNumbers.map(() => '?').join(',');
+
+    const registered = await dbOps.queryAll(`
+      SELECT id, phone_number, email_address, display_name, registration_channel
       FROM users 
-      WHERE phone_number != ? 
-      ORDER BY created_at DESC LIMIT 30
-    `, [cleanPhone]);
-    res.json({ contacts });
+      WHERE phone_number IN (${placeholders})
+        AND registration_channel IN ('PHONE_EMAIL', 'WEB_CLIENT', 'MOBILE_APP', 'TELEGRAM', 'WEB_PORTAL')
+    `, uniqueNumbers);
+
+    res.json({ registeredContacts: registered });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
