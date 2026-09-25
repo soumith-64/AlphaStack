@@ -517,10 +517,15 @@ async function loadEmails(folder = currentFolder) {
   clearEmailSelection();
 
   // 1. INSTANT 0ms RENDER FROM MEMORY CACHE
-  if (emailFolderCache[folder] && emailFolderCache[folder].length > 0) {
+  if (emailFolderCache[folder] && Array.isArray(emailFolderCache[folder])) {
     allEmails = emailFolderCache[folder];
     renderEmailList(allEmails);
     updateFolderCounts(allEmails);
+  } else {
+    // Clear out previous folder's emails immediately so they never linger
+    allEmails = [];
+    renderEmailList([]);
+    updateFolderCounts([]);
   }
 
   // 2. BACKGROUND FETCH TO KEEP SYNCHRONIZED

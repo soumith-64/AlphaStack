@@ -1345,10 +1345,14 @@ async function loadEmails(folder = currentFolder) {
   clearEmailSelection();
 
   // 1. INSTANT 0ms RENDER FROM CACHE (NO DELAY BETWEEN FOLDERS)
-  if (emailFolderCache[folder] && emailFolderCache[folder].length > 0) {
+  if (emailFolderCache[folder] && Array.isArray(emailFolderCache[folder])) {
     allEmails = emailFolderCache[folder];
     renderEmailList(allEmails);
     updateFolderCountsFromList(allEmails);
+  } else {
+    allEmails = [];
+    renderEmailList([]);
+    updateFolderCountsFromList([]);
   }
 
   // 2. BACKGROUND REAL-TIME FETCH TO ENSURE FRESHNESS
