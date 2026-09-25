@@ -705,6 +705,13 @@ function cancelQuote() {
   document.getElementById('quote-preview-bar').style.display = 'none';
 }
 
+function openFullEmailModal(emailId) {
+  const msg = currentMessages.find(m => m.id === emailId);
+  if (msg) {
+    alert(msg.body_text);
+  }
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('chat-message-input');
   const text = input.value.trim();

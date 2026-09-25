@@ -63,6 +63,24 @@ function getInitials(nameOrEmail) {
   return clean.charAt(0).toUpperCase() || 'P';
 }
 
+function getRecipientsDisplay(email) {
+  if (!email) return '';
+  if (email.recipient_emails) {
+    try {
+      const parsed = JSON.parse(email.recipient_emails);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter(Boolean).join(', ');
+      } else if (typeof parsed === 'string') {
+        return parsed;
+      }
+    } catch (e) {
+      const clean = String(email.recipient_emails).replace(/[\[\]"']/g, '').trim();
+      if (clean) return clean;
+    }
+  }
+  return '';
+}
+
 function getFolderFriendlyName(folder) {
   const map = {
     'INBOX': 'Inbox',
@@ -883,8 +901,15 @@ function renderEmailList(emails) {
       ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
       : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-    const avatarInitial = getInitials(email.sender_email);
+    const isSentFolder = currentFolder.toUpperCase() === 'SENT';
+    const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
+    const recipientsDisplay = getRecipientsDisplay(email);
+
+    const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : email.sender_email);
     const cleanSender = email.sender_email.replace(/@phonemail\.com$/i, ' (PhoneMail)');
+    const displaySender = (isSentFolder || isSentByMe) 
+      ? `To: ${recipientsDisplay || 'Recipient'}` 
+      : cleanSender;
     const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
 
     row.innerHTML = `
@@ -896,7 +921,7 @@ function renderEmailList(emails) {
         ${isStarred ? '★' : '☆'}
       </span>
       <div class="item-avatar-circle">${avatarInitial}</div>
-      <div class="item-sender-col" title="${escapeHtml(email.sender_email)}">${escapeHtml(cleanSender)}</div>
+      <div class="item-sender-col" title="${escapeHtml(isSentFolder ? recipientsDisplay : email.sender_email)}">${escapeHtml(displaySender)}</div>
       <div class="item-content-preview">
         <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
         <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
@@ -936,10 +961,17 @@ function openEmailDetails(email) {
   const readingPane = document.getElementById('reading-pane');
   readingPane.style.display = 'flex';
 
+  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
+  const recipientsDisplay = getRecipientsDisplay(email);
+
   document.getElementById('full-subject').innerText = email.subject || '(No Subject)';
-  document.getElementById('full-sender').innerText = email.sender_email;
-  document.getElementById('full-avatar').innerText = getInitials(email.sender_email);
-  document.getElementById('full-to').innerText = currentUser.email;
+  document.getElementById('full-sender').innerText = isSentByMe 
+    ? (currentUser.name ? `${currentUser.name} <${email.sender_email}>` : email.sender_email) 
+    : email.sender_email;
+  document.getElementById('full-avatar').innerText = getInitials(isSentByMe ? (recipientsDisplay || email.sender_email) : email.sender_email);
+  document.getElementById('full-to').innerText = isSentByMe 
+    ? (recipientsDisplay || 'Recipient') 
+    : `me (${currentUser.email})`;
   document.getElementById('full-date').innerText = new Date(email.created_at).toLocaleString([], { 
     dateStyle: 'medium', 
     timeStyle: 'short' 
@@ -1131,8 +1163,12 @@ function startQuickReply() {
   openComposeModal();
   currentReplyToId = activeEmail.id;
   currentReplyConvId = activeEmail.conversation_id;
-  document.getElementById('desk-compose-to').value = activeEmail.sender_email;
-  document.getElementById('desk-compose-subject').value = activeEmail.subject.startsWith('Re:')
+  
+  const isSentByMe = Boolean(activeEmail.sender_email && currentUser && activeEmail.sender_email.includes(currentUser.phone));
+  const replyTarget = isSentByMe ? (getRecipientsDisplay(activeEmail) || activeEmail.sender_email) : activeEmail.sender_email;
+
+  document.getElementById('desk-compose-to').value = replyTarget;
+  document.getElementById('desk-compose-subject').value = (activeEmail.subject || '').startsWith('Re:')
     ? activeEmail.subject
     : `Re: ${activeEmail.subject || ''}`;
   document.getElementById('desk-compose-body').focus();
