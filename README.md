@@ -1,31 +1,45 @@
-# 📱 PhoneMail — Your Phone Number is Your Email Address
+# 🇮🇳 INAI — Bharat's Unified Phone-to-Email WebApp
 
 [![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Hostinger](https://img.shields.io/badge/Hostinger-Cloud%20Hosting-673AB7?logo=hostinger&logoColor=white)](https://www.hostinger.com/)
-[![Twilio](https://img.shields.io/badge/Twilio-Voice%20IVR%20%26%20SMS-F22F46?logo=twilio&logoColor=white)](https://www.twilio.com/)
-[![SMTP](https://img.shields.io/badge/SMTP-Self--Hosted-0052CC)](https://github.com/)
+[![Socket.io](https://img.shields.io/badge/Socket.io-Real--Time%20Sync-010101?logo=socket.dot.io&logoColor=white)](https://socket.io/)
+[![Phone.Email](https://img.shields.io/badge/Phone.Email-Verified%20SMS%20%26%20WhatsApp-25D366?logo=whatsapp&logoColor=white)](https://www.phone.email/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> 🚀 **Built for the AlphaStack 7-Day Buildathon**  
-> Imagine if you didn't need to create complicated email addresses like `john.doe1992@gmail.com`.  
-> What if your email was simply your phone number: **`9876543210@phonemail.com`**?  
-> **PhoneMail makes this real** — with zero paid third-party tools, running natively on **Node.js** and deployed on **Hostinger Cloud Hosting** with your custom domain.
-> 
-> 📋 **Sprint Tracking:** See our [5-Day Fast-Track Roadmap (ROADMAP_5_DAYS.md)](ROADMAP_5_DAYS.md).
+> 🚀 **Built for the AlphaStack Hackathon**  
+> Imagine an email ecosystem where nobody needs to remember, spell, or register cryptic email handles like `john.doe1992@gmail.com`.  
+> What if your email was simply your **10-digit mobile number**: **`9876543210@alphastack.wwisvnr.com`**?  
+> **INAI** makes this a reality for Bharat — an ultra-modern, zero-delay phone-powered email platform built with native Node.js, real-time WebSockets, instant in-memory sync, and national Tiranga aesthetics.
 
 ---
 
-## 🎯 What is PhoneMail? (In 60 Seconds)
+## ⚡ Key Highlights & Core Innovations
 
-PhoneMail connects traditional phone lines (voice calls and SMS) with modern email:
-
-1. **Your Email ID:** Your phone number (e.g. `9876543210@phonemail.com`).
-2. **Anyone Can Email You:** Anyone from Gmail, Outlook, or Yahoo can send an email to your phone number.
-3. **Smart Inbox on Mobile:** Looks and feels just like **WhatsApp**, turning emails from each person into a chat conversation (inspired by **Spike Mail**).
-4. **Power Inbox on Desktop:** Looks and feels just like **Gmail** for power users.
-5. **No Smartphone? No Problem:** If you sign up by phone or kiosk, you receive an **instant SMS text** whenever someone emails you:  
-   > *"You have received an email from boss@company.com. Subject: Meeting update."*
-6. **100% Free & Self-Hosted:** No SendGrid, no Mailgun, and no monthly fees. Built with lightweight, native Node.js and SQLite.
+1. **📱 Phone Number IS Your Email Address:**  
+   Your email ID is automatically mapped to your mobile number (`+91 93815 64959` $\rightarrow$ `9381564959@alphastack.wwisvnr.com`).
+2. **⚡ Zero-Delay Real-Time Sync (0ms Switching):**  
+   Switching between folders (`All Mail`, `Inbox`, `Important`, `Starred`, `Sent`, `Archive`, `Trash`) renders **instantly in 0ms** from an in-memory client cache (`emailFolderCache`), while background synchronization and Socket.IO real-time pipelines update the view without layout flashes.
+3. **⭐ Mark as Important & Priority Sorting:**  
+   Users can mark critical emails as Important. The system assigns a bold gold `PRIORITY` tag and automatically surfaces them at the top of both **Inbox** and **All Mail** (`ORDER BY is_important DESC, created_at DESC`).
+4. **📅 Grouped Emails by Date:**  
+   Clean sticky date section headers (**Today**, **Yesterday**, **This Week**, **Older**) with live item count badges for quick triage.
+5. **👆 Touch Swipe Actions & Desktop Quick Hover:**  
+   - **Swipe Left:** Reveals **Archive** (Amber) & **Delete** (Red). Completing the swipe immediately executes the action.
+   - **Swipe Right:** Reveals **Flag / Important** (Gold) & **Star**. Completing the swipe marks the mail as Important.
+   - **Desktop Row Hover:** Instant action buttons appear on row hover for 1-click archiving, deleting, or starring.
+6. **☑️ Multi-Select & Floating Bulk Action Toolbar:**  
+   Custom SVG tick checkmarks (`✓`), row selection without accidental mail navigation, indeterminate master checkbox, and a sleek floating bulk toolbar:  
+   `[X selected] [Read] [Unread] [⭐ Imp] [Archive] [Trash] [✕]`.
+7. **🪪 Digital ID Card with Dynamic QR Code:**  
+   Official digital identity modal designed as a luxury smart card with a holographic EMV chip, verified status, phone mail ID, dynamic SVG QR code (`mailto:`), 1-click clipboard copy, and native Web Share API support.
+8. **🌐 Real-Time Multi-Language Translation:**  
+   Navbar language dropdown supporting **English, हिन्दी (Hindi), தமிழ் (Tamil), తెలుగు (Telugu), ಕನ್ನಡ (Kannada), বাংলা (Bengali), and Español**. Includes an **AI Real-Time Translation** button inside the reading pane that translates the subject line and email body on the fly.
+9. **🔍 Standalone Auto-Contact Fetch (Zero Prompts):**  
+   Intrusive browser contact permission dialogs are completely removed. Recipient autocomplete queries registered users silently and securely from `/api/contacts`.
+10. **📂 "All Mail" Unified View (`ALL`):**  
+    A single unified mailbox aggregating inbound, outbound, and sub-account communications.
+11. **🇮🇳 National Tiranga Design System:**  
+    Modern Plus Jakarta Sans typography, Kesari Saffron (`#FF671F`), Bharat Green (`#046A38` / `#10B981`), and Chakra Navy (`#06038D`) accents in both Light (Daylight Bharat) and Dark (Midnight Chakra) modes.
 
 ---
 
@@ -33,240 +47,228 @@ PhoneMail connects traditional phone lines (voice calls and SMS) with modern ema
 
 | Layer | Technologies Used | Purpose |
 | :--- | :--- | :--- |
-| **Runtime & Backend** | **Node.js 18+**, **Express.js** | Core API, HTTP services, session routing |
-| **Real-Time Engine** | **Socket.io (WebSockets)** | Instant zero-latency inbox updates without page refresh |
-| **Database** | **SQLite (WAL Mode)** | Zero-config, ultra-fast persistent storage |
-| **Inbound Mail Parsing** | **smtp-server**, **mailparser** | Accepts & parses standard MIME emails without external APIs |
-| **Telephony Gateway** | **Twilio Voice (TwiML)**, **Twilio SMS** | Toll-free IVR (Press '1' & '2'), SMS registration & notifications |
-| **Frontend Interfaces** | **HTML5**, **Vanilla CSS**, **JavaScript** | Responsive Mobile (WhatsApp + Spike) & Desktop (Gmail) UI |
-| **Hosting & Cloud** | **Hostinger Cloud Hosting** | 1-Click Git deployment, free SSL, and domain routing |
+| **Backend Core** | **Node.js 18+**, **Express.js** | High-performance REST API, email routing, and session management |
+| **Real-Time Engine** | **Socket.io** | Instant push delivery for inbound and outbound messages |
+| **Database** | **SQLite (WAL Mode)** / MySQL Compatible | Zero-latency local persistence with auto-migration (`is_important`, `is_read`, `sub-accounts`) |
+| **SMTP Delivery** | **Nodemailer**, **Hostinger SMTP** | Production outbound mail delivery to Gmail, Outlook, Yahoo, etc. |
+| **MIME Parsing** | **mailparser**, **smtp-server** | Robust inbound email extraction and normalization |
+| **Authentication** | **Phone.Email SDK**, **Direct OTP** | SMS & WhatsApp one-tap authentication + 6-cell Telegram OTP auto-submit |
+| **Translation Engine** | **Google Neural API + Fallback Dictionaries** | Real-time multilingual translation for Indian regional languages |
+| **Styling & UI** | **Vanilla CSS (Tiranga Tokens)** | Zero bloated frameworks, maximum performance and fluid animations |
 
 ---
 
-## 🏗️ System Architecture & Data Flow
+## 🏗️ System Architecture & Workflow
 
 ```mermaid
-graph TD
-    subgraph Inbound Channels
-        Call[Toll-Free Voice Call] -->|TwiML Stream| IVR[Twilio Voice IVR]
-        SMSIn[SMS 'REGISTER'] -->|Inbound Text| SMSGate[Twilio SMS Gateway]
-        ExtMail[External Mail Server<br/>Gmail / Outlook] -->|SMTP Port 25 / Catch-All| MailParser[Inbound Mail Service<br/>smtp-server + mailparser]
-        MobUser[Mobile Web User] -->|HTTP / WebSocket| MobUI[Mobile Client<br/>WhatsApp + Spike Mail UI]
-        DeskUser[Desktop Web User] -->|HTTP / WebSocket| DeskUI[Desktop Client<br/>Gmail UI]
+flowchart TD
+    subgraph Clients["User Interfaces"]
+        DeskUI["Desktop WebApp (/desktop)"]
+        MobUI["Mobile WebApp (/mobile)"]
     end
 
-    subgraph PhoneMail Node.js Engine
-        IVR -->|POST /api/twilio/voice-gather| CoreAPI[Express Core Engine]
-        SMSGate -->|POST /api/twilio/sms| CoreAPI
-        MailParser --> CoreAPI
-
-        CoreAPI --> DB[(SQLite Database<br/>WAL Mode)]
-        CoreAPI --> NotifDispatcher[SMS Notification Dispatcher]
-        CoreAPI --> WS[Socket.io Realtime Server]
+    subgraph Auth["Identity & Verification"]
+        PhoneEmail["Phone.Email SDK (SMS & WhatsApp)"]
+        DirectOTP["6-Cell OTP Engine"]
+        AutoDetect["Phone Number Auto-Detection"]
     end
 
-    subgraph Outbound & Alerts
-        NotifDispatcher -->|if !hasMobileApp| SMSOut[SMS Notification<br/>"New email from X..."]
-        WS -->|Instant Chat Sync| MobUI
-        WS -->|Instant Inbox Sync| DeskUI
+    subgraph AppServer["INAI Node.js Backend"]
+        API["Express REST API (/api/emails, /api/contacts, /api/auth)"]
+        SocketIO["Socket.io Real-Time Push"]
+        CacheMgr["In-Memory Zero-Delay Sync Engine"]
+        OutboundSMTP["Hostinger SMTP Engine (Outbound to Gmail/External)"]
+        InboundParser["MIME Mail Parser (Inbound Emails)"]
     end
+
+    subgraph DB["Persistence Layer"]
+        SQLiteDB[("SQLite WAL Database<br/>Emails, Users, Contacts, Aliases")]
+    end
+
+    subgraph External["External World"]
+        Gmail["External Services (Gmail, Outlook, Yahoo)"]
+    end
+
+    DeskUI <-->|HTTP REST & WebSockets| API
+    MobUI <-->|HTTP REST & WebSockets| API
+    Auth --> API
+    API <--> DB
+    API --> SocketIO --> DeskUI & MobUI
+    API --> OutboundSMTP --> Gmail
+    Gmail --> InboundParser --> API
 ```
 
 ---
 
-## 🌾 Rural & Elderly Accessibility ("The Zero-Domain Experience")
+## 📱 Detailed Feature Catalog
 
-In rural communities and for elderly citizens, typing `@` symbols, remembering `.com` spellings, and reading complex email threads is intimidating. PhoneMail solves this with **4 accessibility breakthroughs**:
+### 1. Unified Mailbox Structure
+INAI offers full folder management across desktop and mobile:
+- **All Mail (`ALL`):** Displays all incoming, outgoing, and sub-account communications.
+- **Inbox (`INBOX`):** Primary inbound messages with live unread count badges.
+- **Important (`IMPORTANT`):** Priority messages flagged with gold stars and priority sorting.
+- **Starred (`STARRED`):** Bookmarked and highlighted threads.
+- **Sent (`SENT`):** Outgoing emails with recipient phone or email formatting.
+- **Drafts (`DRAFTS`):** Saved drafts.
+- **Archive (`ARCHIVE`):** Archived emails removed from the active stream.
+- **Spam (`SPAM`):** Flagged spam and suspicious senders.
+- **Trash (`TRASH`):** Deleted messages pending permanent cleanup.
 
-* 🚫 **No `@` Symbol Needed (Just 10 Digits):**  
-  Just like **WhatsApp** and **UPI Numbers (PhonePe/Google Pay)**, users **never type an email domain** inside the app. To send an email, they simply type the **10-digit phone number** or select from their contacts. The system handles the internet email routing invisibly.
-* 🎙️ **IVR Voice-Mailbox (Dial & Listen):**  
-  If an elderly or illiterate user receives an email, they don't have to read it. They simply dial the toll-free number and press **`2`**:
-  > *"Namaste! You have 1 new email from Govt Scheme Office. Press 1 to listen."*  
-  The IVR reads the email out loud in their local language using Text-to-Speech!
-* 🪪 **Digital PhoneMail ID Card (QR Code):**  
-  From their profile, users can view or print a simple **Digital ID Card** containing their photo, 10-digit number, and a scannable QR code. Government officers, banks, and hospitals can scan it to email them instantly without spelling errors.
-* 🗣️ **Vernacular Language Support:**  
-  The mobile onboarding begins with **Language Selection** (English, Hindi, Tamil, Telugu, etc.), ensuring the entire interface speaks the user's mother tongue.
+### 2. Dual-Source Classification Tabs
+Quickly filter the active mailbox between:
+- **All Mail:** Aggregates everything in the current folder.
+- **INAI Network:** Filters for messages sent from other INAI/PhoneMail numbers (clean phone display, hiding `@alphastack.wwisvnr.com`).
+- **External:** Filters for messages from legacy providers (e.g. `@gmail.com`, `@yahoo.com`, `@outlook.com`, etc.).
 
----
+### 3. Priority Email Engine
+- One-click importance toggle available on email cards, swipe gestures, and inside the reading pane.
+- Important emails are automatically promoted to the top of folder streams via `ORDER BY is_important DESC, created_at DESC`.
+- Tagged with an eye-catching **`PRIORITY`** badge for instant identification.
 
-## 👥 Multiple Email IDs on 1 Phone Number (Family & Privacy Aliases)
+### 4. Interactive Touch Swipe Gestures
+- **Swipe Left:** Reveals **Archive** (Amber) & **Delete** (Red) action buttons. Full drag trigger executes the action automatically.
+- **Swipe Right:** Reveals **Flag / Important** (Gold) & **Star**. Full drag trigger flags the email as Important.
+- Desktop users enjoy row-hover quick actions (`Important`, `Archive`, `Delete`) for rapid triage.
 
-> *Hackathon Requirement: "A profile icon in the top-right providing access to account settings. Manage Alias IDs, language, personal details..."*
+### 5. Digital ID Card & Dynamic QR Modal
+- Clicking the ID card icon opens a luxury smart card dialog.
+- Displays name, verified phone number, and official email address.
+- Embedded dynamic SVG QR code configured with `mailto:` scheme for instant scan-to-compose on any device.
+- **Copy Mail ID** button with real-time feedback and native **Share** integration using the Web Share API.
 
-What if one user wants separate personal and work emails? Or what if **an entire rural household shares a single smartphone**? PhoneMail solves this seamlessly:
+### 6. Real-Time Multilingual Translation
+- Instant UI translation across 7 languages:
+  - 🇬🇧 English
+  - 🇮🇳 हिन्दी (Hindi)
+  - 🇮🇳 தமிழ் (Tamil)
+  - 🇮🇳 తెలుగు (Telugu)
+  - 🇮🇳 ಕನ್ನಡ (Kannada)
+  - 🇮🇳 বাংলা (Bengali)
+  - 🇪🇸 Español
+- **Reading Pane AI Translation:** One-click translation of email subject lines and body text into the user's selected language.
 
-### 1. Simple Number Extensions (The UPI / Sub-Number Model)
-Users can append a simple dot or hyphen followed by a digit or tag:
-* **Primary Email:** `9876543210@phonemail.com`
-* **Sub-ID 1 (Personal/Govt):** `9876543210.1@phonemail.com`
-* **Sub-ID 2 (Shopping/OTPs):** `9876543210.2@phonemail.com`
-* **Work Email:** `9876543210.work@phonemail.com`
-
-*For village elders:* They don't need to remember words. They just say: *"My number with a .1 at the end."*
-
-### 2. Multi-Profile "Family Inboxes" (The Netflix Model)
-In households where parents and children share 1 phone:
-* Inside settings, tap **`[ + Add Profile ]`**:
-  * 👨 **Father (Ramesh):** `9876543210.ramesh@phonemail.com`
-  * 👩 **Mother (Sunita):** `9876543210.sunita@phonemail.com`
-  * 🎓 **Son (Rahul - Student):** `9876543210.rahul@phonemail.com`
-* Inside the app, users switch between profiles with a single tap at the top. Rahul's college emails go to Rahul's tab, and the father's agricultural subsidies go to the father's tab.
-
-### 3. Claim a Professional Handle
-Users can claim a custom name linked to their phone number (e.g., `soumith@phonemail.com` $\rightarrow$ links to `9876543210`). Both IDs deliver to the same inbox.
-
-### 4. Disposable "Spam-Shield" Aliases
-Generate temporary addresses for discounts and shopping (e.g. `9876543210.shop@phonemail.com`). A simple **ON / OFF switch** in settings lets users block spam with 1 tap.
-
----
-
-## ⚡ 4 Easy Ways to Create an Account
-
-You can register an email account in under 10 seconds:
-
-| Method | How it works | Who it's for |
-| :--- | :--- | :--- |
-| **📞 1. Toll-Free Phone Call (IVR)** | Call the number and press **`1`** on your keypad. Your account is created instantly using your Caller ID. | Anyone with a landline or feature phone |
-| **💬 2. Send an SMS** | Send any text (like `REGISTER`) to the phone number. | Quick signup without internet |
-| **🌐 3. 2-Field Web Portal** | Visit `/portal`, enter your Phone Number + OTP, click Submit. The form resets automatically for the next user. | Registration kiosks, schools, or offices |
-| **📱 4. Web & Mobile App** | Open the website or mobile link, enter phone number, verify OTP. | Smartphone & desktop users |
+### 7. Standalone Auto-Contact Fetch
+- Zero intrusive browser device permissions.
+- In the Compose modal, typing in the **TO** field auto-queries `/api/contacts`.
+- Instant dropdown displays matching registered contacts and their numbers.
 
 ---
 
-## 🎨 Two Beautiful Interfaces
+## 🚀 Getting Started
 
-### 📱 1. Mobile Experience (WhatsApp + Spike Mail)
-* **Onboarding (WhatsApp Style):**
-  * **Screen 1:** Language Selection (English, Spanish, Hindi, etc.)
-  * **Screen 2:** Terms & Conditions with WhatsApp green buttons
-  * **Screen 3:** Phone verification (auto-detects SIM number)
-  * **Screen 4:** 6-digit OTP verification (auto-detects and auto-verifies)
-* **Inbox (Spike Mail Style):**
-  * **No separate Inbox or Sent:** All emails from the same person are grouped into a continuous chat.
-  * **Filter Chips:** Tap `All`, `Unread`, `Attachments`, or `Favorites`.
-  * **Compact Subject:** Displayed neatly above the chat bubble.
-  * **Swipe Right:** Swipe any message bubble to reply directly to it.
-  * **Group Chats:** Selecting 2 or more people in Compose automatically starts a group conversation.
-  * **Manage Aliases:** Create aliases like `9876543210-work@phonemail.com` from your profile.
+### Prerequisites
+- Node.js 18.x or 20.x
+- npm 9+
 
----
+### Installation & Run
 
-### 💻 2. Desktop Experience (Gmail Style)
-* **Clean Login:** A single minimalist card with Phone + OTP + Terms of Service link.
-* **Familiar Gmail Layout:**
-  * Left sidebar with a large **"+ Compose"** button, Inbox (with unread count), Sent, Drafts, Spam, and Trash.
-  * Search bar across the top.
-  * Email list with checkboxes, stars, sender name, and subject preview.
-  * Side-by-side Reading Pane with quick Reply / Forward buttons.
-  * Profile settings to manage your PhoneMail Aliases.
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/soumith-64/AlphaStack.git
+   cd AlphaStack
+   ```
 
----
+2. **Configure Environment Variables:**
+   Create a `.env` file in the root directory:
+   ```env
+   PORT=3000
+   DOMAIN=alphastack.wwisvnr.com
+   SMTP_HOST=smtp.hostinger.com
+   SMTP_PORT=465
+   SMTP_SECURE=true
+   SMTP_USER=no-reply@alphastack.wwisvnr.com
+   SMTP_PASS=YourSmtpPasswordHere
+   ```
 
-## 🚀 Quickstart: Run Locally in 3 Steps
+3. **Install Dependencies:**
+   ```bash
+   npm install
+   ```
 
-PhoneMail runs natively on Node.js without any heavy virtualization.
+4. **Verify Syntax & Code Correctness:**
+   ```bash
+   node --check src/server.js
+   node --check src/public/desktop/app.js
+   node --check src/public/mobile/app.js
+   ```
 
-### Step 1: Clone the Repo
-```bash
-git clone https://github.com/soumith-64/AlphaStack.git
-cd AlphaStack
-```
+5. **Start INAI Server:**
+   ```bash
+   npm start
+   ```
 
-### Step 2: Set Your Domain
-Copy the example config:
-```bash
-cp .env.example .env
-```
-*(By default, it is pre-configured to work out of the box with zero setup).*
-
-### Step 3: Install & Start
-```bash
-npm install
-npm start
-```
-
-🎉 **That's it!** Open your browser:
-* 📱 **Mobile Interface (WhatsApp + Spike):** [http://localhost:3000/mobile](http://localhost:3000/mobile)
-* 💻 **Desktop Interface (Gmail):** [http://localhost:3000/desktop](http://localhost:3000/desktop)
-* 🌐 **2-Field Registration Kiosk:** [http://localhost:3000/portal](http://localhost:3000/portal)
-* 🧪 **Judge Testing Lab & Live Simulator:** [http://localhost:3000/simulator](http://localhost:3000/simulator)
+6. **Access Web Interfaces:**
+   - 💻 **Desktop WebApp:** [http://localhost:3000/desktop/](http://localhost:3000/desktop/)
+   - 📱 **Mobile WebApp:** [http://localhost:3000/mobile/](http://localhost:3000/mobile/)
+   - 🌐 **Registration Portal:** [http://localhost:3000/portal/](http://localhost:3000/portal/)
+   - 🧪 **Live Simulator & Testing Lab:** [http://localhost:3000/simulator/](http://localhost:3000/simulator/)
 
 ---
 
-## 🧪 How Judges Can Test in 2 Minutes (Zero Telephony Cost)
+## 🌐 Production Cloud Deployment (Hostinger)
 
-We built an interactive **Testing Lab** right into the app at **`/simulator`** so judges and evaluators don't need a Twilio account or phone balance to test:
+INAI is optimized for single-command Git deployment on **Hostinger Cloud Hosting**:
 
-1. **Test the IVR Phone Call:**
-   - Open `/simulator`.
-   - Click **"Simulate Inbound Call"**.
-   - Listen/read the prompt: *"Press 1 to create your PhoneMail account"*.
-   - Tap keypad **`1`** $\rightarrow$ Account is created instantly!
-2. **Test Inbound Email & SMS Notification:**
-   - On the simulator screen, send a test email to `9876543210@phonemail.com`.
-   - Look at the **Live SMS Audit Log** at the bottom of the screen.
-   - You will immediately see:
-     ```
-     [OUTGOING SMS] To: 9876543210
-     "You have received an email from test@gmail.com. Subject: Project Update."
-     ```
-3. **Verify the Inbox:**
-   - Log into `/desktop` or `/mobile` with `9876543210` and see the email waiting in real time!
-
----
-
-## 🌐 Deploying to Hostinger Cloud Hosting
-
-Deploying to **Hostinger Cloud Hosting** takes just 3 clicks via hPanel:
-
-1. Log into **Hostinger hPanel** $\rightarrow$ Navigate to **Node.js**.
-2. Select Node version **`20.x`** and set Entry Point to **`src/server.js`**.
+1. Log into **Hostinger hPanel** $\rightarrow$ Navigate to **Websites** $\rightarrow$ **Node.js**.
+2. Select Node version **`20.x`** and set the Application Entry File to **`src/server.js`**.
 3. Connect your GitHub repository: `https://github.com/soumith-64/AlphaStack.git`.
-4. Click **Deploy**! Hostinger automatically installs dependencies, issues a free SSL certificate, and serves your app at `https://yourdomain.com`.
+4. Set application environment variables in the hPanel Configuration tab.
+5. Click **Deploy / Restart Application**. Hostinger will install packages, configure the reverse proxy with SSL, and serve your app globally.
 
 ---
 
-## 📂 Project Architecture
+## 📂 Project Directory Structure
 
 ```
 AlphaStack/
-├── package.json           # Node.js dependencies & scripts
-├── README.md              # Clear project documentation
-├── ROADMAP_5_DAYS.md      # 5-Day implementation roadmap
-├── HACKATHON_ANALYSIS.md  # Deep technical spec & compliance sheet
+├── package.json               # Node.js dependencies & run scripts
+├── README.md                  # Comprehensive platform documentation
+├── ROADMAP_5_DAYS.md          # Implementation timeline
+├── HACKATHON_ANALYSIS.md      # Architecture & compliance specifications
 ├── src/
-│   ├── server.js          # Main web & WebSocket server
-│   ├── smtp/              # Built-in local SMTP mail parser
-│   ├── services/          # Telephony, SMS, and notification logic
-│   ├── database/          # SQLite database (zero config, super fast)
-│   ├── routes/            # REST API & Twilio webhooks
-│   └── public/            # Frontend interfaces
-│       ├── mobile/        # WhatsApp onboarding + Spike Mail UI
-│       ├── desktop/       # Gmail desktop UI
-│       ├── portal/        # 2-Field Registration Kiosk
-│       └── simulator/     # Judge Testing Lab & SMS Viewer
+│   ├── server.js              # Express app, HTTP routes & WebSocket setup
+│   ├── smtp/                  # Inbound SMTP listener & mail parser
+│   ├── services/              # SMS dispatcher, IVR telephony & notification handlers
+│   ├── database/
+│   │   ├── db.js              # SQLite connection, WAL mode & auto-migrations
+│   │   └── schema.sql         # Database schema (emails, users, contacts, aliases)
+│   ├── routes/
+│   │   ├── authRoutes.js      # Phone verification, OTP validation & profile registration
+│   │   ├── emailRoutes.js     # Email CRUD, bulk operations, starring & importance APIs
+│   │   └── twilioRoutes.js    # Voice IVR & SMS webhook handlers
+│   └── public/
+│       ├── desktop/           # Desktop WebApp (INAI Gmail-grade client)
+│       │   ├── index.html
+│       │   ├── style.css
+│       │   └── app.js
+│       ├── mobile/            # Mobile WebApp (INAI smartphone client)
+│       │   ├── index.html
+│       │   ├── style.css
+│       │   └── app.js
+│       ├── portal/            # 2-Field Registration Kiosk
+│       └── simulator/         # Interactive Testing Lab & SMS Viewer
 ```
 
 ---
 
-## 📋 Hackathon Checklist
+## 📋 Hackathon Requirements & Compliance Matrix
 
-- [x] **Phone number as email address** (e.g. `9876543210@phonemail.com`)
-- [x] **Zero-Domain Addressing** (10-digit number composition without `@` symbol)
-- [x] **IVR Account Creation** (Press '1' on voice call to create account)
-- [x] **IVR Audio Mailbox** (Press '2' to listen to unread emails aloud via Text-to-Speech)
-- [x] **SMS Account Creation** (Text number to create account)
-- [x] **2-Field Web Registration Portal** (Phone + OTP, auto-resets on submit)
-- [x] **Targeted SMS Notifications** (Only sent to non-mobile app users)
-- [x] **Manage Alias IDs & Extensions** (Sub-numbers `.1`, `.2`, family profiles & custom handles)
-- [x] **Mobile WhatsApp Design** (4-screen onboarding + device permission flow)
-- [x] **Mobile Spike Mail Inbox** (Chats, compact subject, single-reply, expander, locked To field)
-- [x] **Desktop Gmail Design** (Sidebar folders, search bar, list view, reading pane)
-- [x] **Pure Node.js & Hostinger Cloud Ready** (Fast, lightweight, zero container overhead)
+- [x] **Phone number as primary email address** (`9876543210@alphastack.wwisvnr.com`)
+- [x] **Zero-Domain Addressing** (10-digit number composition without forcing `@` input)
+- [x] **Rebranded to INAI** (Unified national identity with Indian Tricolor theme)
+- [x] **Zero-Delay Mailbox Sync** (0ms client caching + real-time WebSocket updates)
+- [x] **"All Mail" Unified View** (Aggregation of inbound, outbound, and sub-account mails)
+- [x] **Important Flagging & Priority Sorting** (Gold badges + prioritized ordering)
+- [x] **Date Grouping** (Today, Yesterday, This Week, Older)
+- [x] **Touch Swipe Gestures** (Swipe left to archive/delete, swipe right for importance/star)
+- [x] **Multi-Select & Bulk Actions** (Custom checkmarks + floating bulk toolbar)
+- [x] **Digital ID Card with Dynamic QR** (Official luxury smart card with scan-to-mail QR)
+- [x] **Real-Time Multilingual Translation** (7 languages + reading pane AI translation)
+- [x] **Standalone Auto-Contact Fetch** (Silent query without browser permission prompts)
+- [x] **Desktop-Grade Mobile WebApp** (Full mobile webapp mirroring desktop layout and power)
+- [x] **Outbound SMTP Delivery** (Hostinger SMTP integration with deliverability to Gmail)
 
 ---
 
 ## 📄 License
-Open source and released under the [MIT License](LICENSE).
+This project is open-source and available under the [MIT License](LICENSE).
