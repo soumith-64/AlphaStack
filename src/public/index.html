@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>PhoneMail — Bharat's Phone-Number-Powered Email Platform</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✉️</text></svg>">
+  <title>INAI Barath Mail — 143 · Oru Ping, Oru Bond.</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body, html { width: 100%; height: 100%; background: #080e1a; color: #f8fafc; display: flex; align-items: center; justify-content: center; }
     .loader-box { text-align: center; }
-    .loader-icon { font-size: 48px; margin-bottom: 16px; animation: bounce 1s infinite alternate; }
-    .loader-title { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.2px; }
+    .loader-logo { width: 72px; height: 72px; border-radius: 50%; margin-bottom: 14px; animation: bounce 1s infinite alternate; }
+    .loader-title { font-size: 20px; font-weight: 800; color: #fff; letter-spacing: -0.2px; }
     .loader-sub { font-size: 13px; color: #94a3b8; margin-top: 6px; }
     @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-8px); } }
   </style>
   <script>
-    // Intelligent device-native redirect to the real production application
     (function() {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
       const target = isMobile ? '/mobile/' : '/desktop/';
@@ -25,9 +24,9 @@
 </head>
 <body>
   <div class="loader-box">
-    <div class="loader-icon">✉️</div>
-    <div class="loader-title">PhoneMail</div>
-    <div class="loader-sub">Connecting to your secure mailbox...</div>
+    <img src="/assets/logo.png" alt="INAI Logo" class="loader-logo">
+    <div class="loader-title">INAI Barath Mail</div>
+    <div class="loader-sub">143 · Oru Ping, Oru Bond.</div>
   </div>
 </body>
 </html>

@@ -209,21 +209,26 @@ const showNotify = {
 // ==================== AUTH & SESSION RESTORATION ====================
 function restoreSession() {
   const saved = localStorage.getItem('phonemail-mobile-user') || 
+                localStorage.getItem('inai_user') || 
                 localStorage.getItem('phonemail-user') ||
                 sessionStorage.getItem('phonemail-mobile-user');
   if (saved) {
     try {
       const user = JSON.parse(saved);
-      if (user && user.phone) {
+      if (user && (user.phone || user.email)) {
         currentUser = user;
+        document.documentElement.classList.add('has-saved-session');
         initAppView();
         return;
       }
     } catch (e) {}
   }
+  document.documentElement.classList.remove('has-saved-session');
   // Show Onboarding
-  document.getElementById('onboarding-container').style.display = 'flex';
-  document.getElementById('app-container').style.display = 'none';
+  const onb = document.getElementById('onboarding-container');
+  const app = document.getElementById('app-container');
+  if (onb) onb.style.display = 'flex';
+  if (app) app.style.display = 'none';
   goToScreen('screen-phone');
 }
 
@@ -234,10 +239,12 @@ function saveMobileSession(user) {
   const str = JSON.stringify(user);
   if (remember) {
     localStorage.setItem('phonemail-mobile-user', str);
+    localStorage.setItem('inai_user', str);
     localStorage.setItem('phonemail-user', str);
     if (user.phone) localStorage.setItem('phonemail_saved_phone', user.phone);
   }
   sessionStorage.setItem('phonemail-mobile-user', str);
+  document.documentElement.classList.add('has-saved-session');
 }
 
 function initAppView() {
@@ -508,8 +515,11 @@ async function completeMobileProfile() {
 
 function logoutMobile() {
   localStorage.removeItem('phonemail-mobile-user');
+  localStorage.removeItem('inai_user');
   localStorage.removeItem('phonemail-user');
   sessionStorage.removeItem('phonemail-mobile-user');
+  sessionStorage.removeItem('phonemail-user');
+  document.documentElement.classList.remove('has-saved-session');
   currentUser = null;
   location.reload();
 }
@@ -724,7 +734,7 @@ async function executeBulkAction(action) {
     await fetch('/api/emails/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, emailIds, folder: currentFolder })
+      body: JSON.stringify({ action, ids: emailIds, emailIds: emailIds, folder: currentFolder })
     });
     showToastNotification(`Updated ${count} message${count > 1 ? 's' : ''} ✓`, 'success');
   } catch (err) {
@@ -737,7 +747,7 @@ async function executeBulkActionOnSingle(id, action) {
     await fetch('/api/emails/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, emailIds: [id], folder: currentFolder })
+      body: JSON.stringify({ action, ids: [id], emailIds: [id], folder: currentFolder })
     });
     allEmails = allEmails.filter(e => e.id !== id);
     if (emailFolderCache[currentFolder]) {
@@ -889,15 +899,14 @@ function renderEmailList(emails) {
 }
 
 function createMobileEmailCard(email) {
-  const card = document.createElement('div');
+  const cardWrapper = document.createElement('div');
   const isSelected = selectedEmailIds.has(email.id);
   const isStarred = email.is_starred === 1;
   const isImportant = email.is_important === 1;
 
-  card.id = `mob-row-${email.id}`;
-  card.dataset.id = email.id;
-  card.className = `email-card-item ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}`;
-  card.onclick = () => openEmailDetails(email);
+  cardWrapper.id = `mob-row-${email.id}`;
+  cardWrapper.dataset.id = email.id;
+  cardWrapper.className = `email-card-wrapper`;
 
   const dateObj = new Date(email.created_at);
   const isToday = new Date().toDateString() === dateObj.toDateString();
@@ -911,8 +920,8 @@ function createMobileEmailCard(email) {
 
   const isFromPhoneMail = isPhoneMailSender(email.sender_email);
   const sourceBadgeHtml = isFromPhoneMail
-    ? `<span class="badge-source-tag badge-phonemail-pill">⚡ INAI</span>`
-    : `<span class="badge-source-tag badge-external-pill">🌐 External</span>`;
+    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
+    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
   const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
@@ -921,105 +930,148 @@ function createMobileEmailCard(email) {
     : formattedSender;
   const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 80);
 
-  card.innerHTML = `
-    <!-- Touch Swipe Left Actions (Archive & Delete) -->
-    <div class="swipe-actions-container">
-      <div class="swipe-left-reveal" style="display: none;">
-        <button class="swipe-btn archive" onclick="executeBulkActionOnSingle('${email.id}', 'archive'); event.stopPropagation();">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+  cardWrapper.innerHTML = `
+    <!-- Underlay Swipe Actions (revealed when surface slides) -->
+    <div class="swipe-actions-underlay">
+      <div class="swipe-right-actions">
+        <button type="button" class="swipe-btn star" onclick="toggleStar('${email.id}', event); snapClosed();" title="Star">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>${isStarred ? 'Unstar' : 'Star'}</span>
+        </button>
+        <button type="button" class="swipe-btn important" onclick="toggleImportant('${email.id}', event); snapClosed();" title="Priority">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>Priority</span>
+        </button>
+      </div>
+      <div class="swipe-left-actions">
+        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnSingle('${email.id}', 'archive'); event.stopPropagation();" title="Archive">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
           <span>Archive</span>
         </button>
-        <button class="swipe-btn delete" onclick="executeBulkActionOnSingle('${email.id}', 'delete'); event.stopPropagation();">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnSingle('${email.id}', 'delete'); event.stopPropagation();" title="Delete">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           <span>Delete</span>
         </button>
       </div>
-      <div class="swipe-right-reveal" style="display: none;">
-        <button class="swipe-btn important" onclick="toggleImportant('${email.id}', event); event.stopPropagation();">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Flag</span>
-        </button>
-        <button class="swipe-btn star" onclick="toggleStar('${email.id}', event); event.stopPropagation();">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Star</span>
-        </button>
-      </div>
     </div>
 
-    <!-- Row Controls: Checkbox and Single Star -->
-    <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
-      <label class="custom-checkbox" onclick="event.stopPropagation()">
-        <input type="checkbox" class="row-checkbox" id="mob-check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
-        <span class="checkmark"></span>
-      </label>
-    </div>
-
-    <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-    </span>
-
-    <div class="item-avatar-circle">${avatarInitial}</div>
-
-    <div class="item-content-preview">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-        <span style="font-size: 13px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 68vw;">
-          ${escapeHtml(displaySender)}
-        </span>
-        <span class="item-date-col">${timeDisplay}</span>
+    <!-- Foreground Card Surface -->
+    <div class="email-card-surface ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}">
+      <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
+        <label class="custom-checkbox" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-checkbox" id="mob-check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
+          <span class="checkmark"></span>
+        </label>
       </div>
-      <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 2px;">
-        ${sourceBadgeHtml}
-        ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1px 5px; border-radius: 3px;">PRIORITY</span>' : ''}
+
+      <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </span>
+
+      <div class="item-avatar-circle">${avatarInitial}</div>
+
+      <div class="item-content-preview">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+          <span style="font-size: 13.5px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65vw;">
+            ${escapeHtml(displaySender)}
+          </span>
+          <span class="item-date-col">${timeDisplay}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 3px;">
+          ${sourceBadgeHtml}
+          ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1.5px 6px; border-radius: 4px; margin-left: 2px;">PRIORITY</span>' : ''}
+        </div>
+        <div class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</div>
+        <div class="item-body-snippet">${escapeHtml(cleanBodySnippet)}</div>
       </div>
-      <div class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</div>
-      <div class="item-body-snippet">${escapeHtml(cleanBodySnippet)}</div>
     </div>
   `;
 
-  // Attach Touch Swipe Gesture Handlers
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let isSwiping = false;
+  const surface = cardWrapper.querySelector('.email-card-surface');
+  let startX = 0;
+  let startY = 0;
+  let currentTx = 0;
+  let isDragging = false;
+  let hasMovedHorizontally = false;
 
-  card.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    isSwiping = false;
+  function snapClosed() {
+    currentTx = 0;
+    surface.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+    surface.style.transform = 'translateX(0px)';
+  }
+
+  // Attach snapClosed to cardWrapper so child actions can invoke it
+  cardWrapper.snapClosed = snapClosed;
+
+  surface.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    isDragging = true;
+    hasMovedHorizontally = false;
+    surface.style.transition = 'none';
   }, { passive: true });
 
-  card.addEventListener('touchmove', (e) => {
-    const diffX = e.touches[0].clientX - touchStartX;
-    const diffY = e.touches[0].clientY - touchStartY;
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 20) {
-      isSwiping = true;
-      const leftReveal = card.querySelector('.swipe-left-reveal');
-      const rightReveal = card.querySelector('.swipe-right-reveal');
-      if (diffX < -30 && leftReveal) {
-        leftReveal.style.display = 'flex';
-        if (rightReveal) rightReveal.style.display = 'none';
-      } else if (diffX > 30 && rightReveal) {
-        rightReveal.style.display = 'flex';
-        if (leftReveal) leftReveal.style.display = 'none';
+  surface.addEventListener('touchmove', (e) => {
+    if (!isDragging) return;
+    const diffX = e.touches[0].clientX - startX;
+    const diffY = e.touches[0].clientY - startY;
+
+    if (!hasMovedHorizontally && Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 8) {
+      isDragging = false;
+      return;
+    }
+
+    if (Math.abs(diffX) > 8) {
+      hasMovedHorizontally = true;
+      let newTx = currentTx + diffX;
+      if (newTx > 140) newTx = 140 + (newTx - 140) * 0.2;
+      if (newTx < -140) newTx = -140 + (newTx + 140) * 0.2;
+      surface.style.transform = `translateX(${newTx}px)`;
+    }
+  }, { passive: true });
+
+  surface.addEventListener('touchend', (e) => {
+    if (!isDragging) return;
+    isDragging = false;
+    surface.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
+    const endX = e.changedTouches[0].clientX;
+    const diffX = endX - startX;
+
+    if (hasMovedHorizontally) {
+      if (diffX < -45 || (currentTx < 0 && diffX < 20)) {
+        currentTx = -136;
+        surface.style.transform = 'translateX(-136px)';
+      } else if (diffX > 45 || (currentTx > 0 && diffX > -20)) {
+        currentTx = 136;
+        surface.style.transform = 'translateX(136px)';
+      } else {
+        currentTx = 0;
+        surface.style.transform = 'translateX(0px)';
+      }
+    } else {
+      if (currentTx !== 0) {
+        snapClosed();
       }
     }
   }, { passive: true });
 
-  card.addEventListener('touchend', (e) => {
-    const diffX = e.changedTouches[0].clientX - touchStartX;
-    if (isSwiping && Math.abs(diffX) > 80) {
-      if (diffX < -80) {
-        executeBulkActionOnSingle(email.id, 'archive');
-      } else if (diffX > 80) {
-        toggleImportant(email.id);
-      }
+  surface.addEventListener('click', (e) => {
+    if (hasMovedHorizontally) {
+      e.stopPropagation();
+      e.preventDefault();
+      hasMovedHorizontally = false;
+      return;
     }
-    const leftReveal = card.querySelector('.swipe-left-reveal');
-    const rightReveal = card.querySelector('.swipe-right-reveal');
-    if (leftReveal) leftReveal.style.display = 'none';
-    if (rightReveal) rightReveal.style.display = 'none';
-  }, { passive: true });
+    if (currentTx !== 0) {
+      e.stopPropagation();
+      e.preventDefault();
+      snapClosed();
+      return;
+    }
+    openEmailDetails(email);
+  });
 
-  return card;
+  return cardWrapper;
 }
 
 // ==================== READING PANE VIEW ====================
@@ -1053,7 +1105,9 @@ function openEmailDetails(email) {
   const isFromPhoneMail = isPhoneMailSender(email.sender_email);
   const statusEl = document.getElementById('mob-read-status');
   if (statusEl) {
-    statusEl.innerText = isFromPhoneMail ? '⚡ INAI Verified' : '🌐 External Mail';
+    statusEl.innerHTML = isFromPhoneMail 
+      ? '<span style="color: #046A38; font-weight: 800; font-size: 11px;">⚡ INAI Verified</span>' 
+      : '<span style="color: #2563eb; font-weight: 800; font-size: 11px;">🌐 External Mail</span>';
   }
 
   // Action button colors
@@ -1495,6 +1549,10 @@ async function submitTraditionalCompose() {
 }
 
 // ==================== INITIALIZATION ====================
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    restoreSession();
+  });
+} else {
   restoreSession();
-});
+}

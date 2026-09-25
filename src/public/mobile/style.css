@@ -3,6 +3,14 @@
    Desktop-grade luxury mobile email experience
 ======================================================================== */
 
+/* ==================== PERSISTENT SESSION PRE-RENDER VISIBILITY ==================== */
+html.has-saved-session #onboarding-container {
+  display: none !important;
+}
+html.has-saved-session #app-container {
+  display: flex !important;
+}
+
 :root {
   --bg-app: #f8fafc;
   --bg-surface: #ffffff;
@@ -582,28 +590,69 @@ button {
 .brand-cluster {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
-.brand-icon {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #046A38 0%, #10B981 100%);
-  color: #fff;
+.brand-logo-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid rgba(4, 106, 56, 0.22);
+  flex-shrink: 0;
+}
+
+.brand-text-col {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  line-height: 1.1;
 }
 
 .app-brand-name {
-  font-size: 18px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
   font-weight: 800;
   letter-spacing: -0.3px;
+  color: var(--green-main);
+}
+
+.app-brand-sub {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.3px;
+}
+
+.auth-brand-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.auth-brand-logo-img {
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 6px 20px rgba(4, 106, 56, 0.18);
+  border: 2px solid rgba(4, 106, 56, 0.25);
+}
+
+.brand-subname {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .tiranga-tag-mini {
-  font-size: 13px;
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--green-subtle);
+  border: 1px solid var(--green-border);
+  color: var(--green-main);
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 
 .header-right {
@@ -905,56 +954,39 @@ button {
   border-radius: 6px;
 }
 
-/* Email Card Item */
-.email-card-item {
+/* ==================== SWIPEABLE EMAIL CARD ITEM ==================== */
+.email-card-wrapper {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-light);
-  border-radius: 12px;
-  padding: 10px 12px;
-  margin-bottom: 6px;
-  cursor: pointer;
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  border-radius: 12px;
+  margin-bottom: 7px;
+  touch-action: pan-y;
   user-select: none;
 }
 
-.email-card-item:active {
-  background: #f8fafc;
-}
-
-.email-card-item.unread {
-  border-left: 3.5px solid var(--green-main);
-  background: #ffffff;
-}
-
-.email-card-item.selected {
-  background: rgba(4, 106, 56, 0.05);
-  border-color: var(--green-main);
-}
-
-.email-card-item.is-important {
-  background: #fffbeb;
-  border-color: #fde68a;
-}
-
-/* Touch Swipe Reveal Container */
-.swipe-actions-container {
+.swipe-actions-underlay {
   position: absolute;
-  top: 0; bottom: 0; left: 0; right: 0;
-  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
-  z-index: 20;
+  align-items: stretch;
+  border-radius: 12px;
+  overflow: hidden;
+  z-index: 1;
 }
 
-.swipe-left-reveal, .swipe-right-reveal {
-  pointer-events: auto;
+.swipe-left-actions {
   display: flex;
+  margin-left: auto;
+  height: 100%;
+}
+
+.swipe-right-actions {
+  display: flex;
+  margin-right: auto;
   height: 100%;
 }
 
@@ -963,17 +995,61 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 0 14px;
+  gap: 3px;
+  min-width: 68px;
+  padding: 0 10px;
   color: #fff;
   font-size: 10.5px;
   font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+  user-select: none;
 }
 
-.swipe-btn.archive { background: #d97706; }
+.swipe-btn:active {
+  filter: brightness(0.88);
+}
+
+.swipe-btn.archive { background: #475569; }
 .swipe-btn.delete { background: #ef4444; }
-.swipe-btn.important { background: #eab308; color: #78350f; }
-.swipe-btn.star { background: #f59e0b; }
+.swipe-btn.star { background: #f59e0b; color: #fff; }
+.swipe-btn.important { background: #6366f1; color: #fff; }
+
+.email-card-surface {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease;
+  will-change: transform;
+}
+
+.email-card-surface:active {
+  background: #f8fafc;
+}
+
+.email-card-surface.unread {
+  border-left: 3.5px solid var(--green-main);
+  background: #ffffff;
+}
+
+.email-card-surface.selected {
+  background: rgba(4, 106, 56, 0.05);
+  border-color: var(--green-main);
+}
+
+.email-card-surface.is-important {
+  background: #fffbeb;
+  border-color: #fde68a;
+}
 
 .email-checkbox-wrap {
   display: flex;
@@ -1009,7 +1085,7 @@ button {
 }
 
 .item-sender-col {
-  display: none; /* Merged into preview on mobile */
+  display: none;
 }
 
 .item-content-preview {
@@ -1046,27 +1122,38 @@ button {
   margin-top: 2px;
 }
 
-/* Badge Tags */
+/* Badge Tags Highlighted */
 .badge-source-tag {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-size: 9.5px;
+  gap: 4px;
+  font-size: 10px;
   font-weight: 800;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-bottom: 2px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+  letter-spacing: 0.2px;
+  margin-right: 6px;
   width: fit-content;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.badge-source-tag .badge-icon {
+  flex-shrink: 0;
 }
 
 .badge-phonemail-pill {
-  background: rgba(4, 106, 56, 0.1);
-  color: var(--green-main);
+  background: linear-gradient(135deg, rgba(4, 106, 56, 0.14) 0%, rgba(16, 185, 129, 0.22) 100%);
+  color: #046A38;
+  border: 1px solid rgba(4, 106, 56, 0.35);
+  box-shadow: 0 1px 3px rgba(4, 106, 56, 0.12);
 }
 
 .badge-external-pill {
-  background: rgba(59, 130, 246, 0.1);
-  color: #2563eb;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(99, 102, 241, 0.18) 100%);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.10);
 }
 
 /* Desktop row-quick-actions hidden on touch mobile */

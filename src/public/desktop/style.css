@@ -3,6 +3,14 @@
    Supports both Light (Daylight Bharat) and Dark (Midnight Chakra) Themes
 ======================================================================================== */
 
+/* ==================== PERSISTENT SESSION PRE-RENDER VISIBILITY ==================== */
+html.has-saved-session #desktop-auth-container {
+  display: none !important;
+}
+html.has-saved-session #desktop-main-container {
+  display: flex !important;
+}
+
 :root, [data-theme="light"] {
   --theme-mode: 'light';
   --bg-app: #fbfdfc;
@@ -959,28 +967,64 @@ button {
 .brand-cluster {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.brand-icon {
-  width: 32px;
-  height: 32px;
-  background: var(--green-subtle);
-  color: var(--green-main);
-  border: 1px solid var(--green-border);
-  border-radius: 8px;
+.brand-logo-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid rgba(4, 106, 56, 0.25);
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.brand-cluster:hover .brand-logo-img {
+  transform: scale(1.06);
+}
+
+.brand-name-cluster {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 17px;
-  font-weight: 800;
+  flex-direction: column;
+  line-height: 1.1;
 }
 
-.brand-name {
+.brand-inai-text {
   font-family: 'Outfit', sans-serif;
-  font-size: 19px;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.3px;
+  color: var(--green-main);
+}
+
+.brand-barath-sub {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.4px;
+}
+
+.auth-brand-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.auth-brand-logo-img {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 8px 24px rgba(4, 106, 56, 0.18);
+  border: 2px solid rgba(4, 106, 56, 0.25);
+}
+
+.brand-subname {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-muted);
 }
 
 .tiranga-tag {
@@ -1483,25 +1527,47 @@ button {
 .badge-source-tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 6px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
   vertical-align: middle;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: all 0.15s ease;
+}
+
+.badge-source-tag .badge-icon {
+  flex-shrink: 0;
 }
 
 .badge-phonemail-pill {
-  background: rgba(4, 106, 56, 0.12);
-  color: var(--green-main);
-  border: 1px solid rgba(4, 106, 56, 0.28);
+  background: linear-gradient(135deg, rgba(4, 106, 56, 0.14) 0%, rgba(16, 185, 129, 0.22) 100%);
+  color: #046A38;
+  border: 1.5px solid rgba(4, 106, 56, 0.35);
+  box-shadow: 0 1px 4px rgba(4, 106, 56, 0.15);
 }
 
 .badge-external-pill {
-  background: rgba(37, 99, 235, 0.12);
-  color: #2563eb;
-  border: 1px solid rgba(37, 99, 235, 0.28);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(99, 102, 241, 0.18) 100%);
+  color: #1d4ed8;
+  border: 1.5px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.12);
+}
+
+[data-theme="dark"] .badge-phonemail-pill {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.22) 0%, rgba(5, 150, 105, 0.32) 100%);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+[data-theme="dark"] .badge-external-pill {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.22) 0%, rgba(99, 102, 241, 0.32) 100%);
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.45);
 }
 
 /* Email Cards List Stream */
@@ -1607,15 +1673,24 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .item-subject-title {
   font-weight: 600;
+  margin-left: 2px;
+  color: var(--text-main);
+  flex-shrink: 0;
 }
 
 .item-body-snippet {
   color: var(--text-muted);
   font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .item-date-col {

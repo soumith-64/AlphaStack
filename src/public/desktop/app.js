@@ -431,9 +431,12 @@ function saveDesktopSession(user) {
   const str = JSON.stringify(user);
   if (remember) {
     localStorage.setItem('phonemail-user', str);
+    localStorage.setItem('inai_user', str);
+    localStorage.setItem('phonemail-mobile-user', str);
     if (user.phone) localStorage.setItem('phonemail_saved_phone', user.phone);
   }
   sessionStorage.setItem('phonemail-user', str);
+  document.documentElement.classList.add('has-saved-session');
 }
 
 window.phoneEmailListener = async (userObj) => {
@@ -1567,7 +1570,7 @@ async function executeBulkAction(action) {
     await fetch('/api/emails/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, emailIds, folder: currentFolder })
+      body: JSON.stringify({ action, ids: emailIds, emailIds: emailIds, folder: currentFolder })
     });
     showToastNotification(`Updated ${count} message${count > 1 ? 's' : ''} ✓`);
   } catch (err) {
@@ -1580,7 +1583,7 @@ async function executeBulkActionOnSingle(id, action) {
     await fetch('/api/emails/bulk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, emailIds: [id], folder: currentFolder })
+      body: JSON.stringify({ action, ids: [id], emailIds: [id], folder: currentFolder })
     });
     allEmails = allEmails.filter(e => e.id !== id);
     if (emailFolderCache[currentFolder]) {
@@ -1732,8 +1735,8 @@ function createEmailRowElement(email) {
 
   const isFromPhoneMail = isPhoneMailSender(email.sender_email);
   const sourceBadgeHtml = isFromPhoneMail
-    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent from INAI user">⚡ INAI</span>`
-    : `<span class="badge-source-tag badge-external-pill" title="Sent from external mail service">🌐 External</span>`;
+    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
+    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
   const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const avatarInitial = getInitials((isSentFolder || isSentByMe) ? (recipientsDisplay || 'T') : formattedSender);
@@ -1913,10 +1916,10 @@ function openEmailDetails(email) {
   if (senderBadgeEl) {
     if (isFromPhoneMail) {
       senderBadgeEl.className = 'badge-source-tag badge-phonemail-pill';
-      senderBadgeEl.innerHTML = '⚡ INAI Network';
+      senderBadgeEl.innerHTML = '<svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI Network</span>';
     } else {
       senderBadgeEl.className = 'badge-source-tag badge-external-pill';
-      senderBadgeEl.innerHTML = '🌐 External Provider';
+      senderBadgeEl.innerHTML = '<svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External Provider</span>';
     }
   }
 
@@ -2002,18 +2005,9 @@ function toggleCurrentStar() {
 
 async function deleteCurrentEmail() {
   if (!activeEmail) return;
-  try {
-    await fetch(`/api/emails/${activeEmail.id}/move`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ folder: 'TRASH' })
-    });
-    closeReadingPane();
-    loadEmails();
-    showToastNotification('Email moved to Trash');
-  } catch (err) {
-    console.error(err);
-  }
+  const id = activeEmail.id;
+  closeReadingPane();
+  executeBulkActionOnSingle(id, 'delete');
 }
 
 // ==================== SEARCH & FILTER ====================
@@ -2418,10 +2412,14 @@ async function addDesktopAlias() {
 
 // ==================== SESSION RESTORATION & LOGOUT ====================
 function restoreSession() {
-  const saved = localStorage.getItem('phonemail-user') || sessionStorage.getItem('phonemail-user');
+  const saved = localStorage.getItem('phonemail-user') || 
+                localStorage.getItem('inai_user') || 
+                localStorage.getItem('phonemail-mobile-user') || 
+                sessionStorage.getItem('phonemail-user');
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
+      document.documentElement.classList.add('has-saved-session');
       const auth = document.getElementById('desktop-auth-container');
       const main = document.getElementById('desktop-main-container');
       if (auth && main) {
@@ -2438,6 +2436,7 @@ function restoreSession() {
                 currentUser.name = data.user.display_name || currentUser.name;
                 currentUser.email = data.user.email_address || currentUser.email;
                 localStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                localStorage.setItem('inai_user', JSON.stringify(currentUser));
                 sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
                 updateProfileDisplay();
               }
@@ -2447,7 +2446,10 @@ function restoreSession() {
       }
     } catch (e) {
       localStorage.removeItem('phonemail-user');
+      localStorage.removeItem('inai_user');
+      localStorage.removeItem('phonemail-mobile-user');
       sessionStorage.removeItem('phonemail-user');
+      document.documentElement.classList.remove('has-saved-session');
       currentUser = null;
     }
   }
@@ -2455,7 +2457,11 @@ function restoreSession() {
 
 function logoutDesktop() {
   localStorage.removeItem('phonemail-user');
+  localStorage.removeItem('inai_user');
+  localStorage.removeItem('phonemail-mobile-user');
   sessionStorage.removeItem('phonemail-user');
+  sessionStorage.removeItem('phonemail-mobile-user');
+  document.documentElement.classList.remove('has-saved-session');
   currentUser = null;
   const auth = document.getElementById('desktop-auth-container');
   const main = document.getElementById('desktop-main-container');
@@ -2472,8 +2478,12 @@ function logoutDesktop() {
   showToastNotification('Logged out successfully');
 }
 
-// Check session on startup
-restoreSession();
+// Check session on startup and DOM load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', restoreSession);
+} else {
+  restoreSession();
+}
 
 // ==================== REAL-TIME MULTI-LANGUAGE TRANSLATION SYSTEM ====================
 const INAI_TRANSLATIONS = {

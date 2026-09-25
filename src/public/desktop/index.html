@@ -3,11 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>INAI — India's Unified Phone-to-Email WebApp</title>
+  <title>INAI Barath Mail — 143 · Oru Ping, Oru Bond.</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- Instant Pre-render Session Persistence: Prevents login flash on reload -->
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem('phonemail-user') || localStorage.getItem('inai_user') || localStorage.getItem('phonemail-mobile-user') || sessionStorage.getItem('phonemail-user');
+        if (s) {
+          var u = JSON.parse(s);
+          if (u && (u.phone || u.email)) {
+            document.documentElement.classList.add('has-saved-session');
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
   <script src="/socket.io/socket.io.js"></script>
   <!-- Official Phone.Email Real-Time SMS & WhatsApp Verification SDK -->
   <script src="https://www.phone.email/sign_in_button_v1.js" async></script>
@@ -20,27 +35,25 @@
   <!-- Backdrop overlay for mobile drawer sidebar -->
   <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="toggleSidebar()"></div>
 
-  <!-- ==================== TELEGRAM-STYLE AUTH SCREEN ==================== -->
+  <!-- ==================== AUTH SCREEN ==================== -->
   <div id="desktop-auth-container" class="auth-wrapper">
     
-    <!-- STEP 1: PHONEMAIL ONE-CLICK REAL-TIME AUTH CARD -->
+    <!-- STEP 1: ONE-CLICK REAL-TIME AUTH CARD -->
     <div class="auth-card" id="desktop-card-phone">
-      <div class="brand-badge">
-        <span class="online-dot"></span> 🇮🇳 Bharat's Next-Gen AI Phone-Email Engine
+      <div class="auth-brand-logo-wrap">
+        <img src="/assets/logo.png" alt="INAI Barath Mail" class="auth-brand-logo-img">
       </div>
-      <h1 class="auth-title">Welcome to <span class="saffron-text">IN</span><span class="green-text">AI</span></h1>
-      <p class="auth-subtitle">Sign in using your mobile number for real-time OTP verification & instant unified inbox access.</p>
+      <h1 class="auth-title">INAI <span class="brand-subname">Barath Mail</span></h1>
+      <p class="auth-subtitle">143 · Oru Ping, Oru Bond.</p>
 
-
-
-      <!-- REDESIGNED ATTRACTIVE PHONEMAIL HERO BUTTON -->
+      <!-- ATTRACTIVE HERO SIGN IN BUTTON -->
       <div class="phonemail-hero-container">
         <div class="phonemail-status-pill">
           <span class="phonemail-pulse-ring"></span>
-          <span>⚡ Instant Real-Time OTP (SMS & WhatsApp)</span>
+          <span>⚡ Real-Time SMS & WhatsApp Verification</span>
         </div>
 
-        <button type="button" class="phonemail-hero-btn" id="phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with PhoneMail">
+        <button type="button" class="phonemail-hero-btn" id="phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with Mobile Number">
           <div class="btn-left-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
@@ -238,14 +251,13 @@
           <span class="bar"></span>
           <span class="bar"></span>
         </button>
-        <div class="brand-cluster">
-          <div class="brand-icon">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <div class="brand-cluster" onclick="switchFolder('ALL', this)" style="cursor: pointer;" title="INAI Barath Mail">
+          <img src="/assets/logo.png" alt="INAI Logo" class="brand-logo-img">
+          <div class="brand-name-cluster">
+            <span class="brand-inai-text">INAI</span>
+            <span class="brand-barath-sub">Barath Mail</span>
           </div>
-          <div class="brand-name">
-            <span class="saffron-text">IN</span><span class="green-text">AI</span>
-          </div>
-          <span class="tiranga-tag">🇮🇳 Bharat</span>
+          <span class="tiranga-tag">143</span>
         </div>
         <div class="phone-handle-chip" id="top-phone-chip" title="Your INAI Identity">
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>

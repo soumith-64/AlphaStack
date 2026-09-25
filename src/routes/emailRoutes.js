@@ -290,16 +290,25 @@ router.post('/emails/:id/important', async (req, res) => {
 /**
  * Bulk action on emails (delete, archive, read, unread, star, important, move)
  */
+/**
+ * Bulk action on emails (delete, archive, read, unread, star, important, move)
+ */
 router.post('/emails/bulk', async (req, res) => {
   try {
-    const { ids, action, targetFolder } = req.body;
-    if (!Array.isArray(ids) || ids.length === 0) {
+    const rawIds = req.body.ids || req.body.emailIds;
+    const ids = Array.isArray(rawIds) ? rawIds : (rawIds ? [rawIds] : []);
+    const { action, targetFolder, folder } = req.body;
+    if (ids.length === 0) {
       return res.status(400).json({ error: 'Email IDs required' });
     }
     const placeholders = ids.map(() => '?').join(',');
 
     if (action === 'delete') {
-      await dbOps.execute(`UPDATE emails SET folder = 'TRASH' WHERE id IN (${placeholders})`, ids);
+      if (folder === 'TRASH') {
+        await dbOps.execute(`DELETE FROM emails WHERE id IN (${placeholders})`, ids);
+      } else {
+        await dbOps.execute(`UPDATE emails SET folder = 'TRASH' WHERE id IN (${placeholders})`, ids);
+      }
     } else if (action === 'archive') {
       await dbOps.execute(`UPDATE emails SET folder = 'ARCHIVE' WHERE id IN (${placeholders})`, ids);
     } else if (action === 'read') {
@@ -314,6 +323,25 @@ router.post('/emails/bulk', async (req, res) => {
       await dbOps.execute(`UPDATE emails SET folder = ? WHERE id IN (${placeholders})`, [targetFolder.toUpperCase(), ...ids]);
     }
     res.json({ success: true, count: ids.length, action });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Delete single email
+ */
+router.delete('/emails/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const email = await dbOps.queryOne('SELECT folder FROM emails WHERE id = ?', [id]);
+    if (!email) return res.json({ success: true, message: 'Already deleted' });
+    if (email.folder === 'TRASH') {
+      await dbOps.execute('DELETE FROM emails WHERE id = ?', [id]);
+    } else {
+      await dbOps.execute("UPDATE emails SET folder = 'TRASH' WHERE id = ?", [id]);
+    }
+    res.json({ success: true, id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

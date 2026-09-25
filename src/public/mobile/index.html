@@ -3,11 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>INAI — India's Unified Phone-to-Email WebApp</title>
+  <title>INAI Barath Mail — 143 · Oru Ping, Oru Bond.</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <!-- Instant Pre-render Session Persistence: Prevents login flash on reload -->
+  <script>
+    (function() {
+      try {
+        var s = localStorage.getItem('phonemail-mobile-user') || localStorage.getItem('phonemail-user') || localStorage.getItem('inai_user') || sessionStorage.getItem('phonemail-mobile-user');
+        if (s) {
+          var u = JSON.parse(s);
+          if (u && (u.phone || u.email)) {
+            document.documentElement.classList.add('has-saved-session');
+          }
+        }
+      } catch(e) {}
+    })();
+  </script>
   <script src="/socket.io/socket.io.js"></script>
   <!-- Official Phone.Email Real-Time SMS & WhatsApp Verification SDK -->
   <script src="https://www.phone.email/sign_in_button_v1.js" async></script>
@@ -23,16 +38,14 @@
     <!-- Screen 1: Phone Verification -->
     <div id="screen-phone" class="onboarding-screen active">
       <div class="brand-hero-cluster">
-        <div class="brand-badge-pill">
-          <span class="online-dot"></span> 🇮🇳 Bharat's Next-Gen AI Phone-Email
+        <div class="auth-brand-logo-wrap">
+          <img src="/assets/logo.png" alt="INAI Barath Mail" class="auth-brand-logo-img">
         </div>
-        <h1 class="auth-title">Welcome to <span class="saffron-text">IN</span><span class="green-text">AI</span></h1>
-        <p class="auth-subtitle">Sign in with your mobile number for instant unified inbox access & real-time delivery.</p>
+        <h1 class="auth-title">INAI <span class="brand-subname">Barath Mail</span></h1>
+        <p class="auth-subtitle">143 · Oru Ping, Oru Bond.</p>
       </div>
 
-
-
-      <!-- Redesigned Attractive INAI Phone Hero Button -->
+      <!-- Attractive INAI Phone Hero Button -->
       <div class="phonemail-hero-container">
         <div class="phonemail-status-pill">
           <span class="phonemail-pulse-ring"></span>
@@ -140,12 +153,13 @@
         <button class="icon-btn" onclick="toggleDrawer()" aria-label="Menu" title="Menu">
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
         </button>
-        <div class="brand-cluster">
-          <div class="brand-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <div class="brand-cluster" onclick="switchMobileFolder('ALL')" style="cursor: pointer;" title="INAI Barath Mail">
+          <img src="/assets/logo.png" alt="INAI Logo" class="brand-logo-img">
+          <div class="brand-text-col">
+            <span class="app-brand-name">INAI</span>
+            <span class="app-brand-sub">Barath Mail</span>
           </div>
-          <span class="app-brand-name"><span class="saffron-text">IN</span><span class="green-text">AI</span></span>
-          <span class="tiranga-tag-mini">🇮🇳</span>
+          <span class="tiranga-tag-mini">143</span>
         </div>
       </div>
 
