@@ -1,8 +1,22 @@
+import nodemailer from 'nodemailer';
 import { dbOps } from '../database/db.js';
 import { notificationService } from './notificationService.js';
 import { config } from '../config.js';
 
 let ioInstance = null;
+
+const smtpUser = process.env.HOSTINGER_SMTP_USER || process.env.HOSTINGER_IMAP_USER || 'admin@alphastack.wwisvnr.com';
+const smtpPass = process.env.HOSTINGER_SMTP_PASS || process.env.HOSTINGER_IMAP_PASS || 'Alphastack@2026';
+
+const smtpTransporter = nodemailer.createTransport({
+  host: process.env.HOSTINGER_SMTP_HOST || 'smtp.hostinger.com',
+  port: parseInt(process.env.HOSTINGER_SMTP_PORT || '465', 10),
+  secure: true,
+  auth: {
+    user: smtpUser,
+    pass: smtpPass
+  }
+});
 
 export const emailService = {
   setSocketIO(io) {
@@ -10,19 +24,38 @@ export const emailService = {
   },
 
   /**
-   * Normalizes an email address or raw phone number into a 10-digit phone and optional alias
+   * Normalizes an email address or raw phone number into a 10-digit phone and optional alias,
+   * while preserving standard external email addresses (e.g. name@gmail.com) completely intact.
    */
   parseAddress(input) {
-    if (!input) return { phone: '', alias: '', full: '' };
+    if (!input) return { phone: '', alias: '', full: '', isExternal: false };
     const raw = String(input).trim().toLowerCase();
     
     // Check if it has an @
     let localPart = raw;
+    let domainPart = '';
     if (raw.includes('@')) {
-      localPart = raw.split('@')[0];
+      const atParts = raw.split('@');
+      localPart = atParts[0];
+      domainPart = atParts[1] || '';
     }
 
-    // Check for alias dot/hyphen: e.g. 9876543210.work or 9876543210-1
+    // Check if domain is external (e.g. gmail.com, yahoo.com, outlook.com, etc.)
+    const isDomainLocal = !domainPart || 
+      domainPart === config.domainName.toLowerCase() || 
+      domainPart.includes('alphastack.wwisvnr.com') ||
+      domainPart === 'phonemail.com';
+
+    if (domainPart && !isDomainLocal) {
+      return {
+        phone: '',
+        alias: '',
+        full: raw,
+        isExternal: true
+      };
+    }
+
+    // Local PhoneMail address
     let phonePart = localPart;
     let aliasPart = '';
     if (localPart.includes('.')) {
@@ -36,10 +69,13 @@ export const emailService = {
     }
 
     const digitsOnly = phonePart.replace(/\D/g, '').slice(-10);
+    const isValidPhone = digitsOnly && digitsOnly.length === 10;
+
     return {
-      phone: digitsOnly,
+      phone: isValidPhone ? digitsOnly : '',
       alias: aliasPart,
-      full: digitsOnly ? `${digitsOnly}${aliasPart ? '.' + aliasPart : ''}@${config.domainName}` : raw
+      full: isValidPhone ? `${digitsOnly}${aliasPart ? '.' + aliasPart : ''}@${config.domainName}` : raw,
+      isExternal: !isValidPhone
     };
   },
 
@@ -223,6 +259,53 @@ export const emailService = {
     ]);
 
     const sentEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
+
+    // SEND LIVE OUTBOUND EMAIL VIA HOSTINGER SMTP TO ANY EXTERNAL RECIPIENTS (e.g. Gmail, Yahoo, Outlook, etc.)
+    const externalRecipients = rawRecipientsList
+      .map(r => this.parseAddress(r))
+      .filter(p => p.isExternal && p.full.includes('@'))
+      .map(p => p.full);
+
+    if (externalRecipients.length > 0) {
+      const senderDisplayName = (sender && sender.display_name && !sender.display_name.startsWith('User ')) 
+        ? sender.display_name 
+        : `+91 ${cleanSenderPhone}`;
+
+      for (const extEmail of externalRecipients) {
+        try {
+          console.log(`🚀 [Hostinger SMTP] Transmitting live email to ${extEmail}...`);
+          const info = await smtpTransporter.sendMail({
+            from: `"${senderDisplayName} via PhoneMail" <${smtpUser}>`,
+            replyTo: `${cleanSenderPhone}@${config.domainName}`,
+            to: extEmail,
+            subject: subject || 'Message from PhoneMail',
+            text: bodyText || '',
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 14px; background: #ffffff;">
+                <div style="border-bottom: 2px solid #046A38; padding-bottom: 14px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                  <div>
+                    <span style="font-size: 20px; font-weight: 800; color: #046A38;">Phone<span style="color: #FF671F;">Mail</span></span>
+                    <span style="font-size: 12px; color: #64748b; margin-left: 8px;">• 🇮🇳 Phone-Powered Email</span>
+                  </div>
+                  <div style="font-size: 11px; font-weight: 700; color: #046A38; background: #ecfdf5; border: 1px solid #a7f3d0; padding: 3px 8px; border-radius: 6px;">
+                    ✓ Verified Sender
+                  </div>
+                </div>
+                <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 28px; white-space: pre-wrap;">${bodyText ? String(bodyText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</div>
+                <div style="border-top: 1px solid #f1f5f9; padding-top: 16px; font-size: 12px; color: #64748b; line-height: 1.5;">
+                  Sent from <strong>+91 ${cleanSenderPhone}</strong> via <strong>PhoneMail</strong>.<br>
+                  Hit <strong>Reply</strong> in your email client to send an instant reply directly to this user's phone mailbox: 
+                  <a href="mailto:${cleanSenderPhone}@${config.domainName}" style="color: #046A38; font-weight: 600;">${cleanSenderPhone}@${config.domainName}</a>
+                </div>
+              </div>
+            `
+          });
+          console.log(`✅ [Hostinger SMTP SUCCESS] Delivered to ${extEmail} | ID: ${info.messageId}`);
+        } catch (smtpErr) {
+          console.error(`❌ [Hostinger SMTP ERROR] Failed sending to ${extEmail}:`, smtpErr.message);
+        }
+      }
+    }
 
     // Real-time broadcast to all participants and specific user rooms
     if (ioInstance) {

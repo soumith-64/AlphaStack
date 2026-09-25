@@ -14,6 +14,7 @@
     "express": "^4.21.2",
     "mailparser": "^3.7.2",
     "mysql2": "^3.24.4",
+    "nodemailer": "^10.0.10",
     "smtp-server": "^3.13.6",
     "socket.io": "^4.8.1",
     "sql.js": "^1.14.2"
