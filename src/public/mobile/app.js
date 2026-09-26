@@ -38,13 +38,19 @@ function escapeHtml(str) {
 }
 
 function getInitials(name) {
-  if (!name) return 'U';
-  const clean = String(name).replace(/^[^a-zA-Z0-9]+/, '').trim();
+  if (!name) return 'IN';
+  const clean = String(name).replace(/<[^>]*>/g, '').replace(/[()]/g, '').trim();
+  const words = clean.split(/\s+/).filter(w => /^[a-zA-Z0-9]/.test(w));
+  if (words.length >= 2) {
+    const first = (words[0].match(/[a-zA-Z0-9]/) || [''])[0];
+    const second = (words[1].match(/[a-zA-Z0-9]/) || [''])[0];
+    if (first && second) return (first + second).toUpperCase();
+  }
   const letterMatch = clean.match(/[a-zA-Z]/);
   if (letterMatch) return letterMatch[0].toUpperCase();
-  const numMatch = clean.match(/\d/);
+  const numMatch = clean.match(/\d{1,2}/);
   if (numMatch) return numMatch[0];
-  return 'U';
+  return 'IN';
 }
 
 /**
@@ -52,27 +58,27 @@ function getInitials(name) {
  * Generates vibrant SVG avatar with gradient background and crisp monogram
  */
 function generateDefaultAvatar(seed, displayName = '') {
-  const str = String(seed || displayName || 'User').trim();
+  const str = String(displayName || seed || 'User').trim();
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
   
   const gradients = [
-    ['#046A38', '#10B981'], // Bharat Green
-    ['#FF671F', '#F59E0B'], // Kesari Saffron
-    ['#2563EB', '#38BDF8'], // Ocean Blue
+    ['#059669', '#10B981'], // Bharat Green
+    ['#EA580C', '#F59E0B'], // Kesari Saffron Amber
+    ['#2563EB', '#38BDF8'], // Ocean Sapphire Blue
     ['#7C3AED', '#C084FC'], // Royal Purple
-    ['#DB2777', '#F472B6'], // Rose Pink
+    ['#DB2777', '#F472B6'], // Vivid Rose
     ['#0D9488', '#2DD4BF'], // Teal Aurora
-    ['#DC2626', '#F87171'], // Crimson Flame
-    ['#4F46E5', '#818CF8']  // Indigo Deep
+    ['#DC2626', '#FB7185'], // Crimson Flame
+    ['#4F46E5', '#818CF8']  // Indigo Twilight
   ];
   
   const pair = gradients[Math.abs(hash) % gradients.length];
-  const initial = getInitials(displayName || str);
+  const initial = getInitials(str);
   
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100">
     <defs>
       <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="${pair[0]}"/>
@@ -80,11 +86,15 @@ function generateDefaultAvatar(seed, displayName = '') {
       </linearGradient>
     </defs>
     <rect width="100" height="100" rx="50" fill="url(#g_${Math.abs(hash)})"/>
-    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-    <text x="50" y="61" font-family="-apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', Roboto, sans-serif" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
+    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+    <text x="50" y="52" font-family="-apple-system, BlinkMacSystemFont, Roboto, sans-serif" font-size="42" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
   </svg>`;
 
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  try {
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  } catch (e) {
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
 }
 
 function formatPhoneDisplay(digits, tag = '') {
@@ -300,11 +310,24 @@ function initAppView() {
 
   // Update User Header Info
   const initials = getInitials(currentUser.name || 'User');
+  const myAvatarUrl = currentUser.avatar_url || generateDefaultAvatar(currentUser.phone, currentUser.name);
+
   const avatarEl = document.getElementById('mob-user-avatar');
-  if (avatarEl) avatarEl.innerText = initials;
+  if (avatarEl) {
+    avatarEl.innerHTML = `
+      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <span class="avatar-fallback-initial" style="display:none;">${initials}</span>
+    `;
+    avatarEl.title = `${currentUser.name || 'User'} (+91 ${currentUser.phone})`;
+  }
 
   const drawerAvatar = document.getElementById('mob-drawer-avatar');
-  if (drawerAvatar) drawerAvatar.innerText = initials;
+  if (drawerAvatar) {
+    drawerAvatar.innerHTML = `
+      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <span class="avatar-fallback-initial" style="display:none;">${initials}</span>
+    `;
+  }
 
   const drawerName = document.getElementById('drawer-username');
   if (drawerName) drawerName.innerText = currentUser.name || 'INAI Member';
@@ -1223,8 +1246,9 @@ function createMobileConversationCard(conv) {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </span>
 
-      <div class="item-avatar-circle" style="background-image: url('${conv.avatar_url}'); background-size: cover; background-position: center;">
-        ${!conv.avatar_url ? getInitials(conv.display_title) : ''}
+      <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View ${escapeHtml(conv.display_title)} Digital ID Card">
+        <img src="${conv.avatar_url || generateDefaultAvatar(conv.participant_raw, conv.display_title)}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <span class="avatar-fallback-initial" style="display:none;">${getInitials(conv.display_title || conv.participant_raw)}</span>
       </div>
 
       <div class="item-content-preview">
@@ -1387,10 +1411,17 @@ async function openConversation(convId) {
   // Header configuration
   const avatarEl = document.getElementById('mob-conv-avatar');
   if (avatarEl) {
-    avatarEl.innerHTML = '';
-    avatarEl.style.backgroundImage = `url('${conv.avatar_url}')`;
-    avatarEl.style.backgroundSize = 'cover';
-    avatarEl.style.backgroundPosition = 'center';
+    const chatAvatarUrl = conv.avatar_url || generateDefaultAvatar(conv.participant_raw, conv.display_title);
+    avatarEl.innerHTML = `
+      <img src="${chatAvatarUrl}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <span class="avatar-fallback-initial" style="display:none;">${getInitials(conv.display_title)}</span>
+    `;
+    avatarEl.style.backgroundImage = 'none';
+    avatarEl.onclick = (e) => {
+      e.stopPropagation();
+      openContactInfoModal(conv.participant_raw);
+    };
+    avatarEl.style.cursor = 'pointer';
   }
 
   const titleEl = document.getElementById('mob-conv-title');
@@ -1833,9 +1864,8 @@ async function openContactInfoModal(phoneOrEmail) {
 
   const avatarSvg = generateDefaultAvatar(target, displayName);
   if (avatarEl) {
-    avatarEl.style.backgroundImage = `url('${avatarSvg}')`;
-    avatarEl.style.backgroundSize = 'cover';
-    avatarEl.innerText = '';
+    avatarEl.innerHTML = `<img src="${avatarSvg}" alt="${escapeHtml(displayName)}" class="avatar-inner-img">`;
+    avatarEl.style.backgroundImage = 'none';
   }
 
   // Real dynamic QR code
@@ -1858,9 +1888,8 @@ async function openContactInfoModal(phoneOrEmail) {
   if (editAlias) editAlias.value = 'primary';
   if (editBio) editBio.value = '';
   if (editAvatarPrev) {
-    editAvatarPrev.style.backgroundImage = `url('${avatarSvg}')`;
-    editAvatarPrev.style.backgroundSize = 'cover';
-    editAvatarPrev.innerText = '';
+    editAvatarPrev.innerHTML = `<img src="${avatarSvg}" alt="${escapeHtml(displayName)}" class="avatar-inner-img">`;
+    editAvatarPrev.style.backgroundImage = 'none';
   }
 
   // Fetch from server /api/contacts/detail/:phone
@@ -1875,6 +1904,12 @@ async function openContactInfoModal(phoneOrEmail) {
       if (c.bio && editBio) editBio.value = c.bio;
       if (editName && c.display_name) editName.value = c.display_name;
       if (editEmail && c.email) editEmail.value = c.email;
+      if (c.avatar_url && avatarEl) {
+        avatarEl.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(c.display_name || displayName)}" class="avatar-inner-img">`;
+      }
+      if (c.avatar_url && editAvatarPrev) {
+        editAvatarPrev.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(c.display_name || displayName)}" class="avatar-inner-img">`;
+      }
     }
   } catch (err) {}
 
@@ -1920,12 +1955,12 @@ function selectPersonAvatarGradient(palette) {
   const newSvg = generateDefaultAvatar(`${target}_${palette}`, target);
   
   if (preview) {
-    preview.style.backgroundImage = `url('${newSvg}')`;
-    preview.style.backgroundSize = 'cover';
+    preview.innerHTML = `<img src="${newSvg}" alt="Avatar Preview" class="avatar-inner-img">`;
+    preview.style.backgroundImage = 'none';
   }
   if (cardAvatar) {
-    cardAvatar.style.backgroundImage = `url('${newSvg}')`;
-    cardAvatar.style.backgroundSize = 'cover';
+    cardAvatar.innerHTML = `<img src="${newSvg}" alt="Avatar" class="avatar-inner-img">`;
+    cardAvatar.style.backgroundImage = 'none';
   }
 }
 
@@ -2032,11 +2067,10 @@ function openMobileProfileSettings() {
   if (nameLabel) nameLabel.innerText = currentUser.display_name || 'INAI User';
   if (phoneLabel) phoneLabel.innerText = formattedPhone;
 
-  const mySvg = generateDefaultAvatar(currentUser.phone, currentUser.display_name);
+  const mySvg = currentUser.avatar_url || generateDefaultAvatar(currentUser.phone, currentUser.display_name);
   if (avatarEl) {
-    avatarEl.style.backgroundImage = `url('${mySvg}')`;
-    avatarEl.style.backgroundSize = 'cover';
-    avatarEl.innerText = '';
+    avatarEl.innerHTML = `<img src="${mySvg}" alt="User Avatar" class="avatar-inner-img">`;
+    avatarEl.style.backgroundImage = 'none';
   }
 
   if (langSelect) langSelect.value = currentLanguage;

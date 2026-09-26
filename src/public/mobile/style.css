@@ -713,6 +713,16 @@ button {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  overflow: hidden;
+  position: relative;
+}
+
+.user-avatar-small img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 /* Search & Filter Section */
@@ -1071,17 +1081,46 @@ button {
 .item-star.starred { color: #f59e0b; }
 
 .item-avatar-circle {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: linear-gradient(135deg, #046A38 0%, #10B981 100%);
   color: #fff;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease;
+}
+
+.item-avatar-circle:active {
+  transform: scale(0.94);
+}
+
+.avatar-inner-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.avatar-fallback-initial {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13.5px;
+  text-transform: uppercase;
 }
 
 .item-sender-col {
@@ -1377,6 +1416,16 @@ button {
   align-items: center;
   justify-content: center;
   margin-bottom: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.profile-avatar-small img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .drawer-status-tag {

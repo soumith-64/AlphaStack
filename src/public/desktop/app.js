@@ -239,56 +239,66 @@ function cleanRecipientAddress(addr) {
 }
 
 function getInitials(nameOrEmail) {
-  if (!nameOrEmail) return 'I';
-  const display = formatSenderDisplay(nameOrEmail);
-  const letterMatch = display.match(/[a-zA-Z]/);
+  if (!nameOrEmail) return 'IN';
+  const clean = String(nameOrEmail).replace(/<[^>]*>/g, '').replace(/[()]/g, '').trim();
+  const words = clean.split(/\s+/).filter(w => /^[a-zA-Z0-9]/.test(w));
+  if (words.length >= 2) {
+    const first = (words[0].match(/[a-zA-Z0-9]/) || [''])[0];
+    const second = (words[1].match(/[a-zA-Z0-9]/) || [''])[0];
+    if (first && second) return (first + second).toUpperCase();
+  }
+  const letterMatch = clean.match(/[a-zA-Z]/);
   if (letterMatch) {
     return letterMatch[0].toUpperCase();
   }
-  const numMatch = display.match(/\d/);
+  const numMatch = clean.match(/\d{1,2}/);
   if (numMatch) {
     return numMatch[0];
   }
-  return 'I';
+  return 'IN';
 }
 
 /**
  * Deterministic vivid SVG profile picture generator
  */
 function generateDefaultAvatar(seed, displayName = '') {
-  const str = String(seed || displayName || 'User').trim();
+  const str = String(displayName || seed || 'User').trim();
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);
   }
   
   const gradients = [
-    ['#046A38', '#10B981'], // Bharat Green
-    ['#FF671F', '#F59E0B'], // Kesari Saffron
-    ['#2563EB', '#38BDF8'], // Ocean Blue
+    ['#059669', '#10B981'], // Bharat Green
+    ['#EA580C', '#F59E0B'], // Kesari Saffron Amber
+    ['#2563EB', '#38BDF8'], // Ocean Sapphire Blue
     ['#7C3AED', '#C084FC'], // Royal Purple
-    ['#DB2777', '#F472B6'], // Rose Pink
+    ['#DB2777', '#F472B6'], // Vivid Rose
     ['#0D9488', '#2DD4BF'], // Teal Aurora
-    ['#DC2626', '#F87171'], // Crimson Flame
-    ['#4F46E5', '#818CF8']  // Indigo Deep
+    ['#DC2626', '#FB7185'], // Crimson Flame
+    ['#4F46E5', '#818CF8']  // Indigo Twilight
   ];
   
   const pair = gradients[Math.abs(hash) % gradients.length];
-  const initial = getInitials(displayName || str);
+  const initial = getInitials(str);
   
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
     <defs>
-      <linearGradient id="dg_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="${pair[0]}"/>
         <stop offset="100%" stop-color="${pair[1]}"/>
       </linearGradient>
     </defs>
-    <rect width="100" height="100" rx="50" fill="url(#dg_${Math.abs(hash)})"/>
-    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
-    <text x="50" y="61" font-family="-apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', Roboto, sans-serif" font-size="44" font-weight="800" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
+    <rect width="100" height="100" rx="50" fill="url(#g_${Math.abs(hash)})"/>
+    <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="2"/>
+    <text x="50" y="52" font-family="-apple-system, BlinkMacSystemFont, Roboto, sans-serif" font-size="42" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="central">${initial}</text>
   </svg>`;
 
-  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  try {
+    return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  } catch (e) {
+    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  }
 }
 
 function normalizeSubject(sub) {
@@ -1430,7 +1440,15 @@ document.addEventListener('DOMContentLoaded', () => {
 function updateProfileDisplay() {
   if (!currentUser) return;
   const avatarBadge = document.getElementById('user-avatar-badge');
-  if (avatarBadge) avatarBadge.innerText = getInitials(currentUser.name);
+  if (avatarBadge) {
+    const myAvatarUrl = currentUser.avatar_url || generateDefaultAvatar(currentUser.phone, currentUser.name);
+    const initial = getInitials(currentUser.name || 'User');
+    avatarBadge.innerHTML = `
+      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <span class="avatar-fallback-initial" style="display:none;">${initial}</span>
+    `;
+    avatarBadge.title = `${currentUser.name || 'User'} (+91 ${currentUser.phone}) - Account & Digital ID`;
+  }
   const sPhone = document.getElementById('settings-phone');
   if (sPhone) sPhone.innerText = currentUser.phone;
   const sEmail = document.getElementById('settings-email');
@@ -1931,6 +1949,9 @@ function createConversationRowElement(conv) {
     ? `<span class="conv-count-badge">${conv.message_count} msgs</span>` 
     : '';
 
+  const rowInitial = getInitials(conv.display_title || conv.participant_raw);
+  const rowAvatar = conv.avatar_url || generateDefaultAvatar(conv.participant_raw, conv.display_title);
+
   row.innerHTML = `
     <!-- Row Controls: Checkbox and Star -->
     <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${conv.latestMessage.id}', event)">
@@ -1944,8 +1965,9 @@ function createConversationRowElement(conv) {
       <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </span>
 
-    <div class="item-avatar-circle" style="background-image: url('${conv.avatar_url}'); background-size: cover; background-position: center;">
-      ${!conv.avatar_url ? getInitials(conv.display_title) : ''}
+    <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View ${escapeHtml(conv.display_title)} Digital ID Card">
+      <img src="${rowAvatar}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+      <span class="avatar-fallback-initial" style="display:none;">${rowInitial}</span>
     </div>
     <div class="item-sender-col" title="${escapeHtml(conv.display_title)}">
       ${escapeHtml(conv.display_title)}
@@ -2156,7 +2178,10 @@ function renderDesktopConversationThread(conv) {
     card.innerHTML = `
       <div class="thread-card-header">
         <div class="thread-sender-info">
-          <div class="thread-avatar" style="background-image: url('${avatarSvg}');"></div>
+          <div class="thread-avatar" onclick="openContactInfoModal('${escapeHtml(msg.sender_email)}');" title="View ${escapeHtml(senderDisplay)} Digital ID Card" style="cursor: pointer;">
+            <img src="${avatarSvg}" alt="${escapeHtml(senderDisplay)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <span class="avatar-fallback-initial" style="display:none;">${getInitials(senderDisplay)}</span>
+          </div>
           <div class="thread-meta-col">
             <div class="thread-sender-name">
               <span>${escapeHtml(senderDisplay)}</span>
@@ -3242,9 +3267,8 @@ async function openContactInfoModal(phoneOrEmail) {
 
   const avatarSvg = generateDefaultAvatar(target, displayName);
   if (avatarEl) {
-    avatarEl.style.backgroundImage = `url('${avatarSvg}')`;
-    avatarEl.style.backgroundSize = 'cover';
-    avatarEl.innerText = '';
+    avatarEl.innerHTML = `<img src="${avatarSvg}" alt="${escapeHtml(displayName)}" class="avatar-inner-img">`;
+    avatarEl.style.backgroundImage = 'none';
   }
 
   if (qrEl) {
@@ -3266,9 +3290,8 @@ async function openContactInfoModal(phoneOrEmail) {
   if (editAlias) editAlias.value = 'primary';
   if (editBio) editBio.value = '';
   if (editAvatarPrev) {
-    editAvatarPrev.style.backgroundImage = `url('${avatarSvg}')`;
-    editAvatarPrev.style.backgroundSize = 'cover';
-    editAvatarPrev.innerText = '';
+    editAvatarPrev.innerHTML = `<img src="${avatarSvg}" alt="${escapeHtml(displayName)}" class="avatar-inner-img">`;
+    editAvatarPrev.style.backgroundImage = 'none';
   }
 
   try {
@@ -3282,6 +3305,12 @@ async function openContactInfoModal(phoneOrEmail) {
       if (c.bio && editBio) editBio.value = c.bio;
       if (editName && c.display_name) editName.value = c.display_name;
       if (editEmail && c.email) editEmail.value = c.email;
+      if (c.avatar_url && avatarEl) {
+        avatarEl.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(c.display_name || displayName)}" class="avatar-inner-img">`;
+      }
+      if (c.avatar_url && editAvatarPrev) {
+        editAvatarPrev.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(c.display_name || displayName)}" class="avatar-inner-img">`;
+      }
     }
   } catch (err) {}
 
@@ -3327,12 +3356,12 @@ function selectPersonAvatarGradient(palette) {
   const newSvg = generateDefaultAvatar(`${target}_${palette}`, target);
   
   if (preview) {
-    preview.style.backgroundImage = `url('${newSvg}')`;
-    preview.style.backgroundSize = 'cover';
+    preview.innerHTML = `<img src="${newSvg}" alt="Avatar Preview" class="avatar-inner-img">`;
+    preview.style.backgroundImage = 'none';
   }
   if (cardAvatar) {
-    cardAvatar.style.backgroundImage = `url('${newSvg}')`;
-    cardAvatar.style.backgroundSize = 'cover';
+    cardAvatar.innerHTML = `<img src="${newSvg}" alt="Avatar" class="avatar-inner-img">`;
+    cardAvatar.style.backgroundImage = 'none';
   }
 }
 
