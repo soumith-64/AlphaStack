@@ -414,10 +414,33 @@
           <!-- Toolbar with Two Email Classification Tabs & Bulk Actions -->
           <div class="list-toolbar">
             <div class="toolbar-left">
-              <label class="custom-checkbox" title="Select All">
-                <input type="checkbox" id="select-all-check" onchange="toggleSelectAll(this)">
-                <span class="checkmark"></span>
-              </label>
+              <!-- Select All Checkbox + Dropdown Menu -->
+              <div class="select-dropdown-container">
+                <label class="custom-checkbox" title="Select All">
+                  <input type="checkbox" id="select-all-check" onchange="toggleSelectAll(this)">
+                  <span class="checkmark"></span>
+                </label>
+                <button type="button" class="select-caret-btn" id="select-caret-btn" onclick="toggleSelectTypeMenu(event)" title="Select Options">
+                  <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor"><polygon points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="select-type-menu" id="select-type-menu" style="display: none;">
+                  <button type="button" class="select-menu-item" onclick="selectByType('all')">All</button>
+                  <button type="button" class="select-menu-item" onclick="selectByType('none')">None</button>
+                  <button type="button" class="select-menu-item" onclick="selectByType('read')">Read</button>
+                  <button type="button" class="select-menu-item" onclick="selectByType('unread')">Unread</button>
+                  <button type="button" class="select-menu-item" onclick="selectByType('starred')">Starred</button>
+                  <button type="button" class="select-menu-item" onclick="selectByType('unstarred')">Unstarred</button>
+                </div>
+              </div>
+
+              <!-- Gmail Toolbar Action Buttons -->
+              <button type="button" class="toolbar-icon-action-btn" onclick="syncAndLoadEmails()" title="Refresh Mailbox">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              </button>
+              <button type="button" class="toolbar-icon-action-btn" onclick="markAllVisibleAsRead()" title="Mark All Visible as Read">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"/><polyline points="22,6 12,13 2,6"/><circle cx="18" cy="18" r="3"/></svg>
+              </button>
+
               <h2 class="folder-header-title" id="current-folder-title">Inbox</h2>
             </div>
 
@@ -471,7 +494,15 @@
             </div>
 
             <div class="toolbar-right">
-              <span class="pill-counter" id="mail-page-indicator">0 messages</span>
+              <span class="mail-pagination-label" id="mail-page-indicator">1–25 of 25</span>
+              <div class="pagination-btn-group">
+                <button type="button" class="pagination-nav-btn" id="btn-page-prev" onclick="goToPrevPage()" title="Newer">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button type="button" class="pagination-nav-btn" id="btn-page-next" onclick="goToNextPage()" title="Older">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 18 15 12 9 6"/></svg>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -527,6 +558,18 @@
             <!-- Chronological Messages Stream in Conversation -->
             <div class="reading-thread-container" id="reading-thread-container">
               <!-- Chronological messages render here -->
+            </div>
+
+            <!-- Gmail-Style Bottom Action Chips (Reply & Forward) -->
+            <div class="gmail-reading-bottom-actions">
+              <button type="button" class="gmail-action-chip" onclick="openInlineReplyComposer('reply')" title="Reply to this message">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                <span>Reply</span>
+              </button>
+              <button type="button" class="gmail-action-chip" onclick="openInlineReplyComposer('forward')" title="Forward this message">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+                <span>Forward</span>
+              </button>
             </div>
 
             <!-- Inline Reply Dock at Bottom of Conversation -->

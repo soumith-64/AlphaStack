@@ -1423,6 +1423,125 @@ button {
   font-size: 15px;
   font-weight: 800;
   color: var(--text-main);
+  margin-left: 4px;
+}
+
+/* Gmail Select Dropdown & Toolbar Actions */
+.select-dropdown-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.select-caret-btn {
+  background: transparent;
+  border: none;
+  padding: 4px 3px;
+  cursor: pointer;
+  color: var(--text-dim);
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.select-caret-btn:hover {
+  color: var(--text-main);
+  background: var(--bg-hover);
+}
+
+.select-type-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  z-index: 100;
+  min-width: 120px;
+  overflow: hidden;
+  padding: 4px 0;
+}
+
+.select-menu-item {
+  width: 100%;
+  padding: 7px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-main);
+  cursor: pointer;
+  display: block;
+  transition: background 0.12s ease;
+}
+
+.select-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--green-main);
+}
+
+.toolbar-icon-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.toolbar-icon-action-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+/* Gmail-Grade Pagination Controls */
+.mail-pagination-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0 6px;
+  white-space: nowrap;
+}
+
+.pagination-btn-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pagination-nav-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pagination-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.pagination-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .pill-counter {
@@ -3456,6 +3575,43 @@ button {
   border: 1px solid #a7f3d0;
   padding: 3px 8px;
   border-radius: 6px;
+}
+
+/* Gmail-Style Bottom Action Chips */
+.gmail-reading-bottom-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px 0;
+  padding: 0 4px;
+}
+
+.gmail-action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.18s ease;
+}
+
+.gmail-action-chip:hover {
+  border-color: var(--green-main);
+  color: var(--green-main);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+.gmail-action-chip:active {
+  transform: translateY(0);
 }
 
 /* Inline Reply Dock at Bottom of Conversation */

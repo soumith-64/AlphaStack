@@ -23,6 +23,8 @@ let activeConversation = null;
 let activeConversationId = null;
 let activeReplyingMessage = null;
 let activeContactForModal = null;
+let currentEmailPage = 1;
+const EMAIL_PAGE_SIZE = 50;
 
 // ==================== RESPONSIVE SIDEBAR TOGGLE ====================
 function toggleSidebar() {
@@ -1714,6 +1716,7 @@ function updateFolderCountsFromList(emails) {
 
 function setMailSourceFilter(filter) {
   currentMailSourceFilter = filter;
+  currentEmailPage = 1;
   ['all', 'phonemail', 'external'].forEach(f => {
     const btn = document.getElementById(`tab-source-${f}`);
     if (btn) {
@@ -1790,6 +1793,159 @@ function toggleSelectAll(masterEl) {
     clearEmailSelection();
   }
   updateBulkToolbar();
+}
+
+function toggleSelectTypeMenu(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('select-type-menu');
+  if (!menu) return;
+  const isHidden = menu.style.display === 'none' || !menu.style.display;
+  menu.style.display = isHidden ? 'block' : 'none';
+}
+
+function closeSelectTypeMenu() {
+  const menu = document.getElementById('select-type-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+function selectByType(type) {
+  closeSelectTypeMenu();
+  selectedEmailIds.clear();
+  
+  const visibleCardItems = Array.from(document.querySelectorAll('.email-card-item'));
+  const visibleIds = visibleCardItems.map(item => item.dataset.id).filter(Boolean);
+  const visibleEmails = allEmails.filter(e => visibleIds.includes(e.id));
+
+  visibleEmails.forEach(email => {
+    let match = false;
+    switch(type) {
+      case 'all': match = true; break;
+      case 'none': match = false; break;
+      case 'read': match = email.is_read === 1; break;
+      case 'unread': match = email.is_read === 0; break;
+      case 'starred': match = email.is_starred === 1; break;
+      case 'unstarred': match = email.is_starred === 0; break;
+    }
+    if (match) {
+      selectedEmailIds.add(email.id);
+    }
+  });
+
+  visibleCardItems.forEach(item => {
+    const id = item.dataset.id;
+    const isSelected = selectedEmailIds.has(id);
+    if (isSelected) item.classList.add('selected');
+    else item.classList.remove('selected');
+    const chk = document.getElementById(`check-${id}`);
+    if (chk) chk.checked = isSelected;
+  });
+
+  updateBulkToolbar();
+}
+
+async function markAllVisibleAsRead() {
+  const visibleCardItems = Array.from(document.querySelectorAll('.email-card-item'));
+  const visibleIds = visibleCardItems.map(item => item.dataset.id).filter(Boolean);
+  const unreadEmails = allEmails.filter(e => visibleIds.includes(e.id) && e.is_read === 0);
+
+  if (unreadEmails.length === 0) {
+    showToastNotification('All visible messages are already read');
+    return;
+  }
+
+  const ids = unreadEmails.map(e => e.id);
+  unreadEmails.forEach(e => {
+    e.is_read = 1;
+    e.read_at = e.read_at || new Date().toISOString();
+  });
+
+  Object.keys(emailFolderCache).forEach(f => {
+    if (Array.isArray(emailFolderCache[f])) {
+      emailFolderCache[f].forEach(e => {
+        if (ids.includes(e.id)) e.is_read = 1;
+      });
+    }
+  });
+
+  renderEmailList(allEmails);
+  showToastNotification(`Marked ${ids.length} messages as read ✓`);
+
+  try {
+    await fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'read', ids })
+    });
+  } catch (err) {}
+}
+
+async function toggleReadStatus(id, e) {
+  if (e) e.stopPropagation();
+  const email = allEmails.find(item => item.id === id);
+  if (!email) return;
+
+  const newRead = email.is_read === 1 ? 0 : 1;
+  email.is_read = newRead;
+  if (newRead === 1) email.read_at = email.read_at || new Date().toISOString();
+  else email.read_at = null;
+
+  Object.keys(emailFolderCache).forEach(f => {
+    if (Array.isArray(emailFolderCache[f])) {
+      const cached = emailFolderCache[f].find(item => item.id === id);
+      if (cached) cached.is_read = newRead;
+    }
+  });
+
+  renderEmailList(allEmails);
+  showToastNotification(`Marked as ${newRead === 1 ? 'read' : 'unread'} ✓`);
+
+  try {
+    await fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: newRead === 1 ? 'read' : 'unread', ids: [id] })
+    });
+  } catch (err) {}
+}
+
+function goToPrevPage() {
+  if (currentEmailPage > 1) {
+    currentEmailPage--;
+    renderEmailList(allEmails);
+  }
+}
+
+function goToNextPage() {
+  currentEmailPage++;
+  renderEmailList(allEmails);
+}
+
+function openInlineReplyComposer(mode) {
+  if (mode === 'forward') {
+    startForward();
+  } else {
+    const dock = document.getElementById('conversation-inline-dock');
+    if (dock) {
+      dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const input = document.getElementById('desktop-thread-reply-input');
+      if (input) input.focus();
+    }
+  }
+}
+
+function startForward() {
+  if (!activeEmail) return;
+  openComposeModal();
+  document.getElementById('desk-compose-to').value = '';
+  document.getElementById('desk-compose-subject').value = (activeEmail.subject || '').startsWith('Fwd:')
+    ? activeEmail.subject
+    : `Fwd: ${activeEmail.subject || ''}`;
+  
+  const senderDisplay = formatSenderDisplay(activeEmail.sender_email, false, activeEmail.sender_name);
+  const timeDisplay = new Date(activeEmail.created_at).toLocaleString();
+  const fwdHeader = `\n\n---------- Forwarded message ---------\nFrom: ${senderDisplay}\nDate: ${timeDisplay}\nSubject: ${activeEmail.subject || '(No Subject)'}\nTo: ${getRecipientsDisplay(activeEmail) || 'Me'}\n\n`;
+  document.getElementById('desk-compose-body').value = fwdHeader + (activeEmail.body_text || '');
+  setTimeout(() => document.getElementById('desk-compose-to').focus(), 80);
 }
 
 function clearEmailSelection() {
@@ -1947,6 +2103,13 @@ function renderEmailList(emails) {
     } else if (currentMailSourceFilter === 'external') {
       emptyMsg = `No external (Gmail, Rediff, etc.) emails in ${getFolderFriendlyName(currentFolder)}.`;
     }
+    const indicator = document.getElementById('mail-page-indicator');
+    if (indicator) indicator.innerText = '0 of 0';
+    const prevBtn = document.getElementById('btn-page-prev');
+    if (prevBtn) prevBtn.disabled = true;
+    const nextBtn = document.getElementById('btn-page-next');
+    if (nextBtn) nextBtn.disabled = true;
+
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-dim); padding: 80px 20px;">
         <div style="margin-bottom: 14px;">
@@ -1959,8 +2122,30 @@ function renderEmailList(emails) {
     return;
   }
 
+  // Gmail-Style Pagination Calculations
+  const totalItems = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / EMAIL_PAGE_SIZE));
+  if (currentEmailPage > totalPages) currentEmailPage = totalPages;
+  if (currentEmailPage < 1) currentEmailPage = 1;
+
+  const startIdx = (currentEmailPage - 1) * EMAIL_PAGE_SIZE;
+  const endIdx = Math.min(totalItems, startIdx + EMAIL_PAGE_SIZE);
+  const pageItems = filtered.slice(startIdx, endIdx);
+
+  // Update pagination indicator & navigation buttons
+  const indicator = document.getElementById('mail-page-indicator');
+  if (indicator) {
+    indicator.innerText = `${startIdx + 1}–${endIdx} of ${totalItems}`;
+  }
+
+  const prevBtn = document.getElementById('btn-page-prev');
+  if (prevBtn) prevBtn.disabled = currentEmailPage <= 1;
+
+  const nextBtn = document.getElementById('btn-page-next');
+  if (nextBtn) nextBtn.disabled = currentEmailPage >= totalPages;
+
   // Render individual email rows (standard Gmail view)
-  filtered.forEach(email => {
+  pageItems.forEach(email => {
     try {
       const row = createEmailRowElement(email);
       if (row) container.appendChild(row);
@@ -2041,6 +2226,14 @@ function createEmailRowElement(email) {
 
     <!-- Desktop Hover Actions -->
     <div class="row-quick-actions" onclick="event.stopPropagation()">
+      <button class="quick-action-btn" onclick="toggleReadStatus('${email.id}', event)" title="${email.is_read === 0 ? 'Mark as Read' : 'Mark as Unread'}">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          ${email.is_read === 0 
+            ? '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>' 
+            : '<path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"/><polyline points="22,6 12,13 2,6"/><circle cx="18" cy="18" r="3"/>'
+          }
+        </svg>
+      </button>
       <button class="quick-action-btn" onclick="toggleImportant('${email.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
@@ -2058,6 +2251,8 @@ function createEmailRowElement(email) {
 
 function switchFolder(folder, element) {
   currentFolder = folder;
+  currentEmailPage = 1;
+  closeSelectTypeMenu();
   document.querySelectorAll('.folder-nav .nav-item').forEach(i => i.classList.remove('active'));
   if (element) {
     element.classList.add('active');
@@ -2373,6 +2568,7 @@ async function deleteCurrentEmail() {
 // ==================== SEARCH & FILTER ====================
 function filterEmails(query) {
   searchTerm = (query || '').toLowerCase().trim();
+  currentEmailPage = 1;
   renderEmailList(allEmails);
 }
 
@@ -3084,6 +3280,10 @@ window.addEventListener('click', (e) => {
   const langMenu = document.getElementById('desk-lang-menu');
   if (langMenu && !e.target.closest('.lang-dropdown-wrapper')) {
     langMenu.style.display = 'none';
+  }
+  const selectMenu = document.getElementById('select-type-menu');
+  if (selectMenu && !e.target.closest('.select-dropdown-container')) {
+    selectMenu.style.display = 'none';
   }
 });
 

@@ -705,7 +705,7 @@ button {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #046A38 0%, #10B981 100%);
+  background: transparent;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
@@ -1081,22 +1081,20 @@ button {
 .item-star.starred { color: #f59e0b; }
 
 .item-avatar-circle {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #046A38 0%, #10B981 100%);
-  color: #fff;
-  font-size: 13.5px;
-  font-weight: 800;
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  overflow: hidden;
-  position: relative;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
   transition: transform 0.15s ease;
+  margin-right: 12px;
 }
 
 .item-avatar-circle:active {
@@ -1939,7 +1937,8 @@ button {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: transparent;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
   color: #ffffff;
   font-size: 15px;
   font-weight: 800;

@@ -80,7 +80,7 @@ function generateDefaultAvatar(seed, displayName = '') {
   const pair = gradients[Math.abs(hash) % gradients.length];
   const initial = getInitials(str);
   
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
     <defs>
       <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
         <stop offset="0%" stop-color="${pair[0]}"/>
@@ -340,13 +340,13 @@ function initAppView() {
 
   // Update User Header Info
   const initials = getInitials(currentUser.name || 'User');
-  const myAvatarUrl = currentUser.avatar_url || generateDefaultAvatar(currentUser.phone, currentUser.name);
+  const myFallbackSvg = generateDefaultAvatar(currentUser.phone, currentUser.name);
+  const myAvatarUrl = currentUser.avatar_url || myFallbackSvg;
 
   const avatarEl = document.getElementById('mob-user-avatar');
   if (avatarEl) {
     avatarEl.innerHTML = `
-      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-      <span class="avatar-fallback-initial" style="display:none;">${initials}</span>
+      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">
     `;
     avatarEl.title = `${currentUser.name || 'User'} (+91 ${currentUser.phone})`;
   }
@@ -354,8 +354,7 @@ function initAppView() {
   const drawerAvatar = document.getElementById('mob-drawer-avatar');
   if (drawerAvatar) {
     drawerAvatar.innerHTML = `
-      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-      <span class="avatar-fallback-initial" style="display:none;">${initials}</span>
+      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">
     `;
   }
 
@@ -1408,7 +1407,6 @@ function createMobileTraditionalEmailCard(email) {
 
       <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View ${escapeHtml(displaySender)} Digital ID Card">
         <img src="${rowAvatar}" alt="${escapeHtml(displaySender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
-        <span class="avatar-fallback-initial" style="display:none;">${rowInitial}</span>
       </div>
 
       <div class="item-content-preview">
@@ -1514,6 +1512,9 @@ function createMobileConversationCard(conv) {
     ? `<span class="conv-unread-dot" title="${conv.unread_count} unread">${conv.unread_count}</span>` 
     : '';
 
+  const convFallbackSvg = generateDefaultAvatar(conv.participant_raw, conv.display_title);
+  const convAvatarUrl = conv.avatar_url || convFallbackSvg;
+
   cardWrapper.innerHTML = `
     <!-- Underlay Swipe Actions -->
     <div class="swipe-actions-underlay">
@@ -1553,8 +1554,7 @@ function createMobileConversationCard(conv) {
       </span>
 
       <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View ${escapeHtml(conv.display_title)} Digital ID Card">
-        <img src="${conv.avatar_url || generateDefaultAvatar(conv.participant_raw, conv.display_title)}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-        <span class="avatar-fallback-initial" style="display:none;">${getInitials(conv.display_title || conv.participant_raw)}</span>
+        <img src="${convAvatarUrl}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${convFallbackSvg}';">
       </div>
 
       <div class="item-content-preview">
@@ -1717,10 +1717,10 @@ async function openConversation(convId) {
   // Header configuration
   const avatarEl = document.getElementById('mob-conv-avatar');
   if (avatarEl) {
-    const chatAvatarUrl = conv.avatar_url || generateDefaultAvatar(conv.participant_raw, conv.display_title);
+    const chatFallbackSvg = generateDefaultAvatar(conv.participant_raw, conv.display_title);
+    const chatAvatarUrl = conv.avatar_url || chatFallbackSvg;
     avatarEl.innerHTML = `
-      <img src="${chatAvatarUrl}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-      <span class="avatar-fallback-initial" style="display:none;">${getInitials(conv.display_title)}</span>
+      <img src="${chatAvatarUrl}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${chatFallbackSvg}';">
     `;
     avatarEl.style.backgroundImage = 'none';
     avatarEl.onclick = (e) => {
@@ -2169,8 +2169,9 @@ async function openContactInfoModal(phoneOrEmail) {
   if (dateEl) dateEl.innerText = new Date().toISOString().split('T')[0];
 
   const avatarSvg = generateDefaultAvatar(target, displayName);
+  const contactAvatarUrl = (typeof contactAvatarMap !== 'undefined' && contactAvatarMap[target]) ? contactAvatarMap[target] : avatarSvg;
   if (avatarEl) {
-    avatarEl.innerHTML = `<img src="${avatarSvg}" alt="${escapeHtml(displayName)}" class="avatar-inner-img">`;
+    avatarEl.innerHTML = `<img src="${contactAvatarUrl}" alt="${escapeHtml(displayName)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${avatarSvg}';">`;
     avatarEl.style.backgroundImage = 'none';
   }
 
@@ -2418,9 +2419,10 @@ function openMobileProfileSettings() {
   if (nameLabel) nameLabel.innerText = currentUser.display_name || 'INAI User';
   if (phoneLabel) phoneLabel.innerText = formattedPhone;
 
-  const mySvg = currentUser.avatar_url || generateDefaultAvatar(currentUser.phone, currentUser.display_name);
+  const myFallbackSvg = generateDefaultAvatar(currentUser.phone, currentUser.display_name || currentUser.name);
+  const mySvg = currentUser.avatar_url || myFallbackSvg;
   if (avatarEl) {
-    avatarEl.innerHTML = `<img src="${mySvg}" alt="User Avatar" class="avatar-inner-img">`;
+    avatarEl.innerHTML = `<img src="${mySvg}" alt="User Avatar" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">`;
     avatarEl.style.backgroundImage = 'none';
   }
 
