@@ -999,13 +999,6 @@ button {
   color: var(--green-main);
 }
 
-.brand-barath-sub {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 0.4px;
-}
-
 .auth-brand-logo-wrap {
   display: flex;
   justify-content: center;

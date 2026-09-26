@@ -2385,8 +2385,8 @@ function shareDigitalIdCard() {
 
   if (navigator.share) {
     navigator.share({
-      title: `${name}'s Official INAI Mail ID`,
-      text: `Connect with ${name} on INAI Bharat Mail at: ${email}`,
+      title: `${name}'s Official INAI ID`,
+      text: `Connect with ${name} on INAI at: ${email}`,
       url: window.location.origin
     }).catch(() => {});
   } else {
