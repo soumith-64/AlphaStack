@@ -48,6 +48,16 @@ app.get('/', (req, res) => {
   res.redirect(isMobile ? '/mobile/' : '/desktop/');
 });
 
+// Guard desktop route: Phone users are strictly confined to Mobile (Traditional & Messenger Views)
+app.use((req, res, next) => {
+  const ua = (req.headers['user-agent'] || '').toLowerCase();
+  const isMobile = /mobile|iphone|android|ipad|phone/i.test(ua);
+  if (isMobile && (req.path.startsWith('/desktop') || req.path === '/desktop')) {
+    return res.redirect('/mobile/');
+  }
+  next();
+});
+
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: true,

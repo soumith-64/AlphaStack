@@ -1186,15 +1186,33 @@ function clearSearchInput() {
   renderEmailList(allEmails);
 }
 
-function toggleMobileInboxMode() {
-  mobileInboxMode = (mobileInboxMode === 'messenger') ? 'traditional' : 'messenger';
+function setMobileInboxMode(mode) {
+  if (mode !== 'messenger' && mode !== 'traditional') mode = 'messenger';
+  mobileInboxMode = mode;
   localStorage.setItem('mobile_inbox_mode', mobileInboxMode);
   updateMobileViewModeControls();
   renderEmailList(allEmails);
-  showToastNotification(`Switched to ${mobileInboxMode === 'messenger' ? 'Messenger' : 'Traditional'} View`, 'info');
+  showToastNotification(`Switched to ${mode === 'messenger' ? 'Messenger' : 'Traditional'} View`, 'info');
+}
+
+function toggleMobileInboxMode() {
+  setMobileInboxMode(mobileInboxMode === 'messenger' ? 'traditional' : 'messenger');
 }
 
 function updateMobileViewModeControls() {
+  const tabMessenger = document.getElementById('tab-mode-messenger');
+  const tabTraditional = document.getElementById('tab-mode-traditional');
+
+  if (tabMessenger && tabTraditional) {
+    if (mobileInboxMode === 'traditional') {
+      tabMessenger.classList.remove('active');
+      tabTraditional.classList.add('active');
+    } else {
+      tabTraditional.classList.remove('active');
+      tabMessenger.classList.add('active');
+    }
+  }
+
   const topBtn = document.getElementById('mob-top-mode-btn');
   const topIcon = document.getElementById('mob-top-mode-icon');
   const drawerLabel = document.getElementById('drawer-view-mode-label');
@@ -1219,6 +1237,24 @@ function updateMobileViewModeControls() {
       drawerIcon.innerHTML = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
     }
   }
+
+  // Update FAB icon and background dynamically
+  const fab = document.getElementById('mob-fab-compose') || document.querySelector('.fab-compose');
+  if (fab) {
+    if (mobileInboxMode === 'traditional') {
+      fab.style.background = '#2563eb';
+      fab.title = 'Compose New Email';
+      fab.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+    } else {
+      fab.style.background = '#046A38';
+      fab.title = 'New Message';
+      fab.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+    }
+  }
+}
+
+function handleMobileFabClick() {
+  openTraditionalCompose();
 }
 
 // ==================== MOBILE CONVERSATION / TRADITIONAL LIST RENDERING ====================
@@ -1363,7 +1399,7 @@ function createMobileTraditionalEmailCard(email) {
 
   cardWrapper.id = `mob-email-${email.id}`;
   cardWrapper.dataset.id = email.id;
-  cardWrapper.className = `email-card-wrapper`;
+  cardWrapper.className = `traditional-email-card-wrap`;
 
   const dateObj = new Date(email.created_at);
   const isToday = new Date().toDateString() === dateObj.toDateString();
@@ -1377,8 +1413,8 @@ function createMobileTraditionalEmailCard(email) {
 
   const isFromPhoneMail = isPhoneMailSender(email.sender_email);
   const sourceBadgeHtml = isFromPhoneMail
-    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
-    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
+    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="10" height="10" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
+    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
   const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const displaySender = (isSentFolder || isSentByMe) 
@@ -1388,12 +1424,13 @@ function createMobileTraditionalEmailCard(email) {
   const participantForAvatar = (isSentFolder || isSentByMe) ? (email.recipient_phone || recipientsDisplay) : email.sender_email;
   const rowAvatar = getAvatarUrl(participantForAvatar, displaySender);
   const fallbackSvg = generateDefaultAvatar(participantForAvatar, displaySender);
-  const rowInitial = getInitials(displaySender);
-  const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
+  const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 110);
+  const hasAtt = email.has_attachments || (email.attachments && email.attachments.length > 0);
+  const attCount = email.attachments ? email.attachments.length : (email.has_attachments ? 1 : 0);
 
+  // Traditional Email Card (Mobile Gmail Style)
   cardWrapper.innerHTML = `
-    <!-- Foreground Card Surface -->
-    <div class="email-card-surface ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''}">
+    <div class="traditional-email-surface ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''}">
       <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
         <label class="custom-checkbox" onclick="event.stopPropagation()">
           <input type="checkbox" class="row-checkbox" id="mob-check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
@@ -1405,28 +1442,39 @@ function createMobileTraditionalEmailCard(email) {
         <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </span>
 
-      <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View ${escapeHtml(displaySender)} Digital ID Card">
+      <div class="trad-email-avatar-box" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View Digital ID Card">
         <img src="${rowAvatar}" alt="${escapeHtml(displaySender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
       </div>
 
-      <div class="item-content-preview">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-          <span style="font-size: 14px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;">
+      <div class="trad-email-main-col">
+        <div class="trad-email-header-row">
+          <span class="trad-email-sender ${email.is_read === 0 ? 'bold-unread' : ''}">
             ${escapeHtml(displaySender)}
           </span>
-          <span class="item-date-col">${timeDisplay}</span>
+          <div class="trad-email-meta-right">
+            ${hasAtt ? '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" style="color: var(--text-dim);"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>' : ''}
+            <span class="trad-email-date">${timeDisplay}</span>
+          </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
+
+        <div class="trad-email-subject-line ${email.is_read === 0 ? 'bold-unread' : ''}">
+          ${escapeHtml(email.subject || '(No Subject)')}
+        </div>
+
+        <div class="trad-email-snippet-line">
+          ${escapeHtml(cleanBodySnippet || 'No preview available')}
+        </div>
+
+        <div class="trad-email-tags-row">
           ${sourceBadgeHtml}
-          ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1.5px 6px; border-radius: 4px;">PRIORITY</span>' : ''}
+          ${isImportant ? '<span class="trad-priority-tag">PRIORITY</span>' : ''}
+          ${hasAtt ? `<span class="trad-att-tag">${attCount} ${attCount === 1 ? 'file' : 'files'}</span>` : ''}
         </div>
-        <div class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</div>
-        <div class="item-body-snippet">${escapeHtml(cleanBodySnippet)}</div>
       </div>
     </div>
   `;
 
-  const surface = cardWrapper.querySelector('.email-card-surface');
+  const surface = cardWrapper.querySelector('.traditional-email-surface');
   surface.addEventListener('click', (e) => {
     openMobileTraditionalEmail(email.id);
   });
@@ -1441,11 +1489,14 @@ function openMobileTraditionalEmail(emailId) {
   activeTradEmail = email;
   activeEmail = email;
 
-  // Immediately remove unread class and green line from DOM card
+  // Immediately remove unread class and bold styling from DOM card so badge vanishes
   const cardWrapper = document.getElementById(`mob-email-${email.id}`) || document.querySelector(`[data-id="${email.id}"]`);
   if (cardWrapper) {
-    const surface = cardWrapper.querySelector('.email-card-surface');
-    if (surface) surface.classList.remove('unread');
+    const surface = cardWrapper.querySelector('.email-card-surface, .traditional-email-surface');
+    if (surface) {
+      surface.classList.remove('unread');
+      surface.querySelectorAll('.bold-unread').forEach(el => el.classList.remove('bold-unread'));
+    }
   }
 
   // Mark read
@@ -1462,37 +1513,225 @@ function openMobileTraditionalEmail(emailId) {
     updateFolderCounts(allEmails);
   }
 
-  // Populate and show traditional email view modal
-  const fromEl = document.getElementById('trad-view-from');
-  if (fromEl) fromEl.innerText = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  // Reset translation state
+  isMessageTranslated = false;
+  originalMessageSubject = email.subject || '(No Subject)';
+  originalMessageBody = email.body_html || (email.body_text ? escapeHtml(email.body_text).replace(/\n/g, '<br>') : '(No Content)');
 
-  const toInput = document.getElementById('trad-view-to');
-  if (toInput) toInput.value = getRecipientsDisplay(email) || 'Me';
+  // Populate dedicated full-screen traditional reading view
+  const readingView = document.getElementById('mob-traditional-reading-view');
+  if (!readingView) return;
 
-  const subjEl = document.getElementById('trad-view-subject');
-  if (subjEl) subjEl.innerText = email.subject || '(No Subject)';
+  const folderBadge = document.getElementById('mob-trad-folder-badge');
+  if (folderBadge) folderBadge.innerText = getFolderFriendlyName(currentFolder);
 
-  const dateEl = document.getElementById('trad-view-date');
-  if (dateEl) dateEl.innerText = new Date(email.created_at).toLocaleString();
+  const subjEl = document.getElementById('mob-trad-subject');
+  if (subjEl) subjEl.innerText = originalMessageSubject;
 
-  const bodyEl = document.getElementById('trad-view-body');
-  if (bodyEl) {
-    bodyEl.innerHTML = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
+  const sourcePill = document.getElementById('mob-trad-source-pill');
+  if (sourcePill) {
+    const isPM = isPhoneMailSender(email.sender_email);
+    sourcePill.className = isPM ? 'badge-source-tag badge-phonemail-pill' : 'badge-source-tag badge-external-pill';
+    sourcePill.innerHTML = isPM 
+      ? `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI Network</span>`
+      : `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External Mail</span>`;
   }
 
-  const modal = document.getElementById('traditional-view-modal');
-  if (modal) modal.style.display = 'flex';
+  const catPill = document.getElementById('mob-trad-category-pill');
+  if (catPill) catPill.innerText = email.folder || currentFolder;
+
+  const senderAvatarBox = document.getElementById('mob-trad-sender-avatar');
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  const avatarUrl = getAvatarUrl(email.sender_email, formattedSender);
+  const fallbackSvg = generateDefaultAvatar(email.sender_email, formattedSender);
+  if (senderAvatarBox) {
+    senderAvatarBox.innerHTML = `<img src="${avatarUrl}" alt="${escapeHtml(formattedSender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">`;
+  }
+
+  const senderNameEl = document.getElementById('mob-trad-sender-name');
+  if (senderNameEl) senderNameEl.innerText = formattedSender;
+
+  const timeEl = document.getElementById('mob-trad-time');
+  if (timeEl) timeEl.innerText = new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+
+  const senderAddrEl = document.getElementById('mob-trad-sender-address');
+  if (senderAddrEl) senderAddrEl.innerText = email.sender_email || '';
+
+  const toEl = document.getElementById('mob-trad-to');
+  if (toEl) toEl.innerText = getRecipientsDisplay(email) || (currentUser ? currentUser.phone : 'me');
+
+  const bodyEl = document.getElementById('mob-trad-body');
+  if (bodyEl) {
+    const rawContent = email.body_html || email.body_text || '(No content)';
+    bodyEl.innerHTML = (rawContent.includes('<') && rawContent.includes('>')) 
+      ? rawContent 
+      : escapeHtml(rawContent).replace(/\n/g, '<br>');
+  }
+
+  // Attachments
+  const attCluster = document.getElementById('mob-trad-attachments');
+  if (attCluster) {
+    if (email.attachments && email.attachments.length > 0) {
+      attCluster.style.display = 'flex';
+      attCluster.innerHTML = email.attachments.map(att => `
+        <a href="${att.url || `/api/attachments/${att.id}`}" target="_blank" class="trad-att-chip" download="${escapeHtml(att.filename || 'attachment')}">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <span>${escapeHtml(att.filename || 'File')}</span>
+        </a>
+      `).join('');
+    } else {
+      attCluster.style.display = 'none';
+      attCluster.innerHTML = '';
+    }
+  }
+
+  updateTradStarButton(email.is_starred === 1);
+
+  readingView.style.display = 'flex';
+}
+
+function closeMobileTraditionalReading() {
+  const readingView = document.getElementById('mob-traditional-reading-view');
+  if (readingView) readingView.style.display = 'none';
+  activeTradEmail = null;
+}
+
+function updateTradStarButton(isStarred) {
+  const btn = document.getElementById('mob-trad-star-btn');
+  if (btn) {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+    btn.style.color = isStarred ? '#eab308' : 'inherit';
+  }
+}
+
+async function toggleCurrentTradStar() {
+  if (!activeTradEmail) return;
+  const id = activeTradEmail.id;
+  try {
+    const res = await fetch(`/api/emails/${id}/star`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      activeTradEmail.is_starred = data.is_starred;
+      allEmails.forEach(item => {
+        if (item.id === id) item.is_starred = data.is_starred;
+      });
+      if (emailFolderCache[currentFolder]) {
+        emailFolderCache[currentFolder] = [...allEmails];
+      }
+      updateTradStarButton(data.is_starred === 1);
+      renderEmailList(allEmails);
+      showToastNotification(data.is_starred === 1 ? 'Message starred' : 'Message unstarred');
+    }
+  } catch (err) {}
+}
+
+async function archiveCurrentTradEmail() {
+  if (!activeTradEmail) return;
+  const id = activeTradEmail.id;
+  closeMobileTraditionalReading();
+  await executeBulkActionOnSingle(id, 'archive');
+}
+
+async function deleteCurrentTradEmail() {
+  if (!activeTradEmail) return;
+  const id = activeTradEmail.id;
+  closeMobileTraditionalReading();
+  await executeBulkActionOnSingle(id, 'delete');
+}
+
+function replyFromTraditionalView() {
+  if (!activeTradEmail) return;
+  activeEmail = activeTradEmail;
+  openReplyCompose(false);
+}
+
+function forwardFromTraditionalView() {
+  if (!activeTradEmail) return;
+  activeEmail = activeTradEmail;
+  openReplyCompose(true);
+}
+
+function switchToMessengerForActiveContact() {
+  if (!activeTradEmail) return;
+  const targetSender = activeTradEmail.sender_email;
+  closeMobileTraditionalReading();
+  setMobileInboxMode('messenger');
+  
+  const targetClean = extractCleanParticipant(targetSender);
+  const conv = allConversations.find(c => {
+    const pClean = extractCleanParticipant(c.participant_raw);
+    return pClean === targetClean || (targetClean && pClean.includes(targetClean)) || (pClean && targetClean.includes(pClean));
+  });
+
+  if (conv) {
+    openConversation(conv.id);
+  }
+}
+
+async function toggleTradEmailTranslation() {
+  if (!activeTradEmail) return;
+
+  const bodyEl = document.getElementById('mob-trad-body');
+  const subjEl = document.getElementById('mob-trad-subject');
+  if (!bodyEl || !subjEl) return;
+
+  if (isMessageTranslated) {
+    subjEl.innerText = originalMessageSubject;
+    bodyEl.innerHTML = originalMessageBody;
+    isMessageTranslated = false;
+    showToastNotification('Original message restored', 'info');
+    return;
+  }
+
+  const targetLang = currentLanguage === 'en' ? 'hi' : currentLanguage;
+  showToastNotification(`Translating to ${targetLang.toUpperCase()}...`, 'info');
+
+  try {
+    const plainText = (activeTradEmail.body_text || bodyEl.innerText || '').trim();
+    const cleanSubj = activeTradEmail.subject || '';
+
+    const transUrl = (text, tl) => 
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
+
+    const [subjRes, bodyRes] = await Promise.all([
+      fetch(transUrl(cleanSubj, targetLang)).then(r => r.json()).catch(() => null),
+      fetch(transUrl(plainText.substring(0, 1500), targetLang)).then(r => r.json()).catch(() => null)
+    ]);
+
+    let translatedSubject = cleanSubj;
+    if (subjRes && subjRes[0]) {
+      translatedSubject = subjRes[0].map(s => s[0]).join('');
+    }
+
+    let translatedBody = '';
+    if (bodyRes && bodyRes[0]) {
+      translatedBody = bodyRes[0].map(s => s[0]).join('').replace(/\n/g, '<br>');
+    } else {
+      translatedBody = plainText.replace(/\n/g, '<br>');
+    }
+
+    subjEl.innerHTML = `<span style="font-size:11px; background: rgba(37,99,235,0.12); color: #2563eb; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-right: 6px;">AI ${targetLang.toUpperCase()}</span> ` + escapeHtml(translatedSubject);
+    bodyEl.innerHTML = `
+      <div style="padding: 8px 12px; background: rgba(37,99,235,0.06); border-left: 3px solid #2563eb; border-radius: 6px; margin-bottom: 12px; font-size: 11.5px; color: #2563eb; font-weight: 600;">
+        ⚡ Real-time AI Translation (${targetLang.toUpperCase()})
+      </div>
+      <div>${translatedBody}</div>
+    `;
+
+    isMessageTranslated = true;
+    showToastNotification(`Translated message to ${targetLang.toUpperCase()} ✓`, 'success');
+  } catch (err) {
+    showToastNotification('Translation failed, showing original', 'warning');
+  }
 }
 
 function createMobileConversationCard(conv) {
   const cardWrapper = document.createElement('div');
-  const isSelected = selectedEmailIds.has(conv.id);
   const isStarred = conv.is_starred === 1;
-  const isImportant = conv.is_important === 1;
 
   cardWrapper.id = `mob-conv-${conv.id}`;
   cardWrapper.dataset.id = conv.id;
-  cardWrapper.className = `email-card-wrapper conversation-thread-wrapper`;
+  cardWrapper.className = `conversation-chat-card-wrap`;
 
   const dateObj = new Date(conv.created_at);
   const isToday = new Date().toDateString() === dateObj.toDateString();
@@ -1501,162 +1740,46 @@ function createMobileConversationCard(conv) {
     : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
   const sourceBadgeHtml = conv.is_phonemail
-    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
-    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
-
-  const msgCountBadge = conv.message_count > 1 
-    ? `<span class="conv-count-chip">${conv.message_count} msgs</span>` 
-    : '';
-
-  const unreadPill = conv.unread_count > 0 
-    ? `<span class="conv-unread-dot" title="${conv.unread_count} unread">${conv.unread_count}</span>` 
-    : '';
+    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="10" height="10" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
+    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
   const convFallbackSvg = generateDefaultAvatar(conv.participant_raw, conv.display_title);
   const convAvatarUrl = conv.avatar_url || convFallbackSvg;
 
+  // Pure WhatsApp Messenger Card: 48px avatar + online dot + ✓✓ checkmark + clean snippet + green unread pill
   cardWrapper.innerHTML = `
-    <!-- Underlay Swipe Actions -->
-    <div class="swipe-actions-underlay">
-      <div class="swipe-right-actions">
-        <button type="button" class="swipe-btn star" onclick="toggleStar('${conv.latestMessage.id}', event); snapClosed();" title="Star">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" stroke="currentColor" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>${isStarred ? 'Unstar' : 'Star'}</span>
-        </button>
-        <button type="button" class="swipe-btn important" onclick="toggleImportant('${conv.latestMessage.id}', event); snapClosed();" title="Priority">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span>Priority</span>
-        </button>
-      </div>
-      <div class="swipe-left-actions">
-        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnConversation('${conv.id}', 'archive', event)" title="Archive Conversation">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-          <span>Archive</span>
-        </button>
-        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnConversation('${conv.id}', 'delete', event)" title="Delete Conversation">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          <span>Delete</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Foreground Card Surface -->
-    <div class="email-card-surface ${conv.unread_count > 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''}">
-      <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${conv.latestMessage.id}', event)">
-        <label class="custom-checkbox" onclick="event.stopPropagation()">
-          <input type="checkbox" class="row-checkbox" id="mob-check-${conv.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${conv.latestMessage.id}', event)">
-          <span class="checkmark"></span>
-        </label>
-      </div>
-
-      <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${conv.latestMessage.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-      </span>
-
-      <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View ${escapeHtml(conv.display_title)} Digital ID Card">
+    <div class="chat-conv-surface ${conv.unread_count > 0 ? 'unread' : ''}">
+      <div class="chat-conv-avatar-box" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View Digital ID Card">
         <img src="${convAvatarUrl}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${convFallbackSvg}';">
+        <span class="chat-online-dot"></span>
       </div>
 
-      <div class="item-content-preview">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-          <span style="font-size: 14px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;">
-            ${escapeHtml(conv.display_title)}
-          </span>
-          <div style="display: flex; align-items: center; gap: 4px;">
-            <span class="item-date-col">${timeDisplay}</span>
-            ${unreadPill}
+      <div class="chat-conv-info-col">
+        <div class="chat-conv-top-row">
+          <div class="chat-conv-title-box">
+            <span class="chat-conv-name">${escapeHtml(conv.display_title)}</span>
+            ${sourceBadgeHtml}
+          </div>
+          <span class="chat-conv-time ${conv.unread_count > 0 ? 'unread-time' : ''}">${timeDisplay}</span>
+        </div>
+
+        <div class="chat-conv-bottom-row">
+          <div class="chat-conv-snippet">
+            <span class="chat-check-icon">✓✓</span>
+            <span class="chat-snippet-text">${escapeHtml(conv.latest_snippet || conv.latest_subject || 'No preview available')}</span>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            ${isStarred ? '<span style="color: #eab308; display: inline-flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>' : ''}
+            ${conv.has_attachments ? '<span style="color: var(--text-dim); display: inline-flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>' : ''}
+            ${conv.unread_count > 0 ? `<span class="chat-conv-unread-pill">${conv.unread_count}</span>` : ''}
           </div>
         </div>
-        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
-          ${sourceBadgeHtml}
-          ${msgCountBadge}
-          ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1.5px 6px; border-radius: 4px;">PRIORITY</span>' : ''}
-        </div>
-        <div class="item-subject-title">${escapeHtml(conv.latest_subject)}</div>
-        <div class="item-body-snippet">${escapeHtml(conv.latest_snippet)}</div>
       </div>
     </div>
   `;
 
-  const surface = cardWrapper.querySelector('.email-card-surface');
-  let startX = 0;
-  let startY = 0;
-  let currentTx = 0;
-  let isDragging = false;
-  let hasMovedHorizontally = false;
-
-  function snapClosed() {
-    currentTx = 0;
-    surface.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
-    surface.style.transform = 'translateX(0px)';
-  }
-
-  cardWrapper.snapClosed = snapClosed;
-
-  surface.addEventListener('touchstart', (e) => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    isDragging = true;
-    hasMovedHorizontally = false;
-    surface.style.transition = 'none';
-  }, { passive: true });
-
-  surface.addEventListener('touchmove', (e) => {
-    if (!isDragging) return;
-    const diffX = e.touches[0].clientX - startX;
-    const diffY = e.touches[0].clientY - startY;
-
-    if (!hasMovedHorizontally && Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 10) {
-      isDragging = false;
-      return;
-    }
-
-    if (Math.abs(diffX) > 18) {
-      hasMovedHorizontally = true;
-      let newTx = currentTx + diffX;
-      if (newTx > 140) newTx = 140 + (newTx - 140) * 0.2;
-      if (newTx < -140) newTx = -140 + (newTx + 140) * 0.2;
-      surface.style.transform = `translateX(${newTx}px)`;
-    }
-  }, { passive: true });
-
-  surface.addEventListener('touchend', (e) => {
-    if (!isDragging) return;
-    isDragging = false;
-    surface.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
-    const endX = e.changedTouches[0].clientX;
-    const diffX = endX - startX;
-
-    if (hasMovedHorizontally && Math.abs(diffX) >= 18) {
-      if (diffX < -45 || (currentTx < 0 && diffX < 20)) {
-        currentTx = -136;
-        surface.style.transform = 'translateX(-136px)';
-      } else if (diffX > 45 || (currentTx > 0 && diffX > -20)) {
-        currentTx = 136;
-        surface.style.transform = 'translateX(136px)';
-      } else {
-        currentTx = 0;
-        surface.style.transform = 'translateX(0px)';
-      }
-    } else {
-      hasMovedHorizontally = false;
-      if (currentTx !== 0) snapClosed();
-    }
-  }, { passive: true });
-
-  surface.addEventListener('click', (e) => {
-    if (hasMovedHorizontally) {
-      e.stopPropagation();
-      e.preventDefault();
-      hasMovedHorizontally = false;
-      return;
-    }
-    if (currentTx !== 0) {
-      e.stopPropagation();
-      e.preventDefault();
-      snapClosed();
-      return;
-    }
+  cardWrapper.addEventListener('click', () => {
     openConversation(conv.id);
   });
 
@@ -2078,51 +2201,17 @@ async function submitChatMessage() {
 
 // ==================== TRADITIONAL EMAIL VIEW ON MOBILE ====================
 function openTraditionalViewFromChat(emailId) {
-  if (!activeConversation) return;
-
-  let email = null;
-  if (emailId) {
-    email = activeConversation.messages.find(m => m.id === emailId);
+  let targetId = emailId;
+  if (!targetId && activeConversation) {
+    targetId = activeConversation.latestMessage ? activeConversation.latestMessage.id : null;
   }
-  if (!email) {
-    email = activeConversation.latestMessage;
+  if (targetId) {
+    openMobileTraditionalEmail(targetId);
   }
-  activeTradEmail = email;
-
-  const modal = document.getElementById('traditional-view-modal');
-  if (!modal) return;
-
-  document.getElementById('trad-view-from').innerText = formatSenderDisplay(email.sender_email, true, email.sender_name);
-  
-  // To field is prefilled & LOCKED
-  const toInput = document.getElementById('trad-view-to');
-  if (toInput) {
-    toInput.value = email.recipient_phone || (currentUser ? currentUser.phone : '');
-    toInput.readOnly = true;
-  }
-
-  document.getElementById('trad-view-subject').innerText = email.subject || '(No Subject)';
-  document.getElementById('trad-view-date').innerText = new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-  
-  const bodyViewport = document.getElementById('trad-view-body');
-  if (bodyViewport) {
-    const rawContent = email.body_html || email.body_text || '';
-    bodyViewport.innerHTML = rawContent.includes('<') ? rawContent : escapeHtml(rawContent).replace(/\n/g, '<br>');
-  }
-
-  modal.style.display = 'flex';
 }
 
 function closeTraditionalViewModal() {
-  const modal = document.getElementById('traditional-view-modal');
-  if (modal) modal.style.display = 'none';
-}
-
-function replyFromTraditionalView() {
-  closeTraditionalViewModal();
-  if (activeTradEmail) {
-    triggerReplyToMessage(activeTradEmail.id);
-  }
+  closeMobileTraditionalReading();
 }
 
 // ==================== DIGITAL ID CARD & PERSON INFO MODAL ====================

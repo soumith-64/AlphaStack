@@ -1,3 +1,8 @@
+// Strict Device Guard: Phone/Mobile users are restricted to Mobile views (Traditional & Messenger)
+if (window.innerWidth <= 768 || /mobile|iphone|android|ipad|phone/i.test(navigator.userAgent)) {
+  window.location.replace('/mobile/');
+}
+
 // ==================== STATE MANAGEMENT ====================
 let currentUser = null;
 

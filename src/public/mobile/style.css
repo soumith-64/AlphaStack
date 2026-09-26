@@ -757,6 +757,50 @@ button {
   display: flex;
 }
 
+/* Prominent Mode Switcher: Messenger View vs Traditional View */
+.mobile-view-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 6px;
+}
+
+.mob-view-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-light);
+  background: var(--bg-subtle);
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.mob-view-tab-btn:active {
+  transform: scale(0.97);
+}
+
+.mob-view-tab-btn.active#tab-mode-messenger {
+  background: #ecfdf5;
+  color: #046A38;
+  border-color: #10B981;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.22);
+}
+
+.mob-view-tab-btn.active#tab-mode-traditional {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.22);
+}
+
 .mobile-subbar {
   display: flex;
   align-items: center;
@@ -2342,9 +2386,473 @@ button {
   background: #03522b;
 }
 
-/* ==================== TRADITIONAL EMAIL VIEW MODAL ==================== */
-.traditional-email-card {
-  max-height: 85vh;
+/* ==================== WHATSAPP-STYLE MESSENGER CONVERSATION CARDS ==================== */
+.conversation-chat-card-wrap {
+  position: relative;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+
+.conversation-chat-card-wrap:active {
+  background: var(--bg-hover);
+}
+
+.chat-conv-surface {
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  gap: 12px;
+}
+
+.chat-conv-avatar-box {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.chat-online-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid var(--bg-surface);
+}
+
+.chat-conv-info-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chat-conv-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chat-conv-title-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-conv-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55vw;
+}
+
+.chat-conv-time {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+  margin-left: 6px;
+}
+
+.chat-conv-time.unread-time {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.chat-conv-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-conv-snippet {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chat-check-icon {
+  font-size: 11px;
+  font-weight: 800;
+  color: #3b82f6;
+  letter-spacing: -1px;
+}
+
+.chat-snippet-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-conv-unread-pill {
+  min-width: 19px;
+  height: 19px;
+  border-radius: 9999px;
+  background: #10b981;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.4);
+}
+
+/* ==================== MOBILE GMAIL-STYLE TRADITIONAL EMAIL CARDS ==================== */
+.traditional-email-card-wrap {
+  position: relative;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.traditional-email-surface {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 12px 10px;
+  gap: 10px;
+  transition: background 0.15s ease;
+}
+
+.traditional-email-surface.unread {
+  background: #f8fafc;
+  border-left: 3.5px solid #2563eb;
+}
+
+.traditional-email-surface.selected {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.trad-email-avatar-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.trad-email-main-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.trad-email-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.trad-email-sender {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50vw;
+}
+
+.trad-email-sender.bold-unread {
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.trad-email-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trad-email-date {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.trad-email-subject-line {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trad-email-subject-line.bold-unread {
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.trad-email-snippet-line {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+
+.trad-email-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.trad-priority-tag {
+  font-size: 9px;
+  font-weight: 800;
+  color: #b45309;
+  background: #fef3c7;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+}
+
+.trad-att-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* ==================== FULL-SCREEN TRADITIONAL READING PANE ==================== */
+.traditional-reading-pane {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-app);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: slideInRight 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.trad-reading-top-bar {
+  height: 56px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.trad-top-folder-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-left: 8px;
+}
+
+.trad-reading-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 12px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.trad-subject-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.trad-email-subject {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.35;
+  margin: 0 0 8px 0;
+}
+
+.trad-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.trad-category-badge {
+  font-size: 10px;
+  font-weight: 800;
+  background: var(--bg-subtle);
+  color: var(--text-dim);
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.trad-sender-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 12px 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.trad-sender-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.trad-sender-name-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.trad-sender-name {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trad-email-time {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.trad-sender-address {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+  word-break: break-all;
+}
+
+.trad-recipients-line {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+
+.trad-recipients-line strong {
+  color: var(--text-main);
+}
+
+.trad-email-body-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  min-height: 180px;
+}
+
+.trad-email-body-content {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.trad-attachments-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+}
+
+.trad-att-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-subtle);
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.trad-reading-bottom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.trad-action-pill {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease;
+}
+
+.trad-action-pill:active {
+  transform: scale(0.96);
+  background: var(--bg-hover);
+}
+
+.trad-action-pill.messenger-pill {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #046A38;
 }
 
 .trad-meta-box {
