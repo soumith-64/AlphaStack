@@ -301,6 +301,34 @@ function generateDefaultAvatar(seed, displayName = '') {
   }
 }
 
+/**
+ * Returns best available avatar: custom photo -> external/Gmail auto-fetch -> deterministic initials SVG
+ */
+function getAvatarUrl(rawIdentifier, displayName = '', customAvatar = null) {
+  if (customAvatar) return customAvatar;
+  
+  const cleanId = extractCleanParticipant(rawIdentifier || '');
+  
+  // Check cached contacts
+  if (cleanId && typeof allContacts !== 'undefined' && Array.isArray(allContacts)) {
+    const contact = allContacts.find(c => {
+      if (c && c.avatar_url) {
+        if (c.phone && cleanId.includes(c.phone)) return true;
+        if (c.email && c.email.toLowerCase() === cleanId.toLowerCase()) return true;
+      }
+      return false;
+    });
+    if (contact && contact.avatar_url) return contact.avatar_url;
+  }
+
+  // If email address (e.g. @gmail.com, etc.), auto-fetch from unavatar.io
+  if (cleanId.includes('@')) {
+    return `https://unavatar.io/${encodeURIComponent(cleanId)}?fallback=false`;
+  }
+
+  return generateDefaultAvatar(cleanId || displayName, displayName || cleanId);
+}
+
 function normalizeSubject(sub) {
   if (!sub) return '(no subject)';
   let s = String(sub).trim();
@@ -1878,118 +1906,135 @@ function archiveCurrentEmail() {
   closeReadingPane();
 }
 
-// ==================== EMAIL LIST RENDERING (GROUPED INTO CONVERSATIONS) ====================
+// ==================== EMAIL LIST RENDERING (NORMAL GMAIL WAY - NOT GROUPED) ====================
 function renderEmailList(emails) {
   const container = document.getElementById('email-items-container');
   if (!container) return;
   container.innerHTML = '';
 
   const rawList = emails || [];
-  allConversations = groupEmailsIntoConversations(rawList);
+  let filtered = [...rawList];
 
-  let filtered = [...allConversations];
   if (currentMailSourceFilter === 'phonemail') {
-    filtered = filtered.filter(c => c.is_phonemail);
+    filtered = filtered.filter(e => isPhoneMailSender(e.sender_email));
   } else if (currentMailSourceFilter === 'external') {
-    filtered = filtered.filter(c => !c.is_phonemail);
+    filtered = filtered.filter(e => !isPhoneMailSender(e.sender_email));
+  }
+
+  if (searchTerm) {
+    const term = searchTerm.toLowerCase();
+    filtered = filtered.filter(e => 
+      (e.subject || '').toLowerCase().includes(term) ||
+      (e.sender_email || '').toLowerCase().includes(term) ||
+      (e.sender_name || '').toLowerCase().includes(term) ||
+      (e.body_text || '').toLowerCase().includes(term)
+    );
   }
 
   if (filtered.length === 0) {
-    let emptyMsg = `No conversations found in ${getFolderFriendlyName(currentFolder)}.`;
+    let emptyMsg = `No messages found in ${getFolderFriendlyName(currentFolder)}.`;
     if (currentMailSourceFilter === 'phonemail') {
-      emptyMsg = `No INAI network conversations in ${getFolderFriendlyName(currentFolder)}.`;
+      emptyMsg = `No INAI network emails in ${getFolderFriendlyName(currentFolder)}.`;
     } else if (currentMailSourceFilter === 'external') {
-      emptyMsg = `No external (Gmail, Rediff, etc.) conversations in ${getFolderFriendlyName(currentFolder)}.`;
+      emptyMsg = `No external (Gmail, Rediff, etc.) emails in ${getFolderFriendlyName(currentFolder)}.`;
     }
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-dim); padding: 80px 20px;">
         <div style="margin-bottom: 14px;">
           <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.6;"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
         </div>
-        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Conversations</h3>
+        <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Messages</h3>
         <p style="font-size: 13px;">${emptyMsg}</p>
       </div>
     `;
     return;
   }
 
-  // Render conversation rows
-  filtered.forEach(conv => {
-    const row = createConversationRowElement(conv);
+  // Render individual email rows (standard Gmail view)
+  filtered.forEach(email => {
+    const row = createEmailRowElement(email);
     container.appendChild(row);
   });
 
   updateBulkToolbar();
 }
 
-function createConversationRowElement(conv) {
+function createEmailRowElement(email) {
   const row = document.createElement('div');
-  const isSelected = selectedEmailIds.has(conv.id);
-  const isStarred = conv.is_starred === 1;
-  const isImportant = conv.is_important === 1;
+  const isSelected = selectedEmailIds.has(email.id);
+  const isStarred = email.is_starred === 1;
+  const isImportant = email.is_important === 1;
 
-  row.id = `conv-row-${conv.id}`;
-  row.dataset.id = conv.id;
-  row.className = `email-card-item ${conv.unread_count > 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}`;
+  row.id = `email-row-${email.id}`;
+  row.dataset.id = email.id;
+  row.className = `email-card-item ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''} ${isImportant ? 'is-important' : ''}`;
   row.onclick = () => {
-    openConversation(conv.id);
+    openEmail(email.id);
   };
 
-  const dateObj = new Date(conv.created_at);
+  const dateObj = new Date(email.created_at);
   const isToday = new Date().toDateString() === dateObj.toDateString();
   const timeDisplay = isToday 
     ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
     : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
 
-  const sourceBadgeHtml = conv.is_phonemail
+  const isSentFolder = currentFolder.toUpperCase() === 'SENT';
+  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
+  const recipientsDisplay = getRecipientsDisplay(email);
+
+  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
+  const sourceBadgeHtml = isFromPhoneMail
     ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
     : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
 
-  const msgCountBadge = conv.message_count > 1 
-    ? `<span class="conv-count-badge">${conv.message_count} msgs</span>` 
-    : '';
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  const displaySender = (isSentFolder || isSentByMe) 
+    ? `To: ${recipientsDisplay || 'Recipient'}` 
+    : formattedSender;
 
-  const rowInitial = getInitials(conv.display_title || conv.participant_raw);
-  const rowAvatar = conv.avatar_url || generateDefaultAvatar(conv.participant_raw, conv.display_title);
+  const participantForAvatar = (isSentFolder || isSentByMe) ? (email.recipient_phone || recipientsDisplay) : email.sender_email;
+  const rowAvatar = getAvatarUrl(participantForAvatar, displaySender);
+  const fallbackSvg = generateDefaultAvatar(participantForAvatar, displaySender);
+  const rowInitial = getInitials(displaySender);
+  const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
 
   row.innerHTML = `
     <!-- Row Controls: Checkbox and Star -->
-    <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${conv.latestMessage.id}', event)">
+    <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
       <label class="custom-checkbox" onclick="event.stopPropagation()">
-        <input type="checkbox" class="row-checkbox" id="check-${conv.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${conv.latestMessage.id}', event)">
+        <input type="checkbox" class="row-checkbox" id="check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
         <span class="checkmark"></span>
       </label>
     </div>
 
-    <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${conv.latestMessage.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+    <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </span>
 
-    <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View ${escapeHtml(conv.display_title)} Digital ID Card">
-      <img src="${rowAvatar}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View ${escapeHtml(displaySender)} Digital ID Card">
+      <img src="${rowAvatar}" alt="${escapeHtml(displaySender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
       <span class="avatar-fallback-initial" style="display:none;">${rowInitial}</span>
     </div>
-    <div class="item-sender-col" title="${escapeHtml(conv.display_title)}">
-      ${escapeHtml(conv.display_title)}
+    <div class="item-sender-col" title="${escapeHtml(displaySender)}">
+      ${escapeHtml(displaySender)}
     </div>
     <div class="item-content-preview">
       ${sourceBadgeHtml}
-      ${msgCountBadge}
       ${isImportant ? '<span style="font-size: 10px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1px 6px; border-radius: 4px; margin-right: 4px;">PRIORITY</span>' : ''}
-      <span class="item-subject-title">${escapeHtml(conv.latest_subject)}</span>
-      <span class="item-body-snippet"> — ${escapeHtml(conv.latest_snippet)}</span>
+      <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
+      <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
     </div>
     <div class="item-date-col">${timeDisplay}</div>
 
     <!-- Desktop Hover Actions -->
     <div class="row-quick-actions" onclick="event.stopPropagation()">
-      <button class="quick-action-btn" onclick="toggleImportant('${conv.latestMessage.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
+      <button class="quick-action-btn" onclick="toggleImportant('${email.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
-      <button class="quick-action-btn" onclick="executeBulkActionOnConversation('${conv.id}', 'archive', event)" title="Archive Conversation">
+      <button class="quick-action-btn" onclick="executeBulkActionOnSingle('${email.id}', 'archive', event)" title="Archive Email">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
       </button>
-      <button class="quick-action-btn danger" onclick="executeBulkActionOnConversation('${conv.id}', 'delete', event)" title="Delete Conversation">
+      <button class="quick-action-btn danger" onclick="executeBulkActionOnSingle('${email.id}', 'delete', event)" title="Delete Email">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
     </div>
@@ -2018,55 +2063,41 @@ function switchFolder(folder, element) {
   loadEmails(folder);
 }
 
-// ==================== READING PANE VIEW (CONVERSATION THREAD) ====================
-function openConversation(convId) {
-  const conv = allConversations.find(c => c.id === convId || c.key === convId);
-  if (!conv) return;
+// ==================== READING PANE VIEW (INDIVIDUAL EMAIL - NORMAL GMAIL WAY) ====================
+function openEmail(emailId) {
+  const email = allEmails.find(e => e.id === emailId);
+  if (!email) return;
 
-  activeConversation = conv;
-  activeConversationId = conv.id;
-  activeEmail = conv.latestMessage;
+  activeEmail = email;
 
   // Immediately remove unread class and green line from DOM row
-  const rowEl = document.getElementById(`conv-row-${conv.id}`) || document.querySelector(`[data-id="${conv.id}"]`);
+  const rowEl = document.getElementById(`email-row-${email.id}`) || document.querySelector(`[data-id="${email.id}"]`);
   if (rowEl) {
     rowEl.classList.remove('unread');
     const subjTitle = rowEl.querySelector('.item-subject-title');
     if (subjTitle) subjTitle.style.fontWeight = 'normal';
   }
 
-  // Mark all messages as read locally and in database
-  const unreadMsgs = conv.messages.filter(m => m.is_read === 0);
-  conv.messages.forEach(m => {
-    m.is_read = 1;
-    m.read_at = m.read_at || new Date().toISOString();
-  });
-  conv.is_read = 1;
-  conv.unread_count = 0;
+  // If unread, mark read locally and in database
+  if (email.is_read === 0) {
+    email.is_read = 1;
+    email.read_at = email.read_at || new Date().toISOString();
 
-  if (unreadMsgs.length > 0) {
-    const unreadIds = unreadMsgs.map(m => m.id);
     // Mark via backend API
-    fetch('/api/emails/bulk', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'read', ids: unreadIds })
+    fetch(`/api/emails/${email.id}/read`, {
+      method: 'POST'
     }).catch(() => {});
-  }
 
-  // Update cached folders so returning to inbox leaves row read (no green line)
-  const allMsgIds = conv.messages.map(m => m.id);
-  allEmails.forEach(e => {
-    if (allMsgIds.includes(e.id)) e.is_read = 1;
-  });
-  Object.keys(emailFolderCache).forEach(f => {
-    if (Array.isArray(emailFolderCache[f])) {
-      emailFolderCache[f].forEach(e => {
-        if (allMsgIds.includes(e.id)) e.is_read = 1;
-      });
-    }
-  });
-  updateFolderCountsFromList(allEmails);
+    // Update cached folders so returning to folder keeps it read
+    Object.keys(emailFolderCache).forEach(f => {
+      if (Array.isArray(emailFolderCache[f])) {
+        const cached = emailFolderCache[f].find(e => e.id === email.id);
+        if (cached) cached.is_read = 1;
+      }
+    });
+
+    updateFolderCountsFromList(allEmails);
+  }
 
   const listPane = document.getElementById('mail-list-pane');
   const readingPane = document.getElementById('reading-pane');
@@ -2074,185 +2105,125 @@ function openConversation(convId) {
   if (readingPane) readingPane.style.display = 'flex';
 
   const subjEl = document.getElementById('full-subject');
-  if (subjEl) subjEl.innerText = conv.latest_subject;
+  if (subjEl) subjEl.innerText = email.subject || '(No Subject)';
+
+  const catTag = document.getElementById('reading-category-tag');
+  if (catTag) catTag.innerText = 'EMAIL MESSAGE';
+
+  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
+  const recipientsDisplay = getRecipientsDisplay(email);
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  const replyTarget = isSentByMe ? (email.recipient_phone || recipientsDisplay || email.sender_email) : email.sender_email;
+  const replyTargetName = isSentByMe ? (recipientsDisplay || 'Recipient') : formattedSender;
 
   const toLabel = document.getElementById('inline-dock-recipient-label');
   if (toLabel) {
-    toLabel.innerText = `To: ${conv.display_title} (🔒 Locked)`;
+    toLabel.innerText = `To: ${replyTargetName} (${replyTarget})`;
   }
 
-  // Populate thread container
-  renderDesktopConversationThread(conv);
+  // Populate email message in reading container
+  renderDesktopEmailReadingView(email);
 
-  // Reset reply input & quote banner
+  // Reset reply input
   cancelDesktopQuotedReply();
   const replyInput = document.getElementById('desktop-thread-reply-input');
   if (replyInput) replyInput.value = '';
 
-  // Star status
+  // Star and Important status
   const starBtn = document.getElementById('pane-star-btn');
   if (starBtn) {
-    starBtn.style.color = conv.is_starred === 1 ? 'var(--accent-amber)' : 'var(--text-dim)';
+    starBtn.style.color = email.is_starred === 1 ? 'var(--accent-amber)' : 'var(--text-dim)';
   }
   const impBtn = document.getElementById('pane-important-btn');
   if (impBtn) {
-    impBtn.style.color = conv.is_important === 1 ? '#eab308' : 'var(--text-dim)';
+    impBtn.style.color = email.is_important === 1 ? '#eab308' : 'var(--text-dim)';
   }
 }
 
-function renderDesktopConversationThread(conv) {
-  const threadContainer = document.getElementById('reading-thread-container');
-  if (!threadContainer) return;
-  threadContainer.innerHTML = '';
+function renderDesktopEmailReadingView(email) {
+  const container = document.getElementById('reading-thread-container');
+  if (!container) return;
+  container.innerHTML = '';
 
-  const myPhone = currentUser ? currentUser.phone : '';
-  const myClean = (myPhone || '').replace(/\D/g, '').slice(-10);
+  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  const timeDisplay = new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const isPhoneMail = isPhoneMailSender(email.sender_email);
 
-  conv.messages.forEach((msg, idx) => {
-    const isFirst = idx === 0;
-    const cleanSender = extractCleanParticipant(msg.sender_email);
-    const isOutgoing = cleanSender.includes(myClean) || (currentUser && cleanSender.includes(currentUser.phone));
-    const senderDisplay = formatSenderDisplay(msg.sender_email, false, msg.sender_name);
-    const timeDisplay = new Date(msg.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-    const isPhoneMail = isPhoneMailSender(msg.sender_email);
+  const avatarUrl = getAvatarUrl(email.sender_email, formattedSender);
+  const fallbackSvg = generateDefaultAvatar(email.sender_email, formattedSender);
+  const initials = getInitials(formattedSender);
 
-    const avatarSvg = generateDefaultAvatar(msg.sender_email, senderDisplay);
-    const hasReplied = msg.has_replied === 1;
-
-    // Show Subject badge if first email or if subject changed within this contact conversation
-    const prevMsg = idx > 0 ? conv.messages[idx - 1] : null;
-    const isNewSubject = isFirst || (prevMsg && normalizeSubject(prevMsg.subject) !== normalizeSubject(msg.subject));
-    const subjectHtml = (isNewSubject && msg.subject) ? `
-      <div class="thread-subject-chip">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-        <span>${escapeHtml(msg.subject)}</span>
-      </div>
-    ` : '';
-
-    // Quoted reply snippet
-    let quotedHtml = '';
-    if (msg.quoted_text || msg.reply_to_id) {
-      const qSender = msg.quoted_sender || 'Original Message';
-      const qText = (msg.quoted_text || '').substring(0, 95);
-      quotedHtml = `
-        <div class="thread-quoted-box">
-          <strong>${escapeHtml(qSender)} wrote:</strong> ${escapeHtml(qText)}
+  // Attachments HTML
+  let attachmentsHtml = '';
+  let attList = [];
+  if (email.attachments) {
+    try {
+      attList = typeof email.attachments === 'string' ? JSON.parse(email.attachments) : email.attachments;
+    } catch(e) {}
+  }
+  if (Array.isArray(attList) && attList.length > 0) {
+    attachmentsHtml = `
+      <div class="thread-attachments-box" style="margin-top: 16px; padding: 12px; background: var(--bg-hover); border-radius: 8px;">
+        <div style="font-size: 12px; font-weight: 700; color: var(--text-dim); margin-bottom: 8px;">ATTACHMENTS (${attList.length})</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+          ${attList.map(att => `
+            <a href="${att.url || '#'}" download="${att.filename || 'attachment'}" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 6px; text-decoration: none; color: var(--text-main); font-size: 12px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <span>${escapeHtml(att.filename || 'Attachment')}</span>
+            </a>
+          `).join('')}
         </div>
-      `;
-    }
-
-    // Read Receipt status indicator for outgoing messages
-    let readReceiptHtml = '';
-    if (isOutgoing) {
-      const isRead = msg.is_read === 1 || !!msg.read_at;
-      readReceiptHtml = `
-        <span class="read-receipt-status ${isRead ? 'read' : 'delivered'}" title="${isRead ? 'Read by recipient' : 'Delivered to mailbox'}">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
-            <polyline points="20 6 9 17 4 12"/>
-            <polyline points="22 10 14.5 17.5 11 14"/>
-          </svg>
-          <span>${isRead ? 'Read' : 'Delivered'}</span>
-        </span>
-      `;
-    }
-
-    const card = document.createElement('div');
-    card.className = `thread-message-card ${isOutgoing ? 'outgoing' : 'incoming'}`;
-    card.id = `thread-card-${msg.id}`;
-
-    const rawBody = msg.body_html || escapeHtml(msg.body_text || '').replace(/\n/g, '<br>');
-
-    // Single-reply constraint badge or button
-    let replyActionHtml = '';
-    if (hasReplied) {
-      replyActionHtml = `<span class="replied-lock-badge">Replied ✓</span>`;
-    } else {
-      replyActionHtml = `
-        <button type="button" class="thread-reply-btn" onclick="triggerDesktopReply('${msg.id}', event)">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
-          <span>Reply</span>
-        </button>
-      `;
-    }
-
-    card.innerHTML = `
-      <div class="thread-card-header">
-        <div class="thread-sender-info">
-          <div class="thread-avatar" onclick="openContactInfoModal('${escapeHtml(msg.sender_email)}');" title="View ${escapeHtml(senderDisplay)} Digital ID Card" style="cursor: pointer;">
-            <img src="${avatarSvg}" alt="${escapeHtml(senderDisplay)}" class="avatar-inner-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-            <span class="avatar-fallback-initial" style="display:none;">${getInitials(senderDisplay)}</span>
-          </div>
-          <div class="thread-meta-col">
-            <div class="thread-sender-name">
-              <span>${escapeHtml(senderDisplay)}</span>
-              <span class="badge-source-tag ${isPhoneMail ? 'badge-phonemail-pill' : 'badge-external-pill'}">
-                ${isPhoneMail ? '⚡ INAI Network' : '🌐 External Provider'}
-              </span>
-            </div>
-            <div class="thread-time">
-              <span>${timeDisplay}</span>
-              ${readReceiptHtml}
-            </div>
-          </div>
-        </div>
-        <div class="thread-header-actions">
-          ${replyActionHtml}
-        </div>
-      </div>
-      ${subjectHtml}
-      ${quotedHtml}
-      <div class="thread-card-body">
-        ${rawBody}
       </div>
     `;
+  }
 
-    threadContainer.appendChild(card);
-  });
+  const rawBody = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
+
+  const card = document.createElement('div');
+  card.className = `thread-message-card ${isSentByMe ? 'outgoing' : 'incoming'}`;
+  card.id = `email-view-card-${email.id}`;
+
+  card.innerHTML = `
+    <div class="thread-card-header">
+      <div class="thread-sender-info">
+        <div class="thread-avatar" onclick="openContactInfoModal('${escapeHtml(email.sender_email)}');" title="View ${escapeHtml(formattedSender)} Digital ID Card" style="cursor: pointer;">
+          <img src="${avatarUrl}" alt="${escapeHtml(formattedSender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
+          <span class="avatar-fallback-initial" style="display:none;">${initials}</span>
+        </div>
+        <div class="thread-meta-col">
+          <div class="thread-sender-name">
+            <span>${escapeHtml(formattedSender)}</span>
+            <span class="badge-source-tag ${isPhoneMail ? 'badge-phonemail-pill' : 'badge-external-pill'}">
+              ${isPhoneMail ? '⚡ INAI Network' : '🌐 External Provider'}
+            </span>
+          </div>
+          <div class="thread-time" style="display: flex; align-items: center; gap: 8px;">
+            <span>${timeDisplay}</span>
+            <span style="color: var(--text-dim); font-size: 11px;">To: ${escapeHtml(getRecipientsDisplay(email) || 'Me')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="thread-card-body" style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-main);">
+      ${rawBody}
+    </div>
+    ${attachmentsHtml}
+  `;
+
+  container.appendChild(card);
 }
 
 function openEmailDetails(email) {
   if (!email) return;
-  const convKey = email.conversation_id || getConversationKey(email);
-  const conv = allConversations.find(c => c.id === convKey || c.key === convKey);
-  if (conv) {
-    openConversation(conv.id);
-  } else {
-    loadEmails(currentFolder).then(() => {
-      openConversation(email.conversation_id || email.id);
-    });
-  }
+  openEmail(email.id);
 }
 
 // ==================== DESKTOP THREAD REPLY LOGIC ====================
 function triggerDesktopReply(msgId, e) {
   if (e) e.stopPropagation();
-  if (!activeConversation) return;
-
-  const msg = activeConversation.messages.find(m => m.id === msgId);
-  if (!msg) return;
-
-  if (msg.has_replied === 1) {
-    showToastNotification('This message has already been replied to once.', 'info');
-    return;
-  }
-
-  activeReplyingMessage = msg;
-  const quoteBar = document.getElementById('desktop-quote-bar');
-  const quoteSender = document.getElementById('desktop-quote-sender');
-  const quoteSnippet = document.getElementById('desktop-quote-snippet');
-
-  if (quoteBar && quoteSender && quoteSnippet) {
-    const senderDisplay = formatSenderDisplay(msg.sender_email, false, msg.sender_name);
-    quoteSender.innerText = `Replying to ${senderDisplay}`;
-    quoteSnippet.innerText = (msg.body_text || msg.body_html || '').replace(/\s+/g, ' ').trim().substring(0, 90);
-    quoteBar.style.display = 'flex';
-  }
-
   const input = document.getElementById('desktop-thread-reply-input');
-  if (input) {
-    input.focus();
-    input.placeholder = `Reply to ${formatSenderDisplay(msg.sender_email, false, msg.sender_name)}...`;
-  }
+  if (input) input.focus();
 }
 
 function cancelDesktopQuotedReply() {
@@ -2260,11 +2231,12 @@ function cancelDesktopQuotedReply() {
   const quoteBar = document.getElementById('desktop-quote-bar');
   if (quoteBar) quoteBar.style.display = 'none';
   const input = document.getElementById('desktop-thread-reply-input');
-  if (input) input.placeholder = 'Type a reply to this conversation...';
+  if (input) input.placeholder = 'Type a reply to this email...';
 }
 
 async function submitDesktopThreadReply() {
-  if (!activeConversation) return;
+  const targetEmail = activeEmail;
+  if (!targetEmail) return;
   const input = document.getElementById('desktop-thread-reply-input');
   if (!input) return;
   const body = input.value.trim();
@@ -2273,8 +2245,9 @@ async function submitDesktopThreadReply() {
     return;
   }
 
-  const to = activeConversation.participant_raw || activeConversation.latestMessage.sender_email;
-  const cleanSubject = activeConversation.latest_subject.replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
+  const isSentByMe = Boolean(targetEmail.sender_email && currentUser && targetEmail.sender_email.includes(currentUser.phone));
+  const to = isSentByMe ? (targetEmail.recipient_phone || getRecipientsDisplay(targetEmail) || targetEmail.sender_email) : targetEmail.sender_email;
+  const cleanSubject = (targetEmail.subject || '').replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
   const subject = `Re: ${cleanSubject}`;
 
   try {
@@ -2283,8 +2256,8 @@ async function submitDesktopThreadReply() {
       to: to,
       subject: subject,
       body: body,
-      reply_to_id: activeReplyingMessage ? activeReplyingMessage.id : null,
-      conversation_id: activeConversation.id
+      reply_to_id: targetEmail.id,
+      conversation_id: targetEmail.conversation_id || null
     };
 
     const res = await fetch('/api/emails/send', {
@@ -2296,36 +2269,37 @@ async function submitDesktopThreadReply() {
 
     if (data.success) {
       input.value = '';
-      if (activeReplyingMessage) {
-        activeReplyingMessage.has_replied = 1;
-      }
       cancelDesktopQuotedReply();
 
-      // Append new outgoing message card to thread
-      const now = new Date();
-      const newMsg = {
-        id: data.email ? data.email.id : `tmp_${Date.now()}`,
-        sender_email: `${currentUser.phone}@alphastack.wwisvnr.com`,
-        sender_name: currentUser.name || currentUser.phone,
-        subject: subject,
-        body_text: body,
-        created_at: now.toISOString(),
-        is_read: 1,
-        has_replied: 0,
-        quoted_sender: activeReplyingMessage ? formatSenderDisplay(activeReplyingMessage.sender_email, false, activeReplyingMessage.sender_name) : null,
-        quoted_text: activeReplyingMessage ? (activeReplyingMessage.body_text || '').substring(0, 95) : null
-      };
-
-      activeConversation.messages.push(newMsg);
-      activeConversation.latestMessage = newMsg;
-      activeConversation.latest_snippet = body.substring(0, 95);
-      activeConversation.created_at = newMsg.created_at;
-
-      renderDesktopConversationThread(activeConversation);
-
-      // Scroll to bottom of reading pane
-      const threadContainer = document.getElementById('reading-thread-container');
-      if (threadContainer) threadContainer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      // Append new outgoing message card to container
+      const container = document.getElementById('reading-thread-container');
+      if (container) {
+        const timeDisplay = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+        const senderName = currentUser.name || currentUser.phone;
+        const card = document.createElement('div');
+        card.className = 'thread-message-card outgoing';
+        card.innerHTML = `
+          <div class="thread-card-header">
+            <div class="thread-sender-info">
+              <div class="thread-avatar">
+                <img src="${currentUser.avatar_url || generateDefaultAvatar(currentUser.phone, senderName)}" alt="${escapeHtml(senderName)}" class="avatar-inner-img">
+              </div>
+              <div class="thread-meta-col">
+                <div class="thread-sender-name">
+                  <span>${escapeHtml(senderName)}</span>
+                  <span class="badge-source-tag badge-phonemail-pill">⚡ INAI Network</span>
+                </div>
+                <div class="thread-time">${timeDisplay} • Sent</div>
+              </div>
+            </div>
+          </div>
+          <div class="thread-card-body" style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-main);">
+            ${escapeHtml(body).replace(/\n/g, '<br>')}
+          </div>
+        `;
+        container.appendChild(card);
+        card.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
 
       showToastNotification('Reply sent successfully! 🚀', 'success');
       emailFolderCache = {};
@@ -3365,6 +3339,49 @@ function selectPersonAvatarGradient(palette) {
   }
 }
 
+let activeCustomAvatarDataUrl = '';
+
+function handlePersonAvatarUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (loadEvt) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 120;
+      canvas.height = 120;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 120, 120);
+      activeCustomAvatarDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      const preview = document.getElementById('edit-person-avatar-preview');
+      const cardAvatar = document.getElementById('id-card-avatar-img');
+      if (preview) {
+        preview.innerHTML = `<img src="${activeCustomAvatarDataUrl}" alt="Avatar" class="avatar-inner-img">`;
+      }
+      if (cardAvatar) {
+        cardAvatar.innerHTML = `<img src="${activeCustomAvatarDataUrl}" alt="Avatar" class="avatar-inner-img">`;
+      }
+    };
+    img.src = loadEvt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetPersonAvatarToDefault() {
+  activeCustomAvatarDataUrl = '';
+  const target = activeContactForModal || (currentUser && currentUser.phone) || 'User';
+  const nameEl = document.getElementById('edit-person-name');
+  const name = nameEl ? nameEl.value : target;
+  const defaultSvg = generateDefaultAvatar(target, name);
+  const preview = document.getElementById('edit-person-avatar-preview');
+  const cardAvatar = document.getElementById('id-card-avatar-img');
+  if (preview) preview.innerHTML = `<img src="${defaultSvg}" alt="Avatar" class="avatar-inner-img">`;
+  if (cardAvatar) cardAvatar.innerHTML = `<img src="${defaultSvg}" alt="Avatar" class="avatar-inner-img">`;
+}
+
 async function savePersonInfoSubmit(e) {
   e.preventDefault();
   const phone = (document.getElementById('edit-person-phone').value || '').trim();
@@ -3378,11 +3395,12 @@ async function savePersonInfoSubmit(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        phone: phone.replace(/\D/g, '').slice(-10),
-        display_name: displayName,
+        phone: phone || activeContactForModal,
+        name: displayName,
         email: email,
-        sub_alias: subAlias,
-        bio: bio
+        bio: bio,
+        avatar_url: activeCustomAvatarDataUrl || undefined,
+        alias_tag: subAlias
       })
     });
     const data = await res.json();
@@ -3395,11 +3413,21 @@ async function savePersonInfoSubmit(e) {
       const aliasTag = document.getElementById('id-card-alias-tag');
       if (aliasTag && subAlias) aliasTag.innerText = `Sub-ID: .${subAlias}`;
 
-      if (activeConversation) {
-        activeConversation.display_title = displayName;
-        const subjEl = document.getElementById('full-subject');
-        if (subjEl) subjEl.innerText = activeConversation.latest_subject;
+      // Update in memory emails and re-render
+      if (activeCustomAvatarDataUrl) {
+        allEmails.forEach(em => {
+          if (em.sender_email && (em.sender_email.includes(phone) || (email && em.sender_email.includes(email)))) {
+            em.sender_avatar = activeCustomAvatarDataUrl;
+            em.sender_name = displayName;
+          }
+        });
+        if (currentUser && (currentUser.phone === phone || currentUser.email === email)) {
+          currentUser.avatar_url = activeCustomAvatarDataUrl;
+          currentUser.name = displayName;
+          updateProfileDisplay();
+        }
       }
+      renderEmailList(allEmails);
       switchIdCardTab('card');
     } else {
       showToastNotification(data.error || 'Failed to update contact', 'error');

@@ -769,14 +769,26 @@
       <!-- VIEW 2: EDIT PERSON INFO FORM -->
       <div id="id-card-edit-panel" class="id-panel-view" style="display: none;">
         <form class="person-info-form" onsubmit="savePersonInfoSubmit(event)">
-          <div class="person-avatar-picker-cluster">
+          <div class="person-avatar-picker-cluster" style="align-items: center; flex-wrap: wrap;">
             <div class="person-avatar-preview" id="edit-person-avatar-preview">U</div>
-            <div class="person-avatar-palette">
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="selectPersonAvatarGradient('emerald')" title="Emerald"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="selectPersonAvatarGradient('ocean')" title="Ocean"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);" onclick="selectPersonAvatarGradient('purple')" title="Purple"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="selectPersonAvatarGradient('amber')" title="Amber"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #ec4899, #be185d);" onclick="selectPersonAvatarGradient('rose')" title="Rose"></span>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="person-avatar-palette">
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="selectPersonAvatarGradient('emerald')" title="Emerald"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="selectPersonAvatarGradient('ocean')" title="Ocean"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);" onclick="selectPersonAvatarGradient('purple')" title="Purple"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="selectPersonAvatarGradient('amber')" title="Amber"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #ec4899, #be185d);" onclick="selectPersonAvatarGradient('rose')" title="Rose"></span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <input type="file" id="person-avatar-file-input" accept="image/*" style="display: none;" onchange="handlePersonAvatarUpload(event)">
+                <button type="button" class="btn-secondary" onclick="document.getElementById('person-avatar-file-input').click()" style="padding: 4px 10px; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>Upload Photo</span>
+                </button>
+                <button type="button" class="btn-ghost" onclick="resetPersonAvatarToDefault()" style="padding: 4px 8px; font-size: 11px;">
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 

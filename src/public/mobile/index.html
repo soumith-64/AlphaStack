@@ -186,6 +186,13 @@
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="17" y1="7" x2="17.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/><line x1="17" y1="17" x2="17.01" y2="17"/></svg>
         </button>
 
+        <!-- Mobile Inbox Mode Switcher: Messenger View <-> Traditional View -->
+        <button class="icon-btn" id="mob-top-mode-btn" onclick="toggleMobileInboxMode()" title="Switch to Traditional View" aria-label="Switch View">
+          <span id="mob-top-mode-icon">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+        </button>
+
         <!-- User Profile Avatar Pill -->
         <div class="user-avatar-small" onclick="toggleDrawer()" id="mob-user-avatar">
           S
@@ -477,9 +484,15 @@
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>Profile & Sub-Number Settings</span>
         </div>
-        <a href="/desktop/" class="drawer-item" style="text-decoration: none; color: inherit;">
+        <div class="drawer-item" id="drawer-view-mode-item" onclick="toggleMobileInboxMode(); toggleDrawer();" style="cursor: pointer;">
+          <span id="drawer-view-mode-icon">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </span>
+          <span id="drawer-view-mode-label">Traditional View</span>
+        </div>
+        <a href="/desktop/" class="drawer-item" style="text-decoration: none; color: inherit; opacity: 0.85;">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <span>Switch to Desktop View</span>
+          <span>Open Desktop Webmail</span>
         </a>
         <div class="drawer-item" onclick="logoutMobile(); toggleDrawer();" style="color: #ef4444;">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -593,14 +606,26 @@
       <!-- VIEW 2: EDIT PERSON INFO FORM -->
       <div id="id-card-edit-panel" class="id-panel-view" style="display: none;">
         <form class="person-info-form" onsubmit="savePersonInfoSubmit(event)">
-          <div class="person-avatar-picker-cluster">
+          <div class="person-avatar-picker-cluster" style="align-items: center; flex-wrap: wrap;">
             <div class="person-avatar-preview" id="edit-person-avatar-preview">U</div>
-            <div class="person-avatar-palette">
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="selectPersonAvatarGradient('emerald')"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="selectPersonAvatarGradient('ocean')"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);" onclick="selectPersonAvatarGradient('purple')"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="selectPersonAvatarGradient('amber')"></span>
-              <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #ec4899, #be185d);" onclick="selectPersonAvatarGradient('rose')"></span>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="person-avatar-palette">
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #10b981, #059669);" onclick="selectPersonAvatarGradient('emerald')" title="Emerald"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);" onclick="selectPersonAvatarGradient('ocean')" title="Ocean"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);" onclick="selectPersonAvatarGradient('purple')" title="Purple"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #f59e0b, #d97706);" onclick="selectPersonAvatarGradient('amber')" title="Amber"></span>
+                <span class="avatar-palette-chip" style="background: linear-gradient(135deg, #ec4899, #be185d);" onclick="selectPersonAvatarGradient('rose')" title="Rose"></span>
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <input type="file" id="mob-person-avatar-file-input" accept="image/*" style="display: none;" onchange="handlePersonAvatarUpload(event)">
+                <button type="button" class="btn-secondary" onclick="document.getElementById('mob-person-avatar-file-input').click()" style="padding: 4px 10px; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>Upload Photo</span>
+                </button>
+                <button type="button" class="btn-ghost" onclick="resetPersonAvatarToDefault()" style="padding: 4px 8px; font-size: 11px;">
+                  Reset
+                </button>
+              </div>
             </div>
           </div>
 

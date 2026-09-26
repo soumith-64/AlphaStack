@@ -25,6 +25,8 @@ let activeConversationId = null;
 let activeReplyingMessage = null;
 let activeContactForModal = null;
 let activeTradEmail = null;
+let mobileInboxMode = localStorage.getItem('mobile_inbox_mode') || 'messenger'; // 'messenger' | 'traditional'
+let activeCustomAvatarDataUrl = '';
 
 // ==================== PERSISTENCE & FORMATTING HELPERS ====================
 function escapeHtml(str) {
@@ -95,6 +97,34 @@ function generateDefaultAvatar(seed, displayName = '') {
   } catch (e) {
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
+}
+
+/**
+ * Returns best available avatar: custom photo -> external/Gmail auto-fetch -> deterministic initials SVG
+ */
+function getAvatarUrl(rawIdentifier, displayName = '', customAvatar = null) {
+  if (customAvatar) return customAvatar;
+  
+  const cleanId = extractCleanParticipant(rawIdentifier || '');
+  
+  // Check cached contacts
+  if (cleanId && typeof cachedContacts !== 'undefined' && Array.isArray(cachedContacts)) {
+    const contact = cachedContacts.find(c => {
+      if (c && c.avatar_url) {
+        if (c.phone && cleanId.includes(c.phone)) return true;
+        if (c.email && c.email.toLowerCase() === cleanId.toLowerCase()) return true;
+      }
+      return false;
+    });
+    if (contact && contact.avatar_url) return contact.avatar_url;
+  }
+
+  // If email address (e.g. @gmail.com, etc.), auto-fetch from unavatar.io
+  if (cleanId.includes('@')) {
+    return `https://unavatar.io/${encodeURIComponent(cleanId)}?fallback=false`;
+  }
+
+  return generateDefaultAvatar(cleanId || displayName, displayName || cleanId);
 }
 
 function formatPhoneDisplay(digits, tag = '') {
@@ -340,6 +370,9 @@ function initAppView() {
 
   // Apply Language
   applyInaiLanguage();
+
+  // Update view mode controls on startup
+  updateMobileViewModeControls();
 
   // Load All Mail with 0-delay instant caching
   loadEmails('ALL');
@@ -675,6 +708,24 @@ function updateFolderCounts(emails) {
   const countInd = document.getElementById('mob-count-indicator');
   if (countInd) {
     countInd.innerText = emails.length === 1 ? '1 message' : `${emails.length} messages`;
+  }
+
+  // Real-time unread badge indicator: if 0, hide completely (becomes none)
+  const unreadCount = emails.filter(e => e.is_read === 0).length;
+  const unreadBadge = document.getElementById('badge-unread-count');
+  if (unreadBadge) {
+    if (unreadCount > 0) {
+      unreadBadge.innerText = unreadCount;
+      unreadBadge.style.display = 'inline-flex';
+    } else {
+      unreadBadge.innerText = '';
+      unreadBadge.style.display = 'none';
+    }
+  }
+
+  const pillUnread = document.getElementById('mob-pill-unread');
+  if (pillUnread) {
+    pillUnread.innerText = unreadCount;
   }
 }
 
@@ -1026,23 +1077,63 @@ function groupEmailsIntoConversations(emails) {
     const isGroup = conv.key.startsWith('group_');
     conv.is_group = isGroup;
 
-    // Identify primary participant (counterpart)
-    const myClean = (myPhone || '').replace(/\D/g, '');
+    // Identify primary participant (counterpart) - ALWAYS show other user profile
+    const myClean = (myPhone || '').replace(/\D/g, '').slice(-10);
+    const myEmail = (currentUser && currentUser.email_address || '').toLowerCase().trim();
     let counterpart = '';
     let senderName = '';
 
     for (let i = conv.messages.length - 1; i >= 0; i--) {
       const m = conv.messages[i];
       const s = extractCleanParticipant(m.sender_email);
-      if (!s.includes(myClean)) {
+      const isMe = (myClean && s.includes(myClean)) || (myEmail && s.toLowerCase().includes(myEmail));
+      if (!isMe) {
         counterpart = s;
         senderName = m.sender_name || '';
         break;
       }
     }
     if (!counterpart) {
-      counterpart = extractCleanParticipant(latest.recipient_phone || latest.sender_email);
-      senderName = latest.sender_name || '';
+      // All messages were sent by user. Look for recipient
+      for (let i = conv.messages.length - 1; i >= 0; i--) {
+        const m = conv.messages[i];
+        if (m.recipient_phone) {
+          counterpart = extractCleanParticipant(m.recipient_phone);
+          break;
+        } else if (m.recipient_emails) {
+          try {
+            const arr = JSON.parse(m.recipient_emails);
+            if (Array.isArray(arr) && arr.length > 0) {
+              const other = arr.find(r => {
+                const cr = extractCleanParticipant(r);
+                return !(myClean && cr.includes(myClean)) && !(myEmail && cr.toLowerCase().includes(myEmail));
+              });
+              if (other) {
+                counterpart = extractCleanParticipant(other);
+                break;
+              }
+            }
+          } catch(e) {}
+        }
+      }
+      if (!counterpart) {
+        counterpart = extractCleanParticipant(latest.recipient_phone || getRecipientsDisplay(latest) || 'unknown');
+      }
+      senderName = '';
+    }
+
+    // Check cached contacts for saved name & custom avatar
+    let customAvatar = null;
+    if (counterpart && cachedContacts && cachedContacts.length > 0) {
+      const contact = cachedContacts.find(c => {
+        if (c.phone && counterpart.includes(c.phone)) return true;
+        if (c.email && c.email.toLowerCase() === counterpart.toLowerCase()) return true;
+        return false;
+      });
+      if (contact) {
+        if (contact.name && !senderName) senderName = contact.name;
+        if (contact.avatar_url) customAvatar = contact.avatar_url;
+      }
     }
 
     conv.participant_raw = counterpart;
@@ -1061,9 +1152,8 @@ function groupEmailsIntoConversations(emails) {
       conv.display_subtitle = isPhoneMail ? '⚡ INAI Verified' : '🌐 External Mail';
     }
 
-    // Avatar
-    const seed = conv.display_title || counterpart;
-    conv.avatar_url = latest.participant_avatar || generateDefaultAvatar(seed, conv.display_title);
+    // Avatar auto-fetch & fallback
+    conv.avatar_url = getAvatarUrl(counterpart, conv.display_title, customAvatar);
 
     convList.push(conv);
   });
@@ -1097,7 +1187,42 @@ function clearSearchInput() {
   renderEmailList(allEmails);
 }
 
-// ==================== MOBILE CONVERSATION LIST RENDERING ====================
+function toggleMobileInboxMode() {
+  mobileInboxMode = (mobileInboxMode === 'messenger') ? 'traditional' : 'messenger';
+  localStorage.setItem('mobile_inbox_mode', mobileInboxMode);
+  updateMobileViewModeControls();
+  renderEmailList(allEmails);
+  showToastNotification(`Switched to ${mobileInboxMode === 'messenger' ? 'Messenger' : 'Traditional'} View`, 'info');
+}
+
+function updateMobileViewModeControls() {
+  const topBtn = document.getElementById('mob-top-mode-btn');
+  const topIcon = document.getElementById('mob-top-mode-icon');
+  const drawerLabel = document.getElementById('drawer-view-mode-label');
+  const drawerIcon = document.getElementById('drawer-view-mode-icon');
+
+  if (mobileInboxMode === 'traditional') {
+    if (topBtn) topBtn.title = 'Switch to Messenger View';
+    if (topIcon) {
+      topIcon.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+    }
+    if (drawerLabel) drawerLabel.innerText = 'Messenger View';
+    if (drawerIcon) {
+      drawerIcon.innerHTML = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+    }
+  } else {
+    if (topBtn) topBtn.title = 'Switch to Traditional View';
+    if (topIcon) {
+      topIcon.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+    }
+    if (drawerLabel) drawerLabel.innerText = 'Traditional View';
+    if (drawerIcon) {
+      drawerIcon.innerHTML = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>`;
+    }
+  }
+}
+
+// ==================== MOBILE CONVERSATION / TRADITIONAL LIST RENDERING ====================
 function renderEmailList(emails) {
   const container = document.getElementById('conversations-list');
   if (!container) return;
@@ -1121,6 +1246,57 @@ function renderEmailList(emails) {
   const pillFav = document.getElementById('mob-pill-favorites');
   if (pillFav) pillFav.innerText = favCount;
 
+  if (mobileInboxMode === 'traditional') {
+    // TRADITIONAL VIEW: Render individual email cards
+    let filteredEmails = [...rawList];
+
+    if (activeSourceFilter === 'phonemail') {
+      filteredEmails = filteredEmails.filter(e => isPhoneMailSender(e.sender_email));
+    } else if (activeSourceFilter === 'external') {
+      filteredEmails = filteredEmails.filter(e => !isPhoneMailSender(e.sender_email));
+    }
+
+    if (activeQuickFilter === 'unread') {
+      filteredEmails = filteredEmails.filter(e => e.is_read === 0);
+    } else if (activeQuickFilter === 'attachments') {
+      filteredEmails = filteredEmails.filter(e => e.has_attachments || (e.attachments && e.attachments.length > 0));
+    } else if (activeQuickFilter === 'favorites') {
+      filteredEmails = filteredEmails.filter(e => e.is_starred === 1 || e.is_important === 1);
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filteredEmails = filteredEmails.filter(e => 
+        (e.subject || '').toLowerCase().includes(term) ||
+        (e.sender_email || '').toLowerCase().includes(term) ||
+        (e.sender_name || '').toLowerCase().includes(term) ||
+        (e.body_text || '').toLowerCase().includes(term)
+      );
+    }
+
+    if (filteredEmails.length === 0) {
+      container.innerHTML = `
+        <div style="text-align: center; color: var(--text-dim); padding: 50px 20px;">
+          <div style="margin-bottom: 12px;">
+            <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Emails Found</h3>
+          <p style="font-size: 12.5px;">No messages in ${getFolderFriendlyName(currentFolder)}.</p>
+        </div>
+      `;
+      return;
+    }
+
+    filteredEmails.forEach(email => {
+      const card = createMobileTraditionalEmailCard(email);
+      container.appendChild(card);
+    });
+
+    updateBulkToolbar();
+    return;
+  }
+
+  // MESSENGER VIEW: Render WhatsApp-style conversation cards
   let filtered = [...allConversations];
 
   // 1. Source Filter (All / INAI Network / External)
@@ -1178,6 +1354,136 @@ function renderEmailList(emails) {
   });
 
   updateBulkToolbar();
+}
+
+function createMobileTraditionalEmailCard(email) {
+  const cardWrapper = document.createElement('div');
+  const isSelected = selectedEmailIds.has(email.id);
+  const isStarred = email.is_starred === 1;
+  const isImportant = email.is_important === 1;
+
+  cardWrapper.id = `mob-email-${email.id}`;
+  cardWrapper.dataset.id = email.id;
+  cardWrapper.className = `email-card-wrapper`;
+
+  const dateObj = new Date(email.created_at);
+  const isToday = new Date().toDateString() === dateObj.toDateString();
+  const timeDisplay = isToday 
+    ? dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    : dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+  const isSentFolder = currentFolder.toUpperCase() === 'SENT';
+  const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
+  const recipientsDisplay = getRecipientsDisplay(email);
+
+  const isFromPhoneMail = isPhoneMailSender(email.sender_email);
+  const sourceBadgeHtml = isFromPhoneMail
+    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
+    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
+
+  const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
+  const displaySender = (isSentFolder || isSentByMe) 
+    ? `To: ${recipientsDisplay || 'Recipient'}` 
+    : formattedSender;
+
+  const participantForAvatar = (isSentFolder || isSentByMe) ? (email.recipient_phone || recipientsDisplay) : email.sender_email;
+  const rowAvatar = getAvatarUrl(participantForAvatar, displaySender);
+  const fallbackSvg = generateDefaultAvatar(participantForAvatar, displaySender);
+  const rowInitial = getInitials(displaySender);
+  const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
+
+  cardWrapper.innerHTML = `
+    <!-- Foreground Card Surface -->
+    <div class="email-card-surface ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''}">
+      <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
+        <label class="custom-checkbox" onclick="event.stopPropagation()">
+          <input type="checkbox" class="row-checkbox" id="mob-check-${email.id}" ${isSelected ? 'checked' : ''} onchange="toggleEmailSelection('${email.id}', event)">
+          <span class="checkmark"></span>
+        </label>
+      </div>
+
+      <span class="item-star ${isStarred ? 'starred' : ''}" onclick="toggleStar('${email.id}', event)" title="${isStarred ? 'Unstar' : 'Star'}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      </span>
+
+      <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View ${escapeHtml(displaySender)} Digital ID Card">
+        <img src="${rowAvatar}" alt="${escapeHtml(displaySender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
+        <span class="avatar-fallback-initial" style="display:none;">${rowInitial}</span>
+      </div>
+
+      <div class="item-content-preview">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+          <span style="font-size: 14px; font-weight: 700; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60vw;">
+            ${escapeHtml(displaySender)}
+          </span>
+          <span class="item-date-col">${timeDisplay}</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
+          ${sourceBadgeHtml}
+          ${isImportant ? '<span style="font-size: 9px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1.5px 6px; border-radius: 4px;">PRIORITY</span>' : ''}
+        </div>
+        <div class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</div>
+        <div class="item-body-snippet">${escapeHtml(cleanBodySnippet)}</div>
+      </div>
+    </div>
+  `;
+
+  const surface = cardWrapper.querySelector('.email-card-surface');
+  surface.addEventListener('click', (e) => {
+    openMobileTraditionalEmail(email.id);
+  });
+
+  return cardWrapper;
+}
+
+function openMobileTraditionalEmail(emailId) {
+  const email = allEmails.find(e => e.id === emailId);
+  if (!email) return;
+
+  activeTradEmail = email;
+  activeEmail = email;
+
+  // Immediately remove unread class and green line from DOM card
+  const cardWrapper = document.getElementById(`mob-email-${email.id}`) || document.querySelector(`[data-id="${email.id}"]`);
+  if (cardWrapper) {
+    const surface = cardWrapper.querySelector('.email-card-surface');
+    if (surface) surface.classList.remove('unread');
+  }
+
+  // Mark read
+  if (email.is_read === 0) {
+    email.is_read = 1;
+    email.read_at = new Date().toISOString();
+    fetch(`/api/emails/${email.id}/read`, { method: 'POST' }).catch(() => {});
+    Object.keys(emailFolderCache).forEach(f => {
+      if (Array.isArray(emailFolderCache[f])) {
+        const c = emailFolderCache[f].find(e => e.id === email.id);
+        if (c) c.is_read = 1;
+      }
+    });
+    updateFolderCounts(allEmails);
+  }
+
+  // Populate and show traditional email view modal
+  const fromEl = document.getElementById('trad-view-from');
+  if (fromEl) fromEl.innerText = formatSenderDisplay(email.sender_email, false, email.sender_name);
+
+  const toInput = document.getElementById('trad-view-to');
+  if (toInput) toInput.value = getRecipientsDisplay(email) || 'Me';
+
+  const subjEl = document.getElementById('trad-view-subject');
+  if (subjEl) subjEl.innerText = email.subject || '(No Subject)';
+
+  const dateEl = document.getElementById('trad-view-date');
+  if (dateEl) dateEl.innerText = new Date(email.created_at).toLocaleString();
+
+  const bodyEl = document.getElementById('trad-view-body');
+  if (bodyEl) {
+    bodyEl.innerHTML = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
+  }
+
+  const modal = document.getElementById('traditional-view-modal');
+  if (modal) modal.style.display = 'flex';
 }
 
 function createMobileConversationCard(conv) {
@@ -1300,12 +1606,12 @@ function createMobileConversationCard(conv) {
     const diffX = e.touches[0].clientX - startX;
     const diffY = e.touches[0].clientY - startY;
 
-    if (!hasMovedHorizontally && Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 8) {
+    if (!hasMovedHorizontally && Math.abs(diffY) > Math.abs(diffX) && Math.abs(diffY) > 10) {
       isDragging = false;
       return;
     }
 
-    if (Math.abs(diffX) > 8) {
+    if (Math.abs(diffX) > 18) {
       hasMovedHorizontally = true;
       let newTx = currentTx + diffX;
       if (newTx > 140) newTx = 140 + (newTx - 140) * 0.2;
@@ -1321,7 +1627,7 @@ function createMobileConversationCard(conv) {
     const endX = e.changedTouches[0].clientX;
     const diffX = endX - startX;
 
-    if (hasMovedHorizontally) {
+    if (hasMovedHorizontally && Math.abs(diffX) >= 18) {
       if (diffX < -45 || (currentTx < 0 && diffX < 20)) {
         currentTx = -136;
         surface.style.transform = 'translateX(-136px)';
@@ -1333,6 +1639,7 @@ function createMobileConversationCard(conv) {
         surface.style.transform = 'translateX(0px)';
       }
     } else {
+      hasMovedHorizontally = false;
       if (currentTx !== 0) snapClosed();
     }
   }, { passive: true });
@@ -1367,13 +1674,12 @@ async function openConversation(convId) {
   activeTradEmail = conv.latestMessage;
 
   // Immediately remove unread styling and dot from conversation list card
-  const cardEl = document.getElementById(`conv-${conv.id}`) || document.querySelector(`[data-conv-id="${conv.id}"]`);
-  if (cardEl) {
-    cardEl.classList.remove('unread');
-    const dot = cardEl.querySelector('.conv-unread-dot');
+  const cardWrapper = document.getElementById(`mob-conv-${conv.id}`) || document.querySelector(`[data-id="${conv.id}"]`);
+  if (cardWrapper) {
+    const surface = cardWrapper.querySelector('.email-card-surface');
+    if (surface) surface.classList.remove('unread');
+    const dot = cardWrapper.querySelector('.conv-unread-dot');
     if (dot) dot.remove();
-    const title = cardEl.querySelector('.conv-title');
-    if (title) title.style.fontWeight = 'normal';
   }
 
   // Mark all messages in conversation as read
@@ -1406,7 +1712,7 @@ async function openConversation(convId) {
       });
     }
   });
-  updateFolderCountsFromList(allEmails);
+  updateFolderCounts(allEmails);
 
   // Header configuration
   const avatarEl = document.getElementById('mob-conv-avatar');
@@ -1953,6 +2259,7 @@ function selectPersonAvatarGradient(palette) {
   const preview = document.getElementById('edit-person-avatar-preview');
   const cardAvatar = document.getElementById('id-card-avatar-img');
   const newSvg = generateDefaultAvatar(`${target}_${palette}`, target);
+  activeCustomAvatarDataUrl = newSvg;
   
   if (preview) {
     preview.innerHTML = `<img src="${newSvg}" alt="Avatar Preview" class="avatar-inner-img">`;
@@ -1962,6 +2269,47 @@ function selectPersonAvatarGradient(palette) {
     cardAvatar.innerHTML = `<img src="${newSvg}" alt="Avatar" class="avatar-inner-img">`;
     cardAvatar.style.backgroundImage = 'none';
   }
+}
+
+function handlePersonAvatarUpload(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (loadEvt) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 120;
+      canvas.height = 120;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 120, 120);
+      activeCustomAvatarDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      const preview = document.getElementById('edit-person-avatar-preview');
+      const cardAvatar = document.getElementById('id-card-avatar-img');
+      if (preview) {
+        preview.innerHTML = `<img src="${activeCustomAvatarDataUrl}" alt="Avatar" class="avatar-inner-img">`;
+      }
+      if (cardAvatar) {
+        cardAvatar.innerHTML = `<img src="${activeCustomAvatarDataUrl}" alt="Avatar" class="avatar-inner-img">`;
+      }
+    };
+    img.src = loadEvt.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetPersonAvatarToDefault() {
+  activeCustomAvatarDataUrl = '';
+  const target = activeContactForModal || (currentUser && currentUser.phone) || 'User';
+  const nameEl = document.getElementById('edit-person-name');
+  const name = nameEl ? nameEl.value : target;
+  const defaultSvg = generateDefaultAvatar(target, name);
+  const preview = document.getElementById('edit-person-avatar-preview');
+  const cardAvatar = document.getElementById('id-card-avatar-img');
+  if (preview) preview.innerHTML = `<img src="${defaultSvg}" alt="Avatar" class="avatar-inner-img">`;
+  if (cardAvatar) cardAvatar.innerHTML = `<img src="${defaultSvg}" alt="Avatar" class="avatar-inner-img">`;
 }
 
 async function savePersonInfoSubmit(e) {
@@ -1977,11 +2325,12 @@ async function savePersonInfoSubmit(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        phone: phone.replace(/\D/g, '').slice(-10),
-        display_name: displayName,
+        phone: phone || activeContactForModal,
+        name: displayName,
         email: email,
-        sub_alias: subAlias,
-        bio: bio
+        bio: bio,
+        avatar_url: activeCustomAvatarDataUrl || undefined,
+        alias_tag: subAlias
       })
     });
     const data = await res.json();
@@ -1998,9 +2347,11 @@ async function savePersonInfoSubmit(e) {
       // Update active conversation title if same contact
       if (activeConversation) {
         activeConversation.display_title = displayName;
+        if (activeCustomAvatarDataUrl) activeConversation.avatar_url = activeCustomAvatarDataUrl;
         const topTitle = document.getElementById('mob-conv-title');
         if (topTitle) topTitle.innerText = displayName;
       }
+      renderEmailList(allEmails);
       switchIdCardTab('card');
     } else {
       showToastNotification(data.error || 'Failed to update contact', 'error');

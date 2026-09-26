@@ -306,12 +306,21 @@ router.post('/emails/send', async (req, res) => {
 router.post('/contacts/update', async (req, res) => {
   try {
     const { phone, name, email, bio, avatar_url, alias_tag } = req.body;
-    if (!phone) {
-      return res.status(400).json({ error: 'Phone number is required' });
+    const target = (phone || email || '').trim();
+    if (!target) {
+      return res.status(400).json({ error: 'Phone or email is required' });
     }
-    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10);
-    let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
-    
+    const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
+    const targetEmail = (email || (target.includes('@') ? target : '')).toLowerCase().trim();
+
+    let user = null;
+    if (cleanPhone && cleanPhone.length === 10) {
+      user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    }
+    if (!user && targetEmail) {
+      user = await dbOps.queryOne('SELECT * FROM users WHERE email_address = ?', [targetEmail]);
+    }
+
     if (user) {
       await dbOps.execute(`
         UPDATE users 
@@ -319,35 +328,34 @@ router.post('/contacts/update', async (req, res) => {
             email_address = COALESCE(?, email_address),
             bio = COALESCE(?, bio),
             avatar_url = COALESCE(?, avatar_url)
-        WHERE phone_number = ?
-      `, [name || null, email || null, bio || null, avatar_url || null, cleanPhone]);
+        WHERE id = ?
+      `, [name || null, targetEmail || null, bio || null, avatar_url || null, user.id]);
     } else {
       const newId = 'user_' + Date.now();
-      const defaultEmail = email || `${cleanPhone}@${config.domainName}`;
+      const finalPhone = (cleanPhone && cleanPhone.length === 10) ? cleanPhone : ('ext_' + Date.now());
+      const defaultEmail = targetEmail || `${finalPhone}@${config.domainName}`;
       await dbOps.execute(`
         INSERT INTO users (id, phone_number, email_address, display_name, bio, avatar_url, registration_channel, has_mobile_app)
         VALUES (?, ?, ?, ?, ?, ?, 'WEB_CLIENT', 0)
-      `, [newId, cleanPhone, defaultEmail, name || `User ${cleanPhone}`, bio || '', avatar_url || '']);
+      `, [newId, finalPhone, defaultEmail, name || (targetEmail ? targetEmail.split('@')[0] : `User ${finalPhone}`), bio || '', avatar_url || '']);
+      user = { id: newId, phone_number: finalPhone, email_address: defaultEmail };
     }
 
-    if (alias_tag) {
+    if (alias_tag && cleanPhone && cleanPhone.length === 10) {
       const cleanTag = alias_tag.replace(/^\.+/, '').trim().toLowerCase();
       if (cleanTag) {
-        const u = await dbOps.queryOne('SELECT id FROM users WHERE phone_number = ?', [cleanPhone]);
-        if (u) {
-          const aliasEmail = `${cleanPhone}.${cleanTag}@${config.domainName}`;
-          const existingAlias = await dbOps.queryOne('SELECT id FROM aliases WHERE alias_email = ?', [aliasEmail]);
-          if (!existingAlias) {
-            await dbOps.execute(`
-              INSERT INTO aliases (id, user_id, alias_email, label, is_active)
-              VALUES (?, ?, ?, ?, 1)
-            `, ['alias_' + Date.now(), u.id, aliasEmail, cleanTag]);
-          }
+        const aliasEmail = `${cleanPhone}.${cleanTag}@${config.domainName}`;
+        const existingAlias = await dbOps.queryOne('SELECT id FROM aliases WHERE alias_email = ?', [aliasEmail]);
+        if (!existingAlias) {
+          await dbOps.execute(`
+            INSERT INTO aliases (id, user_id, alias_email, label, is_active)
+            VALUES (?, ?, ?, ?, 1)
+          `, ['alias_' + Date.now(), user.id, aliasEmail, cleanTag]);
         }
       }
     }
 
-    const updatedUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    const updatedUser = await dbOps.queryOne('SELECT * FROM users WHERE id = ?', [user.id]);
     res.json({ success: true, contact: updatedUser });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -359,9 +367,15 @@ router.post('/contacts/update', async (req, res) => {
  */
 router.get('/contacts/detail/:phone', async (req, res) => {
   try {
-    const rawPhone = req.params.phone;
-    const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
-    const user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    const rawTarget = decodeURIComponent(req.params.phone || '');
+    const cleanPhone = String(rawTarget).replace(/\D/g, '').slice(-10);
+    let user = null;
+    if (cleanPhone && cleanPhone.length === 10) {
+      user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanPhone]);
+    }
+    if (!user && rawTarget.includes('@')) {
+      user = await dbOps.queryOne('SELECT * FROM users WHERE email_address = ?', [rawTarget.toLowerCase().trim()]);
+    }
     
     // Check aliases
     let aliases = [];
@@ -370,20 +384,21 @@ router.get('/contacts/detail/:phone', async (req, res) => {
     }
 
     // Message stats
+    const statsTarget = user ? user.phone_number : (cleanPhone || rawTarget);
     const stats = await dbOps.queryOne(`
       SELECT COUNT(*) as total_messages 
       FROM emails 
       WHERE sender_email LIKE ? OR recipient_emails LIKE ?
-    `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    `, [`%${statsTarget}%`, `%${statsTarget}%`]);
 
     res.json({
       success: true,
       contact: user || {
-        phone_number: cleanPhone,
-        display_name: `User ${cleanPhone}`,
-        email_address: `${cleanPhone}@${config.domainName}`,
-        avatar_url: '',
-        bio: ''
+        phone_number: (cleanPhone && cleanPhone.length === 10) ? cleanPhone : rawTarget,
+        display_name: user ? user.display_name : (rawTarget.includes('@') ? rawTarget.split('@')[0] : `User ${cleanPhone}`),
+        email_address: user ? user.email_address : (rawTarget.includes('@') ? rawTarget : `${cleanPhone}@${config.domainName}`),
+        avatar_url: user ? user.avatar_url : '',
+        bio: user ? user.bio : ''
       },
       aliases: aliases || [],
       total_messages: stats ? stats.total_messages : 0
