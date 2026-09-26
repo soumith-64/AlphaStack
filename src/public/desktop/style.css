@@ -3782,5 +3782,9 @@ input:checked + .toggle-slider:before {
   vertical-align: middle;
 }
 
+@keyframes spinLoader {
+  to { transform: rotate(360deg); }
+}
+
 
 

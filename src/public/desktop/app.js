@@ -3,6 +3,7 @@ let currentUser = null;
 
 let currentFolder = 'ALL';
 let currentMailSourceFilter = 'all'; // 'all' | 'phonemail' | 'external'
+let searchTerm = '';
 let allEmails = [];
 let activeEmail = null;
 let selectedEmailIndex = -1;
@@ -1646,7 +1647,15 @@ async function loadEmails(folder = currentFolder) {
     updateFolderCountsFromList(allEmails);
   } else {
     allEmails = [];
-    renderEmailList([]);
+    const container = document.getElementById('email-items-container');
+    if (container) {
+      container.innerHTML = `
+        <div style="text-align: center; color: var(--text-dim); padding: 70px 20px;">
+          <div style="width: 30px; height: 30px; border: 3px solid var(--border-light); border-top-color: var(--green-main); border-radius: 50%; margin: 0 auto 12px; animation: spinLoader 0.8s linear infinite;"></div>
+          <p style="font-size: 13px; font-weight: 500;">Loading messages...</p>
+        </div>
+      `;
+    }
     updateFolderCountsFromList([]);
   }
 
@@ -1952,8 +1961,12 @@ function renderEmailList(emails) {
 
   // Render individual email rows (standard Gmail view)
   filtered.forEach(email => {
-    const row = createEmailRowElement(email);
-    container.appendChild(row);
+    try {
+      const row = createEmailRowElement(email);
+      if (row) container.appendChild(row);
+    } catch (rowErr) {
+      console.error('Error rendering email item:', email && email.id, rowErr);
+    }
   });
 
   updateBulkToolbar();
@@ -2359,17 +2372,8 @@ async function deleteCurrentEmail() {
 
 // ==================== SEARCH & FILTER ====================
 function filterEmails(query) {
-  const term = query.toLowerCase().trim();
-  if (!term) {
-    renderEmailList(allEmails);
-    return;
-  }
-  const filtered = allEmails.filter(e =>
-    (e.sender_email && e.sender_email.toLowerCase().includes(term)) ||
-    (e.subject && e.subject.toLowerCase().includes(term)) ||
-    (e.body_text && e.body_text.toLowerCase().includes(term))
-  );
-  renderEmailList(filtered);
+  searchTerm = (query || '').toLowerCase().trim();
+  renderEmailList(allEmails);
 }
 
 // ==================== COMPOSE MODAL & CONTACTS AUTOCOMPLETE ====================
