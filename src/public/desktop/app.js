@@ -306,39 +306,61 @@ function extractCleanParticipant(str) {
   return s.replace(/^["']|["']$/g, '').trim().toLowerCase();
 }
 
-function getConversationKey(email, myPhone) {
-  if (email.conversation_id) return email.conversation_id;
-
-  const sender = extractCleanParticipant(email.sender_email);
-  const myClean = (myPhone || (currentUser && currentUser.phone) || '').replace(/\D/g, '');
+function getCanonicalContactId(str) {
+  if (!str) return 'unknown';
+  let s = String(str).trim();
+  const angleMatch = s.match(/<([^>]+)>/);
+  if (angleMatch) s = angleMatch[1].trim();
+  s = s.replace(/^["']|["']$/g, '').trim().toLowerCase();
   
+  const atIdx = s.indexOf('@');
+  if (atIdx !== -1) {
+    const local = s.substring(0, atIdx).trim();
+    const cleanDigits = local.replace(/\D/g, '');
+    if (cleanDigits.length >= 10 && cleanDigits.length <= 13) {
+      return cleanDigits.slice(-10);
+    }
+    return s;
+  }
+  
+  const digits = s.replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+  return s;
+}
+
+function getConversationKey(email, myPhone) {
+  const myClean = (myPhone || (currentUser && currentUser.phone) || '').replace(/\D/g, '').slice(-10);
+  const myEmail = (currentUser && currentUser.email_address || '').toLowerCase().trim();
+
+  const senderCanon = getCanonicalContactId(email.sender_email);
+
   let recipients = [];
   if (email.recipient_phone) {
-    recipients = email.recipient_phone.split(/[,;]/).map(r => extractCleanParticipant(r)).filter(Boolean);
+    recipients = email.recipient_phone.split(/[,;]/).map(r => getCanonicalContactId(r)).filter(Boolean);
   } else if (email.recipient_emails) {
     try {
       const parsed = JSON.parse(email.recipient_emails);
-      if (Array.isArray(parsed)) recipients = parsed.map(r => extractCleanParticipant(r)).filter(Boolean);
+      if (Array.isArray(parsed)) recipients = parsed.map(r => getCanonicalContactId(r)).filter(Boolean);
     } catch(e) {}
   }
 
-  const isSenderMe = sender.includes(myClean) || (currentUser && sender.includes(currentUser.phone));
+  const isSenderMe = (senderCanon && myClean && senderCanon === myClean) || (myEmail && senderCanon === myEmail);
   let counterparts = [];
   if (isSenderMe) {
-    counterparts = recipients.filter(r => !r.includes(myClean));
+    counterparts = recipients.filter(r => r !== myClean && r !== myEmail);
   } else {
-    counterparts = [sender, ...recipients.filter(r => !r.includes(myClean) && r !== sender)];
+    counterparts = [senderCanon, ...recipients.filter(r => r !== myClean && r !== myEmail && r !== senderCanon)];
   }
 
-  const normSub = normalizeSubject(email.subject);
+  const uniqueCounterparts = [...new Set(counterparts)].filter(Boolean);
 
-  if (counterparts.length >= 2) {
-    const sorted = [...new Set(counterparts)].sort();
-    return `group_${sorted.join('__')}_${normSub}`;
+  if (uniqueCounterparts.length >= 2) {
+    const sorted = uniqueCounterparts.sort();
+    return `group_${sorted.join('__')}`;
   }
 
-  const otherParty = counterparts[0] || sender || 'unknown';
-  return `direct_${otherParty}_${normSub}`;
+  const otherParty = uniqueCounterparts[0] || senderCanon || 'unknown';
+  return `direct_${otherParty}`;
 }
 
 function groupEmailsIntoConversations(emails) {
@@ -1780,6 +1802,25 @@ async function executeBulkActionOnSingle(id, action) {
   } catch (err) {}
 }
 
+async function executeBulkActionOnConversation(convId, action, e) {
+  if (e) e.stopPropagation();
+  const conv = allConversations.find(c => c.id === convId || c.key === convId);
+  const ids = conv ? conv.messages.map(m => m.id) : [convId];
+  try {
+    await fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ids, emailIds: ids, folder: currentFolder })
+    });
+    allEmails = allEmails.filter(email => !ids.includes(email.id));
+    if (emailFolderCache[currentFolder]) {
+      emailFolderCache[currentFolder] = [...allEmails];
+    }
+    renderEmailList(allEmails);
+    showToastNotification(`Conversation ${action === 'archive' ? 'archived' : 'moved to trash'} ✓`);
+  } catch (err) {}
+}
+
 // ==================== IMPORTANT TOGGLE ====================
 async function toggleImportant(id, e) {
   if (e) e.stopPropagation();
@@ -1923,10 +1964,10 @@ function createConversationRowElement(conv) {
       <button class="quick-action-btn" onclick="toggleImportant('${conv.latestMessage.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
       </button>
-      <button class="quick-action-btn" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'archive')" title="Archive">
+      <button class="quick-action-btn" onclick="executeBulkActionOnConversation('${conv.id}', 'archive', event)" title="Archive Conversation">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
       </button>
-      <button class="quick-action-btn danger" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'delete')" title="Delete">
+      <button class="quick-action-btn danger" onclick="executeBulkActionOnConversation('${conv.id}', 'delete', event)" title="Delete Conversation">
         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
       </button>
     </div>
@@ -1964,15 +2005,46 @@ function openConversation(convId) {
   activeConversationId = conv.id;
   activeEmail = conv.latestMessage;
 
-  // Mark all messages as read
+  // Immediately remove unread class and green line from DOM row
+  const rowEl = document.getElementById(`conv-row-${conv.id}`) || document.querySelector(`[data-id="${conv.id}"]`);
+  if (rowEl) {
+    rowEl.classList.remove('unread');
+    const subjTitle = rowEl.querySelector('.item-subject-title');
+    if (subjTitle) subjTitle.style.fontWeight = 'normal';
+  }
+
+  // Mark all messages as read locally and in database
+  const unreadMsgs = conv.messages.filter(m => m.is_read === 0);
   conv.messages.forEach(m => {
-    if (m.is_read === 0) {
-      m.is_read = 1;
-      fetch(`/api/emails/${m.id}/read`, { method: 'POST' }).catch(() => {});
-    }
+    m.is_read = 1;
+    m.read_at = m.read_at || new Date().toISOString();
   });
   conv.is_read = 1;
   conv.unread_count = 0;
+
+  if (unreadMsgs.length > 0) {
+    const unreadIds = unreadMsgs.map(m => m.id);
+    // Mark via backend API
+    fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'read', ids: unreadIds })
+    }).catch(() => {});
+  }
+
+  // Update cached folders so returning to inbox leaves row read (no green line)
+  const allMsgIds = conv.messages.map(m => m.id);
+  allEmails.forEach(e => {
+    if (allMsgIds.includes(e.id)) e.is_read = 1;
+  });
+  Object.keys(emailFolderCache).forEach(f => {
+    if (Array.isArray(emailFolderCache[f])) {
+      emailFolderCache[f].forEach(e => {
+        if (allMsgIds.includes(e.id)) e.is_read = 1;
+      });
+    }
+  });
+  updateFolderCountsFromList(allEmails);
 
   const listPane = document.getElementById('mail-list-pane');
   const readingPane = document.getElementById('reading-pane');
@@ -2012,7 +2084,7 @@ function renderDesktopConversationThread(conv) {
   threadContainer.innerHTML = '';
 
   const myPhone = currentUser ? currentUser.phone : '';
-  const myClean = (myPhone || '').replace(/\D/g, '');
+  const myClean = (myPhone || '').replace(/\D/g, '').slice(-10);
 
   conv.messages.forEach((msg, idx) => {
     const isFirst = idx === 0;
@@ -2025,8 +2097,10 @@ function renderDesktopConversationThread(conv) {
     const avatarSvg = generateDefaultAvatar(msg.sender_email, senderDisplay);
     const hasReplied = msg.has_replied === 1;
 
-    // First email shows Subject, replies hide Subject
-    const subjectHtml = (isFirst && msg.subject) ? `
+    // Show Subject badge if first email or if subject changed within this contact conversation
+    const prevMsg = idx > 0 ? conv.messages[idx - 1] : null;
+    const isNewSubject = isFirst || (prevMsg && normalizeSubject(prevMsg.subject) !== normalizeSubject(msg.subject));
+    const subjectHtml = (isNewSubject && msg.subject) ? `
       <div class="thread-subject-chip">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         <span>${escapeHtml(msg.subject)}</span>
@@ -2042,6 +2116,21 @@ function renderDesktopConversationThread(conv) {
         <div class="thread-quoted-box">
           <strong>${escapeHtml(qSender)} wrote:</strong> ${escapeHtml(qText)}
         </div>
+      `;
+    }
+
+    // Read Receipt status indicator for outgoing messages
+    let readReceiptHtml = '';
+    if (isOutgoing) {
+      const isRead = msg.is_read === 1 || !!msg.read_at;
+      readReceiptHtml = `
+        <span class="read-receipt-status ${isRead ? 'read' : 'delivered'}" title="${isRead ? 'Read by recipient' : 'Delivered to mailbox'}">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12"/>
+            <polyline points="22 10 14.5 17.5 11 14"/>
+          </svg>
+          <span>${isRead ? 'Read' : 'Delivered'}</span>
+        </span>
       `;
     }
 
@@ -2075,7 +2164,10 @@ function renderDesktopConversationThread(conv) {
                 ${isPhoneMail ? '⚡ INAI Network' : '🌐 External Provider'}
               </span>
             </div>
-            <div class="thread-time">${timeDisplay}</div>
+            <div class="thread-time">
+              <span>${timeDisplay}</span>
+              ${readReceiptHtml}
+            </div>
           </div>
         </div>
         <div class="thread-header-actions">
@@ -2579,6 +2671,37 @@ async function sendDesktopEmail() {
 async function openDesktopSettings() {
   document.getElementById('desktop-settings-modal').style.display = 'flex';
   loadDesktopAliases();
+  initDesktopReadReceipts();
+}
+
+function initDesktopReadReceipts() {
+  const saved = localStorage.getItem('phonemail_read_receipts');
+  const isEnabled = saved === null ? true : saved === 'true';
+  const toggle = document.getElementById('desk-read-receipts-toggle');
+  if (toggle) toggle.checked = isEnabled;
+  if (currentUser && currentUser.phone) {
+    fetch(`/api/settings/read-receipts?phone=${encodeURIComponent(currentUser.phone)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d && typeof d.enabled === 'boolean') {
+          if (toggle) toggle.checked = d.enabled;
+          localStorage.setItem('phonemail_read_receipts', d.enabled ? 'true' : 'false');
+        }
+      })
+      .catch(() => {});
+  }
+}
+
+function toggleDesktopReadReceipts(checked) {
+  localStorage.setItem('phonemail_read_receipts', checked ? 'true' : 'false');
+  if (currentUser && currentUser.phone) {
+    fetch('/api/settings/read-receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: currentUser.phone, enabled: checked })
+    }).catch(() => {});
+  }
+  showNotify.success(`Read Receipts ${checked ? 'Turned ON' : 'Turned OFF'}`, 'Preferences Updated');
 }
 
 function closeDesktopSettings() {

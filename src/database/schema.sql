@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS users (
   registration_channel VARCHAR(32) NOT NULL, -- 'IVR', 'SMS', 'WEB_PORTAL', 'WEB_CLIENT', 'MOBILE_CLIENT'
   has_mobile_app INT DEFAULT 0,
   avatar_url VARCHAR(255),
+  bio TEXT,
+  read_receipts_enabled INT DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -53,11 +55,21 @@ CREATE TABLE IF NOT EXISTS emails (
   reply_to_id VARCHAR(64),
   has_replied INT DEFAULT 0,
   is_read INT DEFAULT 0,
+  read_at DATETIME DEFAULT NULL,
   is_starred INT DEFAULT 0,
   is_important INT DEFAULT 0,
   folder VARCHAR(32) DEFAULT 'INBOX',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+);
+
+-- Persistent Deleted Emails Table (prevents IMAP re-import loop)
+CREATE TABLE IF NOT EXISTS deleted_email_signatures (
+  signature VARCHAR(255) PRIMARY KEY,
+  message_id VARCHAR(255),
+  sender VARCHAR(255),
+  subject VARCHAR(255),
+  deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Telephony & SMS Audit Logs

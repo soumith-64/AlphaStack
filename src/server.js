@@ -85,6 +85,11 @@ dbOps.pruneDuplicateEmails().catch((err) => {
   console.warn('Initial duplicate emails pruning note:', err.message);
 });
 
+// Consolidate legacy fragmented conversations on startup (WhatsApp contact grouping)
+dbOps.consolidateConversations().catch((err) => {
+  console.warn('Initial conversation consolidation note:', err.message);
+});
+
 // Start Hostinger IMAP Inbound Auto-Sync Worker (fetches incoming mail every 20s)
 try {
   imapSyncService.startAutoSync(20);

@@ -150,23 +150,20 @@ export const emailService = {
 
     const normSub = this.normalizeSubject(cleanSubject);
 
-    // Find or create conversation for this sender and recipient with proper thread matching
+    // Find or create conversation for this sender and recipient (WhatsApp-style contact grouping)
     let conversation = null;
-    if (normSub) {
-      const candidateConvs = await dbOps.queryAll(`
-        SELECT c.* FROM conversations c
-        JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
-        JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
-        WHERE cp1.phone_number = ? AND cp2.phone_number = ? AND c.is_group = 0
-        ORDER BY c.updated_at DESC
-      `, [cleanSender, recipientPhone]);
+    const candidateConvs = await dbOps.queryAll(`
+      SELECT c.* FROM conversations c
+      JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
+      JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
+      WHERE ((cp1.phone_number = ? OR cp1.phone_number LIKE ?) AND (cp2.phone_number = ? OR cp2.phone_number LIKE ?))
+        AND c.is_group = 0
+      ORDER BY c.updated_at DESC
+      LIMIT 1
+    `, [cleanSender, `%${cleanSender}%`, recipientPhone, `%${recipientPhone}%`]);
 
-      for (const cand of candidateConvs) {
-        if (this.normalizeSubject(cand.subject) === normSub) {
-          conversation = cand;
-          break;
-        }
-      }
+    if (candidateConvs.length > 0) {
+      conversation = candidateConvs[0];
     }
 
     let conversationId;
@@ -307,24 +304,21 @@ export const emailService = {
       const cleanSub = String(subject || '').trim();
       const normSub = this.normalizeSubject(cleanSub);
 
-      // If 1-to-1 and has topic, search for an existing 1-to-1 conversation with matching normalized subject
-      if (!isGroup && normSub && normalizedRecipients[0]) {
+      // If 1-to-1, search for an existing 1-to-1 conversation with this recipient (WhatsApp-style contact grouping)
+      if (!isGroup && normalizedRecipients[0]) {
         const otherPhone = this.parseAddress(normalizedRecipients[0]).phone || normalizedRecipients[0];
         const candidateConvs = await dbOps.queryAll(`
           SELECT c.* FROM conversations c
           JOIN conversation_participants cp1 ON c.id = cp1.conversation_id
           JOIN conversation_participants cp2 ON c.id = cp2.conversation_id
-          WHERE (cp1.phone_number = ? OR cp1.phone_number LIKE ?) 
-            AND (cp2.phone_number = ? OR cp2.phone_number LIKE ?) 
+          WHERE ((cp1.phone_number = ? OR cp1.phone_number LIKE ?) AND (cp2.phone_number = ? OR cp2.phone_number LIKE ?))
             AND c.is_group = 0
           ORDER BY c.updated_at DESC
+          LIMIT 1
         `, [cleanSenderPhone, `%${cleanSenderPhone}%`, otherPhone, `%${otherPhone}%`]);
 
-        for (const cand of candidateConvs) {
-          if (this.normalizeSubject(cand.subject) === normSub) {
-            targetConvId = cand.id;
-            break;
-          }
+        if (candidateConvs.length > 0) {
+          targetConvId = candidateConvs[0].id;
         }
       }
 
@@ -382,6 +376,13 @@ export const emailService = {
         ? sender.display_name 
         : `+91 ${cleanSenderPhone}`;
 
+      // Check if read receipts are enabled for sender
+      const readReceiptHeaders = (sender && sender.read_receipts_enabled === 0) ? {} : {
+        'Disposition-Notification-To': `${cleanSenderPhone}@${config.domainName}`,
+        'X-Confirm-Reading-To': `${cleanSenderPhone}@${config.domainName}`,
+        'Return-Receipt-To': `${cleanSenderPhone}@${config.domainName}`
+      };
+
       for (const extEmail of externalRecipients) {
         try {
           console.log(`🚀 [Hostinger SMTP] Transmitting live email to ${extEmail}...`);
@@ -398,7 +399,8 @@ export const emailService = {
             headers: {
               'X-Mailer': 'PhoneMail WebClient 1.0',
               'Precedence': 'normal',
-              'Importance': 'normal'
+              'Importance': 'normal',
+              ...readReceiptHeaders
             },
             text: cleanBody 
               ? `${cleanBody}\n\n---\nSent by ${senderDisplayName} (+91 ${cleanSenderPhone}) via PhoneMail.\nReply directly to this email to reach my phone mailbox: ${cleanSenderPhone}@${config.domainName}`

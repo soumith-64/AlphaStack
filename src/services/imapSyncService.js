@@ -147,9 +147,19 @@ export const imapSyncService = {
             const cleanText = (parsed.text || '').trim();
             const textSnippet = cleanText.substring(0, 50);
 
-            // Robust database check: does this email already exist?
+            // Check persistent deleted list (never re-download emails deleted by user)
+            const wasDeleted = await dbOps.isEmailDeleted(cleanFrom, cleanSub);
+            if (wasDeleted) {
+              // Delete permanently from remote Hostinger mailbox to prevent wasted bandwidth
+              try {
+                if (socket) socket.write(`${getNextTag()} STORE ${messagesToFetch[currentFetchIndex]} +FLAGS (\\Deleted)\r\n`);
+              } catch(e) {}
+              return;
+            }
+
+            // Also check if this email already exists anywhere (INBOX, TRASH, ARCHIVE, etc.)
             const existing = await dbOps.queryOne(`
-              SELECT id FROM emails 
+              SELECT id, folder FROM emails 
               WHERE (sender_email = ? OR sender_email LIKE ?) 
                 AND subject = ? 
                 AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
@@ -158,6 +168,16 @@ export const imapSyncService = {
 
             if (existing) {
               return;
+            }
+
+            // Suppress recurring Hostinger automated onboarding/forwarder verification if not wanted
+            const isHostingerAutomated = cleanFrom.includes('hostinger.com') && 
+              (cleanSub.toLowerCase().includes('business email') || cleanSub.toLowerCase().includes('forwarder request') || cleanSub.toLowerCase().includes('welcome'));
+            if (isHostingerAutomated) {
+              const alreadySeenHostinger = await dbOps.queryOne(`
+                SELECT id FROM emails WHERE sender_email LIKE '%hostinger.com%' AND subject = ? LIMIT 1
+              `, [cleanSub]);
+              if (alreadySeenHostinger) return;
             }
 
             console.log(`📥 [IMAP SYNC] Processing message: "${parsed.subject}" to "${toAddress}" from "${fromAddress}"`);

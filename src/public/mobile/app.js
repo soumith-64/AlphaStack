@@ -805,6 +805,25 @@ async function executeBulkActionOnSingle(id, action) {
   } catch (err) {}
 }
 
+async function executeBulkActionOnConversation(convId, action, e) {
+  if (e) e.stopPropagation();
+  const conv = allConversations.find(c => c.id === convId || c.key === convId);
+  const ids = conv ? conv.messages.map(m => m.id) : [convId];
+  try {
+    await fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ids, emailIds: ids, folder: currentFolder })
+    });
+    allEmails = allEmails.filter(email => !ids.includes(email.id));
+    if (emailFolderCache[currentFolder]) {
+      emailFolderCache[currentFolder] = [...allEmails];
+    }
+    renderEmailList(allEmails);
+    showToastNotification(`Conversation ${action === 'archive' ? 'archived' : 'moved to trash'} ✓`, 'success');
+  } catch (err) {}
+}
+
 async function toggleImportant(id, e) {
   if (e) e.stopPropagation();
   try {
@@ -875,42 +894,61 @@ function extractCleanParticipant(str) {
   return s.replace(/^["']|["']$/g, '').trim().toLowerCase();
 }
 
-function getConversationKey(email, myPhone) {
-  // If email already has a server-assigned conversation_id, use it
-  if (email.conversation_id) {
-    return email.conversation_id;
-  }
-
-  const sender = extractCleanParticipant(email.sender_email);
-  const myClean = (myPhone || (currentUser && currentUser.phone) || '').replace(/\D/g, '');
+function getCanonicalContactId(str) {
+  if (!str) return 'unknown';
+  let s = String(str).trim();
+  const angleMatch = s.match(/<([^>]+)>/);
+  if (angleMatch) s = angleMatch[1].trim();
+  s = s.replace(/^["']|["']$/g, '').trim().toLowerCase();
   
-  // Parse recipients
+  const atIdx = s.indexOf('@');
+  if (atIdx !== -1) {
+    const local = s.substring(0, atIdx).trim();
+    const cleanDigits = local.replace(/\D/g, '');
+    if (cleanDigits.length >= 10 && cleanDigits.length <= 13) {
+      return cleanDigits.slice(-10);
+    }
+    return s;
+  }
+  
+  const digits = s.replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+  return s;
+}
+
+function getConversationKey(email, myPhone) {
+  const myClean = (myPhone || (currentUser && currentUser.phone) || '').replace(/\D/g, '').slice(-10);
+  const myEmail = (currentUser && currentUser.email_address || '').toLowerCase().trim();
+
+  const senderCanon = getCanonicalContactId(email.sender_email);
+
   let recipients = [];
   if (email.recipient_phone) {
-    recipients = email.recipient_phone.split(/[,;]/).map(r => extractCleanParticipant(r)).filter(Boolean);
+    recipients = email.recipient_phone.split(/[,;]/).map(r => getCanonicalContactId(r)).filter(Boolean);
+  } else if (email.recipient_emails) {
+    try {
+      const parsed = JSON.parse(email.recipient_emails);
+      if (Array.isArray(parsed)) recipients = parsed.map(r => getCanonicalContactId(r)).filter(Boolean);
+    } catch(e) {}
   }
 
-  // Determine counterpart(s)
-  const isSenderMe = sender.includes(myClean) || (currentUser && sender.includes(currentUser.phone));
+  const isSenderMe = (senderCanon && myClean && senderCanon === myClean) || (myEmail && senderCanon === myEmail);
   let counterparts = [];
-
   if (isSenderMe) {
-    counterparts = recipients.filter(r => !r.includes(myClean));
+    counterparts = recipients.filter(r => r !== myClean && r !== myEmail);
   } else {
-    counterparts = [sender, ...recipients.filter(r => !r.includes(myClean) && r !== sender)];
+    counterparts = [senderCanon, ...recipients.filter(r => r !== myClean && r !== myEmail && r !== senderCanon)];
   }
 
-  const normSub = normalizeSubject(email.subject);
+  const uniqueCounterparts = [...new Set(counterparts)].filter(Boolean);
 
-  // Group Conversation: 2 or more external counterparts
-  if (counterparts.length >= 2) {
-    const sorted = [...new Set(counterparts)].sort();
-    return `group_${sorted.join('__')}_${normSub}`;
+  if (uniqueCounterparts.length >= 2) {
+    const sorted = uniqueCounterparts.sort();
+    return `group_${sorted.join('__')}`;
   }
 
-  // 1-on-1 Conversation
-  const otherParty = counterparts[0] || sender || 'unknown';
-  return `direct_${otherParty}_${normSub}`;
+  const otherParty = uniqueCounterparts[0] || senderCanon || 'unknown';
+  return `direct_${otherParty}`;
 }
 
 function groupEmailsIntoConversations(emails) {
@@ -1161,11 +1199,11 @@ function createMobileConversationCard(conv) {
         </button>
       </div>
       <div class="swipe-left-actions">
-        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'archive'); event.stopPropagation();" title="Archive">
+        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnConversation('${conv.id}', 'archive', event)" title="Archive Conversation">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
           <span>Archive</span>
         </button>
-        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnSingle('${conv.latestMessage.id}', 'delete'); event.stopPropagation();" title="Delete">
+        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnConversation('${conv.id}', 'delete', event)" title="Delete Conversation">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           <span>Delete</span>
         </button>
@@ -1304,15 +1342,47 @@ async function openConversation(convId) {
   activeEmail = conv.latestMessage;
   activeTradEmail = conv.latestMessage;
 
+  // Immediately remove unread styling and dot from conversation list card
+  const cardEl = document.getElementById(`conv-${conv.id}`) || document.querySelector(`[data-conv-id="${conv.id}"]`);
+  if (cardEl) {
+    cardEl.classList.remove('unread');
+    const dot = cardEl.querySelector('.conv-unread-dot');
+    if (dot) dot.remove();
+    const title = cardEl.querySelector('.conv-title');
+    if (title) title.style.fontWeight = 'normal';
+  }
+
   // Mark all messages in conversation as read
+  const unreadMsgs = conv.messages.filter(m => m.is_read === 0);
   conv.messages.forEach(m => {
-    if (m.is_read === 0) {
-      m.is_read = 1;
-      fetch(`/api/emails/${m.id}/read`, { method: 'POST' }).catch(() => {});
-    }
+    m.is_read = 1;
+    m.read_at = m.read_at || new Date().toISOString();
   });
   conv.is_read = 1;
   conv.unread_count = 0;
+
+  if (unreadMsgs.length > 0) {
+    const unreadIds = unreadMsgs.map(m => m.id);
+    fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'read', ids: unreadIds })
+    }).catch(() => {});
+  }
+
+  // Update cached folder emails so it remains read upon return
+  const allMsgIds = conv.messages.map(m => m.id);
+  allEmails.forEach(e => {
+    if (allMsgIds.includes(e.id)) e.is_read = 1;
+  });
+  Object.keys(emailFolderCache).forEach(f => {
+    if (Array.isArray(emailFolderCache[f])) {
+      emailFolderCache[f].forEach(e => {
+        if (allMsgIds.includes(e.id)) e.is_read = 1;
+      });
+    }
+  });
+  updateFolderCountsFromList(allEmails);
 
   // Header configuration
   const avatarEl = document.getElementById('mob-conv-avatar');
@@ -1476,7 +1546,14 @@ function renderChatTimeline(conv) {
           </div>
           <div class="bubble-footer-right">
             <span class="chat-timestamp">${timeDisplay}</span>
-            ${isOutgoing ? '<span class="chat-checks" title="Delivered">✓✓</span>' : ''}
+            ${isOutgoing ? `
+              <span class="chat-checks ${msg.is_read === 1 || msg.read_at ? 'read' : 'delivered'}" title="${msg.is_read === 1 || msg.read_at ? 'Read by recipient' : 'Delivered'}">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                  <polyline points="22 10 14.5 17.5 11 14"/>
+                </svg>
+              </span>
+            ` : ''}
           </div>
         </div>
       </div>
@@ -1964,7 +2041,38 @@ function openMobileProfileSettings() {
 
   if (langSelect) langSelect.value = currentLanguage;
 
+  initMobileReadReceipts();
   modal.style.display = 'flex';
+}
+
+function initMobileReadReceipts() {
+  const saved = localStorage.getItem('phonemail_read_receipts');
+  const isEnabled = saved === null ? true : saved === 'true';
+  const toggle = document.getElementById('mob-read-receipts-toggle');
+  if (toggle) toggle.checked = isEnabled;
+  if (currentUser && currentUser.phone) {
+    fetch(`/api/settings/read-receipts?phone=${encodeURIComponent(currentUser.phone)}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d && typeof d.enabled === 'boolean') {
+          if (toggle) toggle.checked = d.enabled;
+          localStorage.setItem('phonemail_read_receipts', d.enabled ? 'true' : 'false');
+        }
+      })
+      .catch(() => {});
+  }
+}
+
+function toggleMobileReadReceipts(checked) {
+  localStorage.setItem('phonemail_read_receipts', checked ? 'true' : 'false');
+  if (currentUser && currentUser.phone) {
+    fetch('/api/settings/read-receipts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: currentUser.phone, enabled: checked })
+    }).catch(() => {});
+  }
+  showToastNotification(`Read Receipts ${checked ? 'Turned ON' : 'Turned OFF'}`, 'success');
 }
 
 function closeMobileProfileSettings() {

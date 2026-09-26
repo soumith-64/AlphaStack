@@ -5,6 +5,8 @@ data/
 *.db-journal
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite-journal
 .env
 .DS_Store
 dist/

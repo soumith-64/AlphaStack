@@ -634,6 +634,21 @@
           </div>
         </div>
 
+        <!-- Email Preferences & Read Receipts -->
+        <div class="settings-section">
+          <h4>EMAIL PREFERENCES & READ RECEIPTS</h4>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-surface); border: 1px solid var(--border-light); border-radius: 10px;">
+            <div style="flex: 1; padding-right: 16px;">
+              <strong style="font-size: 14px; color: var(--text-main); display: block;">Turn on Read Receipts</strong>
+              <p class="section-help-text" style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-dim);">Show double checkmarks (✓✓) when recipients read your emails, and notify senders when you read theirs.</p>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="desk-read-receipts-toggle" onchange="toggleDesktopReadReceipts(this.checked)" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
         <!-- Sub-Number Aliases -->
         <div class="settings-section">
           <h4>SUB-NUMBER ALIASES</h4>

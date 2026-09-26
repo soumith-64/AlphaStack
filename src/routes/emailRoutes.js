@@ -444,6 +444,14 @@ router.post('/emails/bulk', async (req, res) => {
     const placeholders = ids.map(() => '?').join(',');
 
     if (action === 'delete') {
+      // Record in persistent deleted signatures so IMAP sync never resurrects them
+      try {
+        const emailsToDelete = await dbOps.queryAll(`SELECT id, sender_email, subject FROM emails WHERE id IN (${placeholders})`, ids);
+        for (const em of emailsToDelete) {
+          await dbOps.recordDeletedEmail(em);
+        }
+      } catch (e) {}
+
       if (folder === 'TRASH') {
         await dbOps.execute(`DELETE FROM emails WHERE id IN (${placeholders})`, ids);
       } else {
@@ -452,9 +460,9 @@ router.post('/emails/bulk', async (req, res) => {
     } else if (action === 'archive') {
       await dbOps.execute(`UPDATE emails SET folder = 'ARCHIVE' WHERE id IN (${placeholders})`, ids);
     } else if (action === 'read') {
-      await dbOps.execute(`UPDATE emails SET is_read = 1 WHERE id IN (${placeholders})`, ids);
+      await dbOps.execute(`UPDATE emails SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE id IN (${placeholders})`, ids);
     } else if (action === 'unread') {
-      await dbOps.execute(`UPDATE emails SET is_read = 0 WHERE id IN (${placeholders})`, ids);
+      await dbOps.execute(`UPDATE emails SET is_read = 0, read_at = NULL WHERE id IN (${placeholders})`, ids);
     } else if (action === 'star') {
       await dbOps.execute(`UPDATE emails SET is_starred = 1 WHERE id IN (${placeholders})`, ids);
     } else if (action === 'important') {
@@ -469,13 +477,83 @@ router.post('/emails/bulk', async (req, res) => {
 });
 
 /**
+ * Mark single email as read
+ */
+router.post('/emails/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbOps.execute('UPDATE emails SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+    res.json({ success: true, id, is_read: 1 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Mark single email as unread
+ */
+router.post('/emails/:id/unread', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbOps.execute('UPDATE emails SET is_read = 0, read_at = NULL WHERE id = ?', [id]);
+    res.json({ success: true, id, is_read: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Mark all messages in a conversation as read
+ */
+router.post('/conversations/:id/read', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await dbOps.execute('UPDATE emails SET is_read = 1, read_at = CURRENT_TIMESTAMP WHERE conversation_id = ?', [id]);
+    res.json({ success: true, conversation_id: id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Get / Set Read Receipts Settings
+ */
+router.get('/settings/read-receipts', async (req, res) => {
+  try {
+    const phone = req.query.phone;
+    if (!phone) return res.json({ success: true, enabled: true });
+    const clean = phone.replace(/\D/g, '').slice(-10);
+    const user = await dbOps.queryOne('SELECT read_receipts_enabled FROM users WHERE phone_number LIKE ? LIMIT 1', [`%${clean}%`]);
+    res.json({ success: true, enabled: user ? user.read_receipts_enabled === 1 : true });
+  } catch (err) {
+    res.json({ success: true, enabled: true });
+  }
+});
+
+router.post('/settings/read-receipts', async (req, res) => {
+  try {
+    const { phone, enabled } = req.body;
+    if (!phone) return res.status(400).json({ error: 'Phone number required' });
+    const clean = phone.replace(/\D/g, '').slice(-10);
+    await dbOps.execute('UPDATE users SET read_receipts_enabled = ? WHERE phone_number LIKE ?', [enabled ? 1 : 0, `%${clean}%`]);
+    res.json({ success: true, enabled: !!enabled });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Delete single email
  */
 router.delete('/emails/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const email = await dbOps.queryOne('SELECT folder FROM emails WHERE id = ?', [id]);
+    const email = await dbOps.queryOne('SELECT id, folder, sender_email, subject FROM emails WHERE id = ?', [id]);
     if (!email) return res.json({ success: true, message: 'Already deleted' });
+    
+    // Record into persistent deleted list so IMAP sync never resurrects it
+    await dbOps.recordDeletedEmail(email);
+
     if (email.folder === 'TRASH') {
       await dbOps.execute('DELETE FROM emails WHERE id = ?', [id]);
     } else {

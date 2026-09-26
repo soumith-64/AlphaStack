@@ -103,7 +103,22 @@ async function getSqliteDb() {
       db.run('ALTER TABLE emails ADD COLUMN is_starred INT DEFAULT 0;');
     } catch (e) {}
     try {
+      db.run('ALTER TABLE emails ADD COLUMN read_at DATETIME DEFAULT NULL;');
+    } catch (e) {}
+    try {
       db.run('ALTER TABLE users ADD COLUMN bio TEXT;');
+    } catch (e) {}
+    try {
+      db.run('ALTER TABLE users ADD COLUMN read_receipts_enabled INT DEFAULT 1;');
+    } catch (e) {}
+    try {
+      db.run(`CREATE TABLE IF NOT EXISTS deleted_email_signatures (
+        signature VARCHAR(255) PRIMARY KEY,
+        message_id VARCHAR(255),
+        sender VARCHAR(255),
+        subject VARCHAR(255),
+        deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`);
     } catch (e) {}
     saveToDisk();
   } catch (err) {
@@ -130,6 +145,8 @@ export const dbOps = {
             if (col === 'reply_to_id') typeDef = 'VARCHAR(64) DEFAULT NULL';
             if (col === 'avatar_url') typeDef = 'VARCHAR(255) DEFAULT NULL';
             if (col === 'language') typeDef = "VARCHAR(10) DEFAULT 'en'";
+            if (col === 'read_at') typeDef = 'DATETIME DEFAULT NULL';
+            if (col === 'read_receipts_enabled') typeDef = 'INT DEFAULT 1';
             await mysqlPool.execute(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
             console.log(`✅ [MySQL Auto-Heal] Added missing column \`${col}\` to emails table`);
             const [retryRows] = await mysqlPool.execute(sql, params);
@@ -184,6 +201,8 @@ export const dbOps = {
             let typeDef = 'INT DEFAULT 0';
             if (col === 'folder') typeDef = "VARCHAR(50) DEFAULT 'INBOX'";
             if (col === 'reply_to_id') typeDef = 'VARCHAR(64) DEFAULT NULL';
+            if (col === 'read_at') typeDef = 'DATETIME DEFAULT NULL';
+            if (col === 'read_receipts_enabled') typeDef = 'INT DEFAULT 1';
             await mysqlPool.execute(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
             console.log(`✅ [MySQL Auto-Heal] Added missing column \`${col}\` to emails table`);
             const [retryResult] = await mysqlPool.execute(sql, params);
@@ -204,6 +223,51 @@ export const dbOps = {
       saveToDisk();
     }
     return { changes: 1 };
+  },
+
+  async recordDeletedEmail(email) {
+    if (!email) return;
+    try {
+      const sender = String(email.sender_email || '').toLowerCase().trim();
+      const subject = String(email.subject || '').trim().toLowerCase();
+      const sig = `${sender}___${subject}`;
+      if (mysqlPool) {
+        try {
+          await mysqlPool.execute(`
+            INSERT INTO deleted_email_signatures (signature, message_id, sender, subject)
+            VALUES (?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE deleted_at = CURRENT_TIMESTAMP
+          `, [sig, email.id || null, email.sender_email || null, email.subject || null]);
+          return;
+        } catch(mErr) {}
+      }
+      const sqliteDb = await getSqliteDb();
+      if (sqliteDb) {
+        sqliteDb.run(`
+          INSERT OR REPLACE INTO deleted_email_signatures (signature, message_id, sender, subject, deleted_at)
+          VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        `, [sig, email.id || null, email.sender_email || null, email.subject || null]);
+        saveToDisk();
+      }
+    } catch (e) {
+      console.warn('Notice: recordDeletedEmail note:', e.message);
+    }
+  },
+
+  async isEmailDeleted(sender, subject) {
+    try {
+      const sSender = String(sender || '').toLowerCase().trim();
+      const sSub = String(subject || '').trim().toLowerCase();
+      const sig = `${sSender}___${sSub}`;
+      const row = await this.queryOne(`
+        SELECT signature FROM deleted_email_signatures 
+        WHERE signature = ? OR (sender = ? AND subject = ?)
+        LIMIT 1
+      `, [sig, sSender, sSub]);
+      return !!row;
+    } catch (e) {
+      return false;
+    }
   },
 
   async logTelephony(phoneNumber, type, content, provider = 'SYSTEM_SMS', status = 'DELIVERED') {
@@ -246,24 +310,30 @@ export const dbOps = {
 
   async consolidateConversations() {
     try {
-      function norm(s) {
-        return String(s || '').replace(/^(\s*(re|fwd|fw|aw|sv)\s*:\s*)+/i, '').trim().toLowerCase();
-      }
       function extractClean(str) {
-        if (!str) return '';
-        const match = str.match(/<([^>]+)>/);
-        if (match) return match[1].toLowerCase().trim();
-        const digits = str.replace(/\D/g, '').slice(-10);
-        if (digits && digits.length === 10) return digits;
-        return str.toLowerCase().trim();
+        if (!str) return 'unknown';
+        const angleMatch = str.match(/<([^>]+)>/);
+        let s = angleMatch ? angleMatch[1] : str;
+        s = s.replace(/^["']|["']$/g, '').trim().toLowerCase();
+        const atIdx = s.indexOf('@');
+        if (atIdx !== -1) {
+          const local = s.substring(0, atIdx).trim();
+          const cleanDigits = local.replace(/\D/g, '');
+          if (cleanDigits.length >= 10 && cleanDigits.length <= 13) {
+            return cleanDigits.slice(-10);
+          }
+          return s;
+        }
+        const digits = s.replace(/\D/g, '');
+        if (digits.length >= 10) return digits.slice(-10);
+        return s;
       }
 
       const convs = await this.queryAll('SELECT * FROM conversations ORDER BY created_at ASC');
       const convMap = new Map();
       for (const c of convs) {
         const p = extractClean(c.participant_phone);
-        const s = norm(c.subject);
-        const key = c.is_group ? 'group_' + c.id : p + '___' + s;
+        const key = c.is_group ? ('group_' + c.id) : ('direct_' + p);
         if (!convMap.has(key)) {
           convMap.set(key, c);
         } else {
@@ -271,11 +341,12 @@ export const dbOps = {
           await this.execute('UPDATE emails SET conversation_id = ? WHERE conversation_id = ?', [master.id, c.id]);
           await this.execute('DELETE FROM conversation_participants WHERE conversation_id = ?', [c.id]);
           await this.execute('DELETE FROM conversations WHERE id = ?', [c.id]);
-          if (c.subject && (c.subject.toLowerCase().startsWith('re:') || c.subject.toLowerCase().startsWith('fwd:'))) {
+          if (c.subject) {
             await this.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP, subject = ? WHERE id = ?', [c.subject, master.id]);
           }
         }
       }
+      console.log('✅ [CONSOLIDATION] Contact-based conversation threads synchronized.');
     } catch (err) {
       console.warn('Notice: Conversation consolidation exception:', err.message);
     }
