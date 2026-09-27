@@ -1807,21 +1807,32 @@ function updateFolderCountsFromList(emails) {
   const unreadCount = emails.filter(e => e.is_read === 0).length;
   const badge = document.getElementById('inbox-count-badge');
   if (badge) {
-    badge.innerText = unreadCount > 0 ? unreadCount : '';
-    badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    if (currentFolder === 'INBOX') {
+      badge.innerText = unreadCount > 0 ? unreadCount : '';
+      badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+    }
   }
 
   const allBadge = document.getElementById('all-count-badge');
   if (allBadge) {
-    allBadge.innerText = countAll > 0 ? countAll : '';
-    allBadge.style.display = countAll > 0 ? 'inline-block' : 'none';
+    // Only update All Mail badge with the true total count of All Mail
+    if (currentFolder === 'ALL') {
+      allBadge.innerText = countAll > 0 ? countAll : '';
+      allBadge.style.display = countAll > 0 ? 'inline-block' : 'none';
+    } else if (emailFolderCache['ALL']) {
+      const totalAll = emailFolderCache['ALL'].length;
+      allBadge.innerText = totalAll > 0 ? totalAll : '';
+      allBadge.style.display = totalAll > 0 ? 'inline-block' : 'none';
+    }
   }
 
   const impCount = emails.filter(e => e.is_important === 1).length;
   const impBadge = document.getElementById('important-count-badge');
   if (impBadge) {
-    impBadge.innerText = impCount > 0 ? impCount : '';
-    impBadge.style.display = impCount > 0 ? 'inline-block' : 'none';
+    if (currentFolder === 'IMPORTANT') {
+      impBadge.innerText = impCount > 0 ? impCount : '';
+      impBadge.style.display = impCount > 0 ? 'inline-block' : 'none';
+    }
   }
 
   const indicator = document.getElementById('mail-page-indicator');
@@ -3642,7 +3653,7 @@ const INAI_TRANSLATIONS = {
     trash: 'Trash',
     compose: 'Compose Email',
     mailboxes: 'MAILBOXES',
-    source_all: 'All Mail',
+    source_all: 'All',
     source_inai: 'INAI Network',
     source_external: 'External (Gmail...)',
     back_to_messages: 'Back to messages',

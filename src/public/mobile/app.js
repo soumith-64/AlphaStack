@@ -3662,7 +3662,7 @@ const INAI_TRANSLATIONS = {
     spam: 'Spam',
     trash: 'Trash',
     mailboxes: 'MAILBOXES',
-    source_all: 'All Mail',
+    source_all: 'All',
     source_inai: 'INAI Network',
     source_external: 'External (Gmail...)',
     search_hint: 'Search phone numbers, contacts, subjects...'
