@@ -72,28 +72,11 @@
         </button>
 
         <!-- Hidden Phone.Email Embed SDK Button -->
-        <div class="pe-signin-embed" style="opacity: 0.001; position: absolute; z-index: -1; width: 1px; height: 1px; overflow: hidden;">
+        <div class="pe-signin-embed" style="position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden;">
           <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
         </div>
 
-        <div class="auth-or-separator" style="width: 100%; margin: 18px 0 14px;">
-          <span>OR ENTER PHONE NUMBER</span>
-        </div>
-
-        <!-- Direct Phone Number Input with Real-Time SMS/WhatsApp OTP -->
-        <form id="mobile-phone-form" onsubmit="handleMobilePhoneSubmit(event)" style="width: 100%; display: flex; flex-direction: column; gap: 10px;">
-          <div class="mobile-phone-input-row">
-            <span class="phone-prefix">🇮🇳 +91</span>
-            <input type="tel" id="mobile-phone-input" class="phone-input" placeholder="10-digit mobile number" maxlength="10" inputmode="numeric" pattern="[0-9]*" autocomplete="tel-national" required>
-            <button type="button" class="btn-autofill" onclick="autoDetectMobilePhone()" title="Auto-detect previous phone number">Detect</button>
-          </div>
-          <button type="submit" class="btn-primary-mobile full-width" id="btn-mobile-send-otp">
-            <span>Get OTP via SMS</span>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-          </button>
-        </form>
-
-        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 14px 0 6px;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 16px 0 6px;">
           <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: var(--text-muted); user-select: none;">
             <input type="checkbox" id="mob-remember-me" checked style="accent-color: #046A38; width: 16px; height: 16px; cursor: pointer;">
             <span>Keep me signed in on this device</span>

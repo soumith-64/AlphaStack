@@ -837,17 +837,21 @@ function triggerPhoneEmailLogin() {
     return;
   }
 
-  // Fallback: If SDK button is still loading into DOM, open official secure popup directly
+  // Fallback: open official secure login popup directly
   const clientId = '13311688567845248231';
-  const currentOrigin = window.location.origin;
-  const w = 480, h = 640;
-  const left = (window.screen.width - w) / 2;
-  const top = (window.screen.height - h) / 2;
-  window.open(
-    `https://www.phone.email/sign-in?client_id=${clientId}&redirect_url=${encodeURIComponent(currentOrigin)}`,
-    'pe_auth_popup',
-    `toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=${w},height=${h},top=${top},left=${left}`
-  );
+  const redirectUrl = window.location.href.split('?')[0].split('#')[0];
+  const authUrl = `https://auth.phone.email/log-in?client_id=${clientId}&auth_type=8&origin=${encodeURIComponent(redirectUrl)}`;
+  const w = 500, h = 600;
+  const left = Math.max(0, (window.screen.width - w) / 2);
+  const top = Math.max(0, (window.screen.height - h) / 2);
+  try {
+    const popup = window.open(authUrl, 'peLoginWindow', `toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=${w},height=${h},top=${top},left=${left}`);
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      window.location.href = authUrl;
+    }
+  } catch (err) {
+    window.location.href = authUrl;
+  }
 
   setTimeout(() => {
     if (btn) {
@@ -3276,6 +3280,18 @@ async function addDesktopAlias() {
 
 // ==================== SESSION RESTORATION & LOGOUT ====================
 function restoreSession() {
+  // Check if Phone.Email redirected back with user_json_url
+  const searchStr = window.location.search || (window.location.hash.includes('user_json_url') ? window.location.hash.replace(/^#/, '?') : '');
+  const urlParams = new URLSearchParams(searchStr);
+  const userJsonUrl = urlParams.get('user_json_url');
+  if (userJsonUrl) {
+    window.phoneEmailListener({ user_json_url: userJsonUrl });
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (e) {}
+    return;
+  }
+
   const saved = localStorage.getItem('phonemail-user') || 
                 localStorage.getItem('inai_user') || 
                 localStorage.getItem('phonemail-mobile-user') || 
