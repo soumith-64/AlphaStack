@@ -1774,6 +1774,25 @@ function getFormattedEmailBody(email) {
   let html = (email.body_html || '').trim();
   let text = (email.body_text || '').trim();
 
+  // Attached images helper - ensure attachments are rendered prominently if not in body
+  let attachedImagesHtml = '';
+  if (email.attachments && email.attachments.length > 0) {
+    const unreferencedImages = email.attachments.filter(att => {
+      const isImg = (att.content_type && att.content_type.startsWith('image/')) || 
+                    (att.filename && /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(att.filename));
+      if (!isImg) return false;
+      const attUrl = att.url || `/api/attachments/${att.id}`;
+      return !html.includes(attUrl) && (!att.content_id || !html.includes(att.content_id));
+    });
+    if (unreferencedImages.length > 0) {
+      attachedImagesHtml = unreferencedImages.map(att => `
+        <div class="email-attached-image-wrap" style="margin: 12px 0; text-align: center;">
+          <img src="${att.url || `/api/attachments/${att.id}`}" alt="${escapeHtml(att.filename || 'Image')}" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 0 auto; cursor: pointer;">
+        </div>
+      `).join('');
+    }
+  }
+
   // If HTML is present
   if (html) {
     // 1. Repair truncated HTML (e.g. unclosed <img> tag or unclosed quotes)
@@ -1801,25 +1820,33 @@ function getFormattedEmailBody(email) {
       const formattedText = escapeHtml(text).replace(/\n/g, '<br>');
       return `
         <div class="email-body-html-wrap">${html}</div>
+        ${attachedImagesHtml}
         <div class="email-body-text-fallback" style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-color, #e2e8f0); line-height: 1.6; color: var(--text-main);">
           ${formattedText}
         </div>
       `;
     }
 
-    return html;
+    return `<div class="email-body-html-wrap">${html}</div>${attachedImagesHtml}`;
   }
 
   // Fallback to plain text
   if (text) {
-    return escapeHtml(text).replace(/\n/g, '<br>');
+    return `${attachedImagesHtml}<div class="email-body-text-content" style="line-height: 1.65; word-break: break-word;">${escapeHtml(text).replace(/\n/g, '<br>')}</div>`;
+  }
+
+  if (attachedImagesHtml) {
+    return attachedImagesHtml;
   }
 
   return '<span style="color: var(--text-dim); font-style: italic;">(No Content)</span>';
 }
 
 function openMobileTraditionalEmail(emailId) {
-  const email = allEmails.find(e => e.id === emailId);
+  let email = allEmails.find(e => e.id === emailId);
+  if (!email && activeConversation && activeConversation.messages) {
+    email = activeConversation.messages.find(m => m.id === emailId);
+  }
   if (!email) return;
 
   activeTradEmail = email;
@@ -1921,6 +1948,8 @@ function openMobileTraditionalEmail(emailId) {
   updateTradStarButton(email.is_starred === 1);
 
   readingView.style.display = 'flex';
+  const scrollArea = readingView.querySelector('.trad-reading-scroll-area');
+  if (scrollArea) scrollArea.scrollTop = 0;
 }
 
 function closeMobileTraditionalReading() {
@@ -2279,10 +2308,30 @@ function renderChatTimeline(conv) {
     // Single-reply constraint
     const hasReplied = msg.has_replied === 1;
 
-    // Body formatting: Check if long email
-    const rawBody = (msg.body_text || msg.body_html || '').trim();
-    const isLongEmail = rawBody.length > 280;
-    const previewBody = isLongEmail ? rawBody.substring(0, 250) + '...' : rawBody;
+    // Extract inline or attached image if present
+    let previewImageSrc = '';
+    if (msg.body_html) {
+      const imgMatch = msg.body_html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (imgMatch && imgMatch[1]) {
+        previewImageSrc = imgMatch[1];
+      }
+    }
+    if (!previewImageSrc && msg.attachments && msg.attachments.length > 0) {
+      const imgAtt = msg.attachments.find(a => 
+        (a.content_type && a.content_type.startsWith('image/')) || 
+        (a.filename && /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(a.filename))
+      );
+      if (imgAtt) {
+        previewImageSrc = imgAtt.url || `/api/attachments/${imgAtt.id}`;
+      }
+    }
+
+    let cleanText = (msg.body_text || '').replace(/\[image:[^\]]*\]/gi, '').trim();
+    if (!cleanText && msg.body_html) {
+      cleanText = msg.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    const hasLongContent = cleanText.length > 180 || Boolean(previewImageSrc) || (msg.body_html && msg.body_html.length > 250);
+    const snippetText = hasLongContent ? (cleanText.substring(0, 160) + (cleanText.length > 160 ? '...' : '')) : cleanText;
 
     // First email in thread shows Subject; replies hide Subject
     const isFirstMessage = idx === 0;
@@ -2322,18 +2371,34 @@ function renderChatTimeline(conv) {
       <div class="chat-sender-label">${escapeHtml(formatSenderDisplay(msg.sender_email, false, msg.sender_name))}</div>
     ` : '';
 
-    // Body display
-    const bodyContentHtml = `
-      <div class="chat-message-text" id="body-text-${msg.id}">
-        ${escapeHtml(previewBody).replace(/\n/g, '<br>')}
+    // Inline Image Preview thumbnail in bubble - prominent with tap badge
+    const imageHtml = previewImageSrc ? `
+      <div class="bubble-image-preview" onclick="openTraditionalViewFromChat('${msg.id}')" title="Tap to view full email and image">
+        <img src="${previewImageSrc}" alt="Email image" loading="lazy" onerror="this.closest('.bubble-image-preview').style.display='none';">
+        <div class="bubble-image-overlay">
+          <span class="bubble-image-badge">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <span>Full Mail</span>
+          </span>
+        </div>
       </div>
-      ${isLongEmail ? `
-        <div class="chat-long-email-actions">
-          <button type="button" class="btn-chat-link" onclick="toggleExpandMessage('${msg.id}', ${JSON.stringify(rawBody)})">
-            Read full email ▾
+    ` : '';
+
+    // Body display with snippet & actions
+    const bodyContentHtml = `
+      ${imageHtml}
+      <div class="chat-message-text" id="body-text-${msg.id}">
+        ${escapeHtml(snippetText).replace(/\n/g, '<br>')}
+      </div>
+      ${hasLongContent ? `
+        <div class="chat-long-email-actions" id="chat-actions-${msg.id}">
+          <button type="button" class="btn-chat-link expand-btn" onclick="toggleExpandMessage('${msg.id}')">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+            <span>View Full Mail ▾</span>
           </button>
           <button type="button" class="btn-chat-link trad-link" onclick="openTraditionalViewFromChat('${msg.id}')">
-            Traditional View ↗
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            <span>Open Full View ↗</span>
           </button>
         </div>
       ` : ''}
@@ -2353,7 +2418,7 @@ function renderChatTimeline(conv) {
     }
 
     bubbleWrapper.innerHTML = `
-      <div class="chat-bubble ${isOutgoing ? 'outgoing' : 'incoming'}">
+      <div class="chat-bubble ${isOutgoing ? 'outgoing' : 'incoming'} ${hasLongContent ? 'has-rich-email' : ''}">
         ${senderBadgeHtml}
         ${subjectHtml}
         ${quotedReplyHtml}
@@ -2396,17 +2461,73 @@ function renderChatTimeline(conv) {
   });
 }
 
-function toggleExpandMessage(msgId, fullBody) {
+function toggleExpandMessage(msgId) {
   const el = document.getElementById(`body-text-${msgId}`);
   if (!el) return;
-  el.innerHTML = escapeHtml(fullBody).replace(/\n/g, '<br>');
-  const actions = el.parentElement.querySelector('.chat-long-email-actions');
-  if (actions) {
-    actions.innerHTML = `
-      <button type="button" class="btn-chat-link trad-link" onclick="openTraditionalViewFromChat('${msgId}')">
-        Traditional View ↗
-      </button>
-    `;
+
+  const isExpanded = el.classList.contains('expanded-full');
+
+  let msg = null;
+  if (activeConversation && activeConversation.messages) {
+    msg = activeConversation.messages.find(m => m.id === msgId);
+  }
+  if (!msg) {
+    msg = allEmails.find(e => e.id === msgId);
+  }
+  if (!msg) return;
+
+  const actions = document.getElementById(`chat-actions-${msgId}`) || el.parentElement.querySelector('.chat-long-email-actions');
+  const bubble = el.closest('.chat-bubble');
+
+  if (isExpanded) {
+    el.classList.remove('expanded-full');
+    if (bubble) bubble.classList.remove('expanded-full');
+
+    let cleanText = (msg.body_text || '').replace(/\[image:[^\]]*\]/gi, '').trim();
+    if (!cleanText && msg.body_html) {
+      cleanText = msg.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    el.innerHTML = escapeHtml(cleanText.substring(0, 160) + (cleanText.length > 160 ? '...' : '')).replace(/\n/g, '<br>');
+
+    if (bubble) {
+      const prevImg = bubble.querySelector('.bubble-image-preview');
+      if (prevImg) prevImg.style.display = 'block';
+    }
+
+    if (actions) {
+      actions.innerHTML = `
+        <button type="button" class="btn-chat-link expand-btn" onclick="toggleExpandMessage('${msgId}')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+          <span>View Full Mail ▾</span>
+        </button>
+        <button type="button" class="btn-chat-link trad-link" onclick="openTraditionalViewFromChat('${msgId}')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Open Full View ↗</span>
+        </button>
+      `;
+    }
+  } else {
+    el.classList.add('expanded-full');
+    if (bubble) bubble.classList.add('expanded-full');
+    el.innerHTML = getFormattedEmailBody(msg);
+
+    if (bubble) {
+      const prevImg = bubble.querySelector('.bubble-image-preview');
+      if (prevImg) prevImg.style.display = 'none';
+    }
+
+    if (actions) {
+      actions.innerHTML = `
+        <button type="button" class="btn-chat-link expand-btn" onclick="toggleExpandMessage('${msgId}')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="18 15 12 9 6 15"/></svg>
+          <span>Collapse Mail ▴</span>
+        </button>
+        <button type="button" class="btn-chat-link trad-link" onclick="openTraditionalViewFromChat('${msgId}')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>Open Full View ↗</span>
+        </button>
+      `;
+    }
   }
 }
 
@@ -2561,15 +2682,44 @@ async function submitChatMessage() {
 function openTraditionalViewFromChat(emailId) {
   let targetId = emailId;
   if (!targetId && activeConversation) {
-    targetId = activeConversation.latestMessage ? activeConversation.latestMessage.id : null;
+    if (activeConversation.latestMessage && activeConversation.latestMessage.id) {
+      targetId = activeConversation.latestMessage.id;
+    } else if (activeConversation.messages && activeConversation.messages.length > 0) {
+      targetId = activeConversation.messages[activeConversation.messages.length - 1].id;
+    }
   }
   if (targetId) {
     openMobileTraditionalEmail(targetId);
+  } else {
+    showToastNotification('Select an email to view details', 'info');
   }
 }
 
 function closeTraditionalViewModal() {
   closeMobileTraditionalReading();
+}
+
+// ==================== MOBILE IMAGE LIGHTBOX VIEWER ====================
+function openImageLightbox(src, alt) {
+  if (!src) return;
+  const modal = document.getElementById('mob-image-lightbox');
+  const img = document.getElementById('mob-lightbox-img');
+  const caption = document.getElementById('mob-lightbox-caption');
+  const download = document.getElementById('mob-lightbox-download');
+  if (!modal || !img) return;
+
+  img.src = src;
+  if (caption) caption.innerText = alt || 'Email Image';
+  if (download) {
+    download.href = src;
+    download.setAttribute('download', alt ? (alt.replace(/[^a-zA-Z0-9_-]/g, '_') + '.png') : 'inai_email_photo.png');
+  }
+  modal.style.display = 'flex';
+}
+
+function closeImageLightbox() {
+  const modal = document.getElementById('mob-image-lightbox');
+  if (modal) modal.style.display = 'none';
 }
 
 // ==================== DIGITAL ID CARD & PERSON INFO MODAL ====================
@@ -4011,6 +4161,15 @@ function inviteFriend(name, phone) {
   }
   showToastNotification(`Invitation prepared for ${name || phone} ✓`, 'info');
 }
+
+// Delegated click listener to open email images in fullscreen lightbox
+document.addEventListener('click', (e) => {
+  const img = e.target.closest('.trad-email-body-content img, .email-body-html-wrap img, .chat-message-text img, .email-attached-image-wrap img');
+  if (img && img.src && !img.closest('#mob-image-lightbox')) {
+    e.stopPropagation();
+    openImageLightbox(img.src, img.alt);
+  }
+});
 
 // ==================== INITIALIZATION ====================
 if (document.readyState === 'loading') {

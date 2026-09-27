@@ -933,10 +933,28 @@
     </div>
   </div>
 
+  <!-- ==================== MOBILE FULL-SCREEN IMAGE LIGHTBOX MODAL ==================== -->
+  <div id="mob-image-lightbox" class="image-lightbox-overlay" style="display: none;" onclick="closeImageLightbox()">
+    <div class="lightbox-top-bar" onclick="event.stopPropagation()">
+      <span class="lightbox-title" id="mob-lightbox-caption">Email Image</span>
+      <div class="lightbox-actions">
+        <a id="mob-lightbox-download" href="" download="image" class="lightbox-btn" title="Download Image" target="_blank">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </a>
+        <button type="button" class="lightbox-btn" onclick="closeImageLightbox()" title="Close">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="lightbox-content" onclick="event.stopPropagation()">
+      <img id="mob-lightbox-img" src="" alt="Full view image">
+    </div>
+  </div>
+
   <!-- Modern Popup Toast & Dialog Overlay -->
   <div id="app-toast-container" class="app-toast-container"></div>
   <div id="app-dialog-overlay" class="app-dialog-overlay" style="display: none;"></div>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>
