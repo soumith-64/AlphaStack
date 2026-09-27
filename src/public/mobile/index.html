@@ -472,10 +472,12 @@
       </div>
       <div class="modal-body">
         <div class="trad-field" style="position: relative;">
-          <label style="margin-bottom: 5px; font-size: 11px; font-weight: 700; color: #64748b;">TO (RECIPIENT)</label>
+          <label style="margin-bottom: 5px; font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 0.5px;">TO</label>
           <input type="text" id="trad-to" placeholder="Type phone number or email (e.g. user@gmail.com)" autocomplete="off">
           <div id="mobile-contacts-picker" class="mobile-contacts-picker" style="display: none;"></div>
         </div>
+        <!-- Real-Time Recipient Verification Status Badge -->
+        <div id="mob-recipient-verify-pill" class="recipient-verify-container" style="display: none;"></div>
         <div class="trad-field">
           <label style="margin-bottom: 5px; font-size: 11px; font-weight: 700; color: #64748b;">SUBJECT</label>
           <input type="text" id="trad-subject" placeholder="Subject">

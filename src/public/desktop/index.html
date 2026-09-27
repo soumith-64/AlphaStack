@@ -407,12 +407,12 @@
 
         <div class="sidebar-divider"></div>
         <div class="sidebar-group-title">PEOPLE & NETWORK</div>
-        <button class="nav-item" onclick="openFindFriendsModal()" style="color: #046A38; font-weight: 700; width: 100%;">
-          <span class="nav-icon" style="color: #046A38;">
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <button class="nav-item nav-item-friends" onclick="openFindFriendsModal()" title="Find Friends on INAI Network" style="color: #046A38; font-weight: 600; width: 100%; display: flex; align-items: center; gap: 8px;">
+          <span class="nav-icon" style="color: #046A38; display: flex; align-items: center;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </span>
-          <span class="nav-label">Find Friends on INAI</span>
-          <span class="nav-badge" style="background: #ecfdf5; color: #046A38; font-size: 10px; font-weight: 800; padding: 2px 6px;">NEW</span>
+          <span class="nav-label" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px;">Find Friends on INAI</span>
+          <span class="friends-badge" style="background: rgba(4, 106, 56, 0.09); color: #046A38; border: 1px solid rgba(4, 106, 56, 0.2); font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; flex-shrink: 0;">NEW</span>
         </button>
       </aside>
 
@@ -634,12 +634,15 @@
 
       <div class="compose-body">
         <div class="compose-field" style="position: relative;">
-          <label style="margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); display: block;">TO (RECIPIENT)</label>
+          <label for="desk-compose-to" class="compose-label">To</label>
           <input type="text" id="desk-compose-to" placeholder="Type name, phone number, or external email (e.g. user@gmail.com)" autocomplete="off">
           <div id="desk-contacts-dropdown" class="contacts-autocomplete" style="display: none;"></div>
         </div>
+        <!-- Real-Time Recipient Verification Status Badge -->
+        <div id="desk-recipient-verify-pill" class="recipient-verify-container" style="display: none;"></div>
+
         <div class="compose-field">
-          <label style="margin-bottom: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); display: block;">SUBJECT</label>
+          <label for="desk-compose-subject" class="compose-label">Subject</label>
           <input type="text" id="desk-compose-subject" placeholder="Subject">
         </div>
         <textarea id="desk-compose-body" rows="8" placeholder="Type your message here..."></textarea>

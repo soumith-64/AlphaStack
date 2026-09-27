@@ -1209,14 +1209,14 @@ button {
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  font-weight: 800;
-  padding: 2px 7px;
-  border-radius: 999px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 5px;
   vertical-align: middle;
   letter-spacing: 0.2px;
-  margin-right: 6px;
+  margin-right: 5px;
   width: fit-content;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  line-height: 1.3;
 }
 
 .badge-source-tag .badge-icon {
@@ -1224,17 +1224,53 @@ button {
 }
 
 .badge-phonemail-pill {
-  background: linear-gradient(135deg, rgba(4, 106, 56, 0.14) 0%, rgba(16, 185, 129, 0.22) 100%);
+  background: rgba(4, 106, 56, 0.08);
   color: #046A38;
-  border: 1px solid rgba(4, 106, 56, 0.35);
-  box-shadow: 0 1px 3px rgba(4, 106, 56, 0.12);
+  border: 1px solid rgba(4, 106, 56, 0.22);
 }
 
 .badge-external-pill {
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(99, 102, 241, 0.18) 100%);
-  color: #1d4ed8;
-  border: 1px solid rgba(37, 99, 235, 0.35);
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.10);
+  background: rgba(71, 85, 105, 0.08);
+  color: #475569;
+  border: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+/* Recipient Verification Container Mobile */
+.recipient-verify-container {
+  margin: 6px 0 8px 0;
+  display: flex;
+  align-items: center;
+  animation: fadeIn 0.15s ease;
+}
+
+.verify-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.15px;
+  line-height: 1.3;
+}
+
+.verify-chip.verified-inai {
+  background: rgba(4, 106, 56, 0.08);
+  color: #046A38;
+  border: 1px solid rgba(4, 106, 56, 0.22);
+}
+
+.verify-chip.verified-external {
+  background: rgba(71, 85, 105, 0.08);
+  color: #475569;
+  border: 1px solid rgba(71, 85, 105, 0.2);
+}
+
+.verify-chip.info-inai {
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
+  border: 1px solid rgba(2, 132, 199, 0.2);
 }
 
 /* Desktop row-quick-actions hidden on touch mobile */

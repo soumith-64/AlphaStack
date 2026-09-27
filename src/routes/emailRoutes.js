@@ -260,6 +260,24 @@ router.get('/emails', async (req, res) => {
         if (digits && userMap[digits]) {
           e.sender_name = userMap[digits];
         }
+        // Also enrich recipient name for outbound & sent mails
+        let rList = [];
+        try {
+          rList = JSON.parse(e.recipient_emails || '[]');
+        } catch (_) {
+          rList = [e.recipient_emails];
+        }
+        if (Array.isArray(rList) && rList.length > 0) {
+          const rStr = String(rList[0]).trim();
+          const angleMatch = rStr.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>/);
+          if (angleMatch && angleMatch[1]) {
+            e.recipient_name = angleMatch[1].trim();
+          }
+          const rDigits = rStr.replace(/\D/g, '').slice(-10);
+          if (rDigits && userMap[rDigits]) {
+            e.recipient_name = userMap[rDigits];
+          }
+        }
       }
     } catch (uErr) {}
 

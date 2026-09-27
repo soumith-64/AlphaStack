@@ -156,6 +156,8 @@ function lookupContactName(phone) {
   if (!phone) return '';
   const digits = String(phone).replace(/\D/g, '').slice(-10);
   if (!digits || digits.length !== 10) return '';
+
+  // 1. Check in-memory cached contacts & device contacts
   const all = [...(cachedContacts || []), ...(cachedDeviceContacts || [])];
   const found = all.find(c => {
     const cP = String(c.phone || c.phone_number || '').replace(/\D/g, '').slice(-10);
@@ -164,7 +166,51 @@ function lookupContactName(phone) {
   if (found) {
     if (found.name && !/^User\s*\d+/i.test(found.name)) return found.name.trim();
     if (found.display_name && !/^User\s*\d+/i.test(found.display_name)) return found.display_name.trim();
+    if (found.device_name) return found.device_name.trim();
   }
+
+  // 2. Check localStorage persistent custom contact names map
+  try {
+    const customMap = JSON.parse(localStorage.getItem('inai_custom_contact_names') || '{}');
+    if (customMap[digits]) return customMap[digits].trim();
+  } catch (e) {}
+
+  // 3. Check localStorage cached device names
+  try {
+    const namesMap = JSON.parse(localStorage.getItem('phonemail_cached_device_names') || '{}');
+    for (const [k, v] of Object.entries(namesMap)) {
+      if (String(k).replace(/\D/g, '').slice(-10) === digits && v && !/^User\s*\d+/i.test(v)) {
+        return v.trim();
+      }
+    }
+  } catch (e) {}
+
+  // 4. Check allEmails for any email where sender or recipient had a real display name for these digits
+  if (typeof allEmails !== 'undefined' && Array.isArray(allEmails)) {
+    for (const em of allEmails) {
+      if (em.sender_name && !/^User\s*\d+/i.test(em.sender_name)) {
+        const sDigits = (em.sender_email || '').replace(/\D/g, '').slice(-10);
+        if (sDigits === digits) return em.sender_name.trim();
+      }
+      if (em.recipient_name && !/^User\s*\d+/i.test(em.recipient_name)) {
+        let rList = [];
+        try { rList = JSON.parse(em.recipient_emails || '[]'); } catch(_) { rList = [em.recipient_emails]; }
+        if (rList.some(r => String(r).replace(/\D/g, '').slice(-10) === digits)) {
+          return em.recipient_name.trim();
+        }
+      }
+      // Heuristic: check subject line for "hi [Name]" or "Hi [Name]"
+      const isTarget = (em.recipient_emails && String(em.recipient_emails).includes(digits)) ||
+                       (em.sender_email && String(em.sender_email).includes(digits));
+      if (isTarget && em.subject) {
+        const subMatch = em.subject.match(/^(?:hi|hello|hey|dear)\s+([a-zA-Z]{2,20})\b/i);
+        if (subMatch && subMatch[1]) {
+          return subMatch[1].charAt(0).toUpperCase() + subMatch[1].slice(1).toLowerCase();
+        }
+      }
+    }
+  }
+
   return '';
 }
 
@@ -232,37 +278,67 @@ function formatSenderDisplay(rawSender, includeAddress = false, fallbackName = '
 function cleanRecipientAddress(addr) {
   if (!addr) return '';
   let str = String(addr).trim();
+
+  // If format is "Name" <email/phone>
+  const angleMatch = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
+  let explicitName = '';
+  if (angleMatch) {
+    explicitName = (angleMatch[1] || '').trim().replace(/^["']+|["']+$/g, '');
+    str = (angleMatch[2] || '').trim();
+  }
+
   const phoneAliasMatch = str.match(/^(\d{10})(?:\.([a-zA-Z0-9_-]+))?@(alphastack\.wwisvnr\.com|phonemail\.com)/i);
-  if (phoneAliasMatch) {
-    return formatPhoneDisplay(phoneAliasMatch[1], phoneAliasMatch[2]);
+  const plainPhoneMatch = str.match(/^(\d{10})@/);
+  const digitsOnly = str.replace(/\D/g, '').slice(-10);
+
+  if (phoneAliasMatch || plainPhoneMatch || (digitsOnly && digitsOnly.length === 10 && !str.includes('@'))) {
+    const phone = phoneAliasMatch ? phoneAliasMatch[1] : (plainPhoneMatch ? plainPhoneMatch[1] : digitsOnly);
+    const tag = phoneAliasMatch && phoneAliasMatch[2] ? phoneAliasMatch[2] : '';
+    const phoneFormatted = formatPhoneDisplay(phone, tag);
+
+    const contactName = explicitName || lookupContactName(phone);
+    if (contactName && !/^User\s*\d+/i.test(contactName) && contactName.replace(/\D/g, '') !== phone) {
+      return `${contactName} (${phoneFormatted})`;
+    }
+    return phoneFormatted;
   }
-  const plainPhone = str.match(/^(\d{10})@/);
-  if (plainPhone) {
-    return formatPhoneDisplay(plainPhone[1]);
-  }
-  if (/^\d{10}$/.test(str)) {
-    return formatPhoneDisplay(str);
+
+  if (explicitName && explicitName.toLowerCase() !== str.toLowerCase()) {
+    return `${explicitName} (${str})`;
   }
   return str;
 }
 
 function getInitials(nameOrEmail) {
   if (!nameOrEmail) return 'IN';
-  const clean = String(nameOrEmail).replace(/<[^>]*>/g, '').replace(/[()]/g, '').trim();
+  // Strip "To:" or "From:" prefix if present
+  let clean = String(nameOrEmail).replace(/^(?:To|From):\s*/i, '');
+  // If format is "Name (+91 ...)", extract only the name part
+  const bracketIdx = clean.indexOf('(');
+  if (bracketIdx > 0) {
+    clean = clean.substring(0, bracketIdx).trim();
+  }
+  clean = clean.replace(/<[^>]*>/g, '').replace(/[()]/g, '').trim();
   const words = clean.split(/\s+/).filter(w => /^[a-zA-Z0-9]/.test(w));
   if (words.length >= 2) {
     const first = (words[0].match(/[a-zA-Z0-9]/) || [''])[0];
     const second = (words[1].match(/[a-zA-Z0-9]/) || [''])[0];
     if (first && second) return (first + second).toUpperCase();
   }
+  if (words.length === 1 && words[0].length >= 2) {
+    const alpha = words[0].replace(/[^a-zA-Z0-9]/g, '');
+    if (alpha.length >= 2) {
+      if (/^[a-zA-Z]+$/.test(alpha)) {
+        return (alpha[0] + alpha[1]).toUpperCase();
+      }
+    }
+  }
   const letterMatch = clean.match(/[a-zA-Z]/);
   if (letterMatch) {
     return letterMatch[0].toUpperCase();
   }
-  const numMatch = clean.match(/\d{1,2}/);
-  if (numMatch) {
-    return numMatch[0];
-  }
+  const digits = clean.replace(/\D/g, '');
+  if (digits.length >= 2) return digits.slice(-2);
   return 'IN';
 }
 
@@ -1540,6 +1616,24 @@ function initDesktopApp() {
   loadEmails();
   loadDesktopAliases();
 
+  // Load cached device contacts and fetch account network contacts
+  try {
+    const raw = localStorage.getItem('phonemail_cached_device_contacts');
+    if (raw) cachedDeviceContacts = JSON.parse(raw);
+  } catch(e) {}
+
+  if (currentUser && currentUser.phone) {
+    fetch(`/api/contacts?phone=${encodeURIComponent(currentUser.phone)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.contacts) {
+          cachedContacts = data.contacts;
+          if (allEmails && allEmails.length > 0) renderEmailList(allEmails);
+        }
+      })
+      .catch(() => {});
+  }
+
   // Apply saved language preference
   if (typeof applyInaiLanguage === 'function') {
     applyInaiLanguage();
@@ -2186,9 +2280,12 @@ function createEmailRowElement(email) {
   const recipientsDisplay = getRecipientsDisplay(email);
 
   const isFromPhoneMail = isPhoneMailSender(email.sender_email);
+  const inaiIcon = `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+  const extIcon = `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
+
   const sourceBadgeHtml = isFromPhoneMail
-    ? `<span class="badge-source-tag badge-phonemail-pill" title="Sent via INAI Network"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI</span></span>`
-    : `<span class="badge-source-tag badge-external-pill" title="Sent via External Mail Service"><svg class="badge-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External</span></span>`;
+    ? `<span class="badge-source-tag badge-phonemail-pill" title="INAI Network Verified">${inaiIcon}<span>INAI</span></span>`
+    : `<span class="badge-source-tag badge-external-pill" title="External Mail Service">${extIcon}<span>External</span></span>`;
 
   const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const displaySender = (isSentFolder || isSentByMe) 
@@ -2196,9 +2293,10 @@ function createEmailRowElement(email) {
     : formattedSender;
 
   const participantForAvatar = (isSentFolder || isSentByMe) ? (email.recipient_phone || recipientsDisplay) : email.sender_email;
-  const rowAvatar = getAvatarUrl(participantForAvatar, displaySender);
-  const fallbackSvg = generateDefaultAvatar(participantForAvatar, displaySender);
-  const rowInitial = getInitials(displaySender);
+  const targetForInitials = (isSentFolder || isSentByMe) ? (recipientsDisplay || 'Recipient') : formattedSender;
+  const rowAvatar = getAvatarUrl(participantForAvatar, targetForInitials);
+  const fallbackSvg = generateDefaultAvatar(participantForAvatar, targetForInitials);
+  const rowInitial = getInitials(targetForInitials);
   const cleanBodySnippet = (email.body_text || '').replace(/\s+/g, ' ').trim().substring(0, 95);
 
   row.innerHTML = `
@@ -2214,8 +2312,8 @@ function createEmailRowElement(email) {
       <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
     </span>
 
-    <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View ${escapeHtml(displaySender)} Digital ID Card">
-      <img src="${rowAvatar}" alt="${escapeHtml(displaySender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
+    <div class="item-avatar-circle" onclick="openContactInfoModal('${escapeHtml(participantForAvatar)}'); event.stopPropagation();" title="View ${escapeHtml(targetForInitials)} Digital ID Card">
+      <img src="${rowAvatar}" alt="${escapeHtml(targetForInitials)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
       <span class="avatar-fallback-initial" style="display:none;">${rowInitial}</span>
     </div>
     <div class="item-sender-col" title="${escapeHtml(displaySender)}">
@@ -2331,7 +2429,13 @@ function openEmail(emailId) {
 
   const toLabel = document.getElementById('inline-dock-recipient-label');
   if (toLabel) {
-    toLabel.innerText = `To: ${replyTargetName} (${replyTarget})`;
+    if (replyTargetName && replyTarget && replyTargetName.includes(replyTarget)) {
+      toLabel.innerText = `To: ${replyTargetName}`;
+    } else if (replyTargetName && replyTarget) {
+      toLabel.innerText = `To: ${replyTargetName} (${replyTarget})`;
+    } else {
+      toLabel.innerText = `To: ${replyTargetName || replyTarget || 'Recipient'}`;
+    }
   }
 
   // Populate email message in reading container
@@ -2408,7 +2512,10 @@ function renderDesktopEmailReadingView(email) {
           <div class="thread-sender-name">
             <span>${escapeHtml(formattedSender)}</span>
             <span class="badge-source-tag ${isPhoneMail ? 'badge-phonemail-pill' : 'badge-external-pill'}">
-              ${isPhoneMail ? '⚡ INAI Network' : '🌐 External Provider'}
+              ${isPhoneMail 
+                ? '<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI Network</span>' 
+                : '<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External Provider</span>'
+              }
             </span>
           </div>
           <div class="thread-time" style="display: flex; align-items: center; gap: 8px;">
@@ -2500,7 +2607,7 @@ async function submitDesktopThreadReply() {
               <div class="thread-meta-col">
                 <div class="thread-sender-name">
                   <span>${escapeHtml(senderName)}</span>
-                  <span class="badge-source-tag badge-phonemail-pill">⚡ INAI Network</span>
+                  <span class="badge-source-tag badge-phonemail-pill"><svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg><span>INAI Network</span></span>
                 </div>
                 <div class="thread-time">${timeDisplay} • Sent</div>
               </div>
@@ -2607,6 +2714,7 @@ function renderContactsDropdown(contacts, headerTitle = 'Registered PhoneMail Us
       e.preventDefault();
       input.value = c.phone_number;
       dropdown.style.display = 'none';
+      verifyAndRenderRecipientStatus(c.phone_number, 'desk-recipient-verify-pill');
       document.getElementById('desk-compose-subject').focus();
     };
     dropdown.appendChild(item);
@@ -2769,20 +2877,108 @@ function setupContactsAutocomplete() {
     }
   }
 
+  let verifyDebounce = null;
   input.addEventListener('input', () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => fetchAndRender(input.value), 250);
+    clearTimeout(verifyDebounce);
+    verifyDebounce = setTimeout(() => verifyAndRenderRecipientStatus(input.value, 'desk-recipient-verify-pill'), 180);
   });
 
   input.addEventListener('focus', () => {
     if (!input.value.trim()) {
       fetchAndRender('');
+    } else {
+      verifyAndRenderRecipientStatus(input.value, 'desk-recipient-verify-pill');
     }
   });
 
   input.addEventListener('blur', () => {
     setTimeout(() => { dropdown.style.display = 'none'; }, 250);
   });
+}
+
+async function verifyAndRenderRecipientStatus(val, pillElementId) {
+  const container = document.getElementById(pillElementId);
+  if (!container) return;
+
+  const raw = String(val || '').trim();
+  if (!raw) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  // 1. External email address (e.g. soumithjv2@gmail.com, user@yahoo.in)
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(raw);
+  const isInternalDomain = raw.toLowerCase().includes('alphastack.wwisvnr.com') || raw.toLowerCase().includes('phonemail.com');
+
+  if (isEmail && !isInternalDomain) {
+    container.style.display = 'flex';
+    container.innerHTML = `
+      <div class="verify-chip verified-external">
+        <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>Verified External Email: <strong>${escapeHtml(raw)}</strong> &bull; Ready via Secure Hostinger SMTP Outbound</span>
+      </div>
+    `;
+    return;
+  }
+
+  // 2. Phone number or internal INAI address
+  const cleanPhone = raw.replace(/\D/g, '').slice(-10);
+  if (cleanPhone.length === 10) {
+    const formatted = `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}`;
+    let contactName = lookupContactName(cleanPhone);
+
+    container.style.display = 'flex';
+    container.innerHTML = `
+      <div class="verify-chip verified-inai">
+        <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>Verifying INAI Member status...</span>
+      </div>
+    `;
+
+    try {
+      const res = await fetch('/api/contacts/filter-phonemail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumbers: [cleanPhone] })
+      });
+      const data = await res.json();
+      const isRegistered = data.registeredContacts && data.registeredContacts.length > 0;
+      const regUser = isRegistered ? data.registeredContacts[0] : null;
+      if (regUser && regUser.display_name && !/^User\s*\d+/i.test(regUser.display_name)) {
+        contactName = regUser.display_name;
+      }
+
+      if (isRegistered) {
+        container.innerHTML = `
+          <div class="verify-chip verified-inai">
+            <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+            <span>Verified INAI Network Member: ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted}) &bull; Instant Delivery</span>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="verify-chip info-inai">
+            <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>Phone Recipient: ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted}) &bull; Direct Mail & SMS Relay</span>
+          </div>
+        `;
+      }
+    } catch (e) {
+      container.innerHTML = `
+        <div class="verify-chip info-inai">
+          <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span>Recipient: ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted})</span>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  container.style.display = 'none';
+  container.innerHTML = '';
 }
 
 function openComposeModal() {
@@ -2795,6 +2991,11 @@ function openComposeModal() {
   document.getElementById('desk-compose-body').value = '';
   const dropdown = document.getElementById('desk-contacts-dropdown');
   if (dropdown) dropdown.style.display = 'none';
+  const verifyPill = document.getElementById('desk-recipient-verify-pill');
+  if (verifyPill) {
+    verifyPill.style.display = 'none';
+    verifyPill.innerHTML = '';
+  }
   modal.style.display = 'block';
   setTimeout(() => document.getElementById('desk-compose-to').focus(), 50);
 }
@@ -2804,6 +3005,11 @@ function closeComposeModal() {
   if (modal) modal.style.display = 'none';
   const dropdown = document.getElementById('desk-contacts-dropdown');
   if (dropdown) dropdown.style.display = 'none';
+  const verifyPill = document.getElementById('desk-recipient-verify-pill');
+  if (verifyPill) {
+    verifyPill.style.display = 'none';
+    verifyPill.innerHTML = '';
+  }
   currentReplyToId = null;
   currentReplyConvId = null;
 }
@@ -3409,17 +3615,61 @@ function fallbackLocalTranslate(text, lang) {
 
 // ==================== DIGITAL ID CARD & PERSON INFO MANAGEMENT (DESKTOP) ====================
 function openActiveContactInfoModal() {
-  if (!activeConversation) return;
-  openContactInfoModal(activeConversation.participant_raw);
+  let target = null;
+  let customName = null;
+
+  if (activeEmail) {
+    const isSentFolder = currentFolder && currentFolder.toUpperCase() === 'SENT';
+    const isSentByMe = Boolean(
+      isSentFolder ||
+      (activeEmail.sender_email && currentUser && currentUser.phone && activeEmail.sender_email.includes(currentUser.phone))
+    );
+    if (isSentByMe) {
+      // Recipient is the other party!
+      const recDisplay = getRecipientsDisplay(activeEmail);
+      target = activeEmail.recipient_phone || recDisplay || (activeEmail.recipient_emails && activeEmail.recipient_emails[0]);
+      customName = lookupContactName(target) || activeEmail.recipient_name || '';
+    } else {
+      // Sender is the other party!
+      target = activeEmail.sender_email;
+      customName = activeEmail.sender_name || lookupContactName(target) || '';
+    }
+  } else if (activeConversation) {
+    target = activeConversation.participant_raw;
+    customName = activeConversation.sender_name || '';
+  }
+
+  if (!target && currentUser) {
+    target = currentUser.phone;
+    customName = currentUser.name || currentUser.display_name;
+  }
+
+  if (target) {
+    openContactInfoModal(target, customName);
+  }
 }
 
 function openDigitalIdModal() {
   openContactInfoModal(currentUser ? currentUser.phone : null);
 }
 
-async function openContactInfoModal(phoneOrEmail) {
-  const target = phoneOrEmail || (activeConversation && activeConversation.participant_raw) || (currentUser && currentUser.phone);
-  if (!target) return;
+async function openContactInfoModal(phoneOrEmail, customName = '') {
+  let raw = phoneOrEmail || (activeConversation && activeConversation.participant_raw) || (currentUser && currentUser.phone);
+  if (!raw) return;
+
+  // Clean target
+  let target = String(raw).trim();
+  try {
+    const parsed = JSON.parse(target);
+    if (Array.isArray(parsed) && parsed.length > 0) target = parsed[0];
+  } catch(e) {}
+  target = target.replace(/^[<"']+|[>"']+$/g, '').trim();
+  const angleMatch = target.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>$/);
+  let parsedName = customName;
+  if (angleMatch) {
+    if (!parsedName) parsedName = angleMatch[1];
+    target = angleMatch[2];
+  }
 
   activeContactForModal = target;
   const modal = document.getElementById('digital-id-modal');
@@ -3427,9 +3677,9 @@ async function openContactInfoModal(phoneOrEmail) {
 
   switchIdCardTab('card');
 
-  const isPM = isPhoneMailSender(target);
   const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
-  const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : target;
+  const isPM = isPhoneMailSender(target) || (cleanPhone && cleanPhone.length === 10);
+  const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : (target.includes('@') ? '' : target);
 
   const nameEl = document.getElementById('id-card-name');
   const phoneEl = document.getElementById('id-card-phone');
@@ -3439,8 +3689,9 @@ async function openContactInfoModal(phoneOrEmail) {
   const qrEl = document.getElementById('id-card-qr-img');
   const dateEl = document.getElementById('id-card-issue-date');
 
-  const defaultEmail = isPM ? `${cleanPhone}@alphastack.wwisvnr.com` : target;
-  const displayName = (activeConversation && activeConversation.sender_name) || (isPM ? `User ${cleanPhone.slice(-4)}` : target.split('@')[0]);
+  const defaultEmail = isPM && cleanPhone ? `${cleanPhone}@alphastack.wwisvnr.com` : target;
+  const resolvedContactName = lookupContactName(cleanPhone) || parsedName || (activeConversation && activeConversation.sender_name);
+  let displayName = resolvedContactName || (isPM && cleanPhone ? `User ${cleanPhone.slice(-4)}` : target.split('@')[0]);
 
   if (nameEl) nameEl.innerText = displayName;
   if (phoneEl) phoneEl.innerText = formattedPhone;
@@ -3468,7 +3719,7 @@ async function openContactInfoModal(phoneOrEmail) {
   const editAvatarPrev = document.getElementById('edit-person-avatar-preview');
 
   if (editName) editName.value = displayName;
-  if (editPhone) editPhone.value = formattedPhone;
+  if (editPhone) editPhone.value = formattedPhone || cleanPhone;
   if (editEmail) editEmail.value = defaultEmail;
   if (editAlias) editAlias.value = 'primary';
   if (editBio) editBio.value = '';
@@ -3483,16 +3734,20 @@ async function openContactInfoModal(phoneOrEmail) {
     const data = await res.json();
     if (data.contact) {
       const c = data.contact;
-      if (c.display_name && nameEl) nameEl.innerText = c.display_name;
-      if (c.email && emailEl) emailEl.innerText = c.email;
+      const apiName = (c.display_name && !/^User\s*\d+/i.test(c.display_name)) ? c.display_name : null;
+      const finalName = apiName || displayName;
+      const finalEmail = c.email_address || c.email || defaultEmail;
+
+      if (nameEl) nameEl.innerText = finalName;
+      if (emailEl) emailEl.innerText = finalEmail;
       if (c.bio && editBio) editBio.value = c.bio;
-      if (editName && c.display_name) editName.value = c.display_name;
-      if (editEmail && c.email) editEmail.value = c.email;
+      if (editName) editName.value = finalName;
+      if (editEmail) editEmail.value = finalEmail;
       if (c.avatar_url && avatarEl) {
-        avatarEl.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(c.display_name || displayName)}" class="avatar-inner-img">`;
+        avatarEl.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(finalName)}" class="avatar-inner-img">`;
       }
       if (c.avatar_url && editAvatarPrev) {
-        editAvatarPrev.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(c.display_name || displayName)}" class="avatar-inner-img">`;
+        editAvatarPrev.innerHTML = `<img src="${c.avatar_url}" alt="${escapeHtml(finalName)}" class="avatar-inner-img">`;
       }
     }
   } catch (err) {}
@@ -3622,19 +3877,41 @@ async function savePersonInfoSubmit(e) {
       const aliasTag = document.getElementById('id-card-alias-tag');
       if (aliasTag && subAlias) aliasTag.innerText = `Sub-ID: .${subAlias}`;
 
-      // Update in memory emails and re-render
-      if (activeCustomAvatarDataUrl) {
-        allEmails.forEach(em => {
-          if (em.sender_email && (em.sender_email.includes(phone) || (email && em.sender_email.includes(email)))) {
-            em.sender_avatar = activeCustomAvatarDataUrl;
-            em.sender_name = displayName;
-          }
-        });
-        if (currentUser && (currentUser.phone === phone || currentUser.email === email)) {
-          currentUser.avatar_url = activeCustomAvatarDataUrl;
-          currentUser.name = displayName;
-          updateProfileDisplay();
+      // Save name into local custom contact names map
+      const cleanDigits = String(phone || activeContactForModal).replace(/\D/g, '').slice(-10);
+      if (cleanDigits && displayName) {
+        try {
+          const customMap = JSON.parse(localStorage.getItem('inai_custom_contact_names') || '{}');
+          customMap[cleanDigits] = displayName;
+          localStorage.setItem('inai_custom_contact_names', JSON.stringify(customMap));
+        } catch(e) {}
+      }
+
+      // Update in memory cached contacts
+      const existingIdx = cachedContacts.findIndex(c => String(c.phone_number || c.phone || '').replace(/\D/g, '').slice(-10) === cleanDigits);
+      if (existingIdx >= 0) {
+        cachedContacts[existingIdx].display_name = displayName;
+        cachedContacts[existingIdx].name = displayName;
+      } else {
+        cachedContacts.push({ phone_number: cleanDigits, display_name: displayName, email_address: email });
+      }
+
+      // Update in memory emails (both sender and recipient!) and re-render
+      allEmails.forEach(em => {
+        if (em.sender_email && (em.sender_email.includes(cleanDigits) || (email && em.sender_email.includes(email)))) {
+          em.sender_name = displayName;
+          if (activeCustomAvatarDataUrl) em.sender_avatar = activeCustomAvatarDataUrl;
         }
+        let rList = [];
+        try { rList = JSON.parse(em.recipient_emails || '[]'); } catch(_) { rList = [em.recipient_emails]; }
+        if (rList.some(r => String(r).includes(cleanDigits) || (email && String(r).includes(email)))) {
+          em.recipient_name = displayName;
+        }
+      });
+      if (currentUser && (currentUser.phone === phone || currentUser.email === email)) {
+        if (activeCustomAvatarDataUrl) currentUser.avatar_url = activeCustomAvatarDataUrl;
+        currentUser.name = displayName;
+        updateProfileDisplay();
       }
       renderEmailList(allEmails);
       switchIdCardTab('card');
