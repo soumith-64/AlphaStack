@@ -477,6 +477,17 @@ function initAppView() {
   document.getElementById('onboarding-container').style.display = 'none';
   document.getElementById('app-container').style.display = 'flex';
 
+  // Ensure conversation and reading panes start hidden on fresh app view
+  const initialReadingPane = document.getElementById('reading-pane');
+  if (initialReadingPane) {
+    initialReadingPane.style.setProperty('display', 'none', 'important');
+    initialReadingPane.classList.remove('active');
+  }
+  const initialTradView = document.getElementById('mob-traditional-reading-view');
+  if (initialTradView) {
+    initialTradView.style.setProperty('display', 'none', 'important');
+  }
+
   const formattedPhone = formatPhoneDisplay(currentUser.phone);
   const displayName = currentUser.name || currentUser.display_name || (currentUser.phone ? `User ${currentUser.phone}` : 'INAI Member');
 
@@ -2446,7 +2457,10 @@ async function openConversation(convId) {
 
   // Show WhatsApp chat pane
   const pane = document.getElementById('reading-pane');
-  if (pane) pane.style.display = 'flex';
+  if (pane) {
+    pane.style.setProperty('display', 'flex', 'important');
+    pane.classList.add('active');
+  }
 
   // Push history state so iOS edge-swipe and browser back work seamlessly
   try {
@@ -2724,7 +2738,10 @@ function toggleExpandMessage(msgId) {
 
 function closeReadingPane(shouldPopHistory = true) {
   const pane = document.getElementById('reading-pane');
-  if (pane) pane.style.display = 'none';
+  if (pane) {
+    pane.style.setProperty('display', 'none', 'important');
+    pane.classList.remove('active');
+  }
   activeConversation = null;
   activeConversationId = null;
   activeReplyingMessage = null;
