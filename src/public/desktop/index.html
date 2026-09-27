@@ -453,7 +453,7 @@
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"/><polyline points="22,6 12,13 2,6"/><circle cx="18" cy="18" r="3"/></svg>
               </button>
 
-              <h2 class="folder-header-title" id="current-folder-title">Inbox</h2>
+              <h2 class="folder-header-title" id="current-folder-title" style="display: none;">Inbox</h2>
             </div>
 
             <!-- FLOATING BULK ACTIONS TOOLBAR (Reveals when >= 1 email is checked) -->
@@ -509,9 +509,6 @@
             <div class="desktop-filter-toolbar">
               <!-- Quick Filter Pills -->
               <div class="desktop-quick-filters">
-                <button type="button" class="desk-filter-pill active" id="desk-filter-all" onclick="setDesktopQuickFilter('all')">
-                  <span>All</span>
-                </button>
                 <button type="button" class="desk-filter-pill" id="desk-filter-unread" onclick="setDesktopQuickFilter('unread')">
                   <span class="unread-dot-mini"></span>
                   <span>Unread</span>
@@ -533,7 +530,7 @@
               <div class="desktop-date-filter-wrapper" style="position: relative;">
                 <button type="button" class="desk-date-btn" id="desk-date-dropdown-btn" onclick="toggleDesktopDateDropdown(event)">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                  <span id="desk-date-btn-label">Date: All</span>
+                  <span id="desk-date-btn-label">Date</span>
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                 </button>
 

@@ -1843,17 +1843,30 @@ function setMailSourceFilter(filter) {
       else btn.classList.remove('active');
     }
   });
+  if (filter === 'all') {
+    currentQuickFilter = 'all';
+    ['unread', 'attachments', 'starred'].forEach(f => {
+      const btn = document.getElementById(`desk-filter-${f}`);
+      if (btn) btn.classList.remove('active');
+    });
+    updateDesktopClearBtnVisibility();
+  }
   renderEmailList(allEmails);
 }
 
 // ==================== ADVANCED FILTER TOOLBAR HANDLERS ====================
 function setDesktopQuickFilter(filter) {
-  currentQuickFilter = filter;
+  // Chip-toggle behavior: clicking active filter turns it off back to 'all'
+  if (currentQuickFilter === filter) {
+    currentQuickFilter = 'all';
+  } else {
+    currentQuickFilter = filter;
+  }
   currentEmailPage = 1;
-  ['all', 'unread', 'attachments', 'starred'].forEach(f => {
+  ['unread', 'attachments', 'starred'].forEach(f => {
     const btn = document.getElementById(`desk-filter-${f}`);
     if (btn) {
-      if (f === filter) btn.classList.add('active');
+      if (f === currentQuickFilter) btn.classList.add('active');
       else btn.classList.remove('active');
     }
   });
@@ -1950,7 +1963,7 @@ function updateDesktopDateUI() {
   const btn = document.getElementById('desk-date-dropdown-btn');
   const label = document.getElementById('desk-date-btn-label');
   if (label) {
-    label.innerText = currentDateFilter === 'all' ? 'Date: All' : `Date: ${getDesktopDatePresetLabel(currentDateFilter)}`;
+    label.innerText = currentDateFilter === 'all' ? 'Date' : getDesktopDatePresetLabel(currentDateFilter);
   }
   if (btn) {
     if (currentDateFilter !== 'all') btn.classList.add('active');
@@ -1979,12 +1992,9 @@ function resetAllDesktopFilters() {
   if (startInput) startInput.value = '';
   if (endInput) endInput.value = '';
 
-  ['all', 'unread', 'attachments', 'starred'].forEach(f => {
+  ['unread', 'attachments', 'starred'].forEach(f => {
     const btn = document.getElementById(`desk-filter-${f}`);
-    if (btn) {
-      if (f === 'all') btn.classList.add('active');
-      else btn.classList.remove('active');
-    }
+    if (btn) btn.classList.remove('active');
   });
 
   updateDesktopDateUI();
