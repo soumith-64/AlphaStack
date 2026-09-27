@@ -1159,6 +1159,11 @@ async function toggleImportant(id, e) {
       allEmails.forEach(item => {
         if (item.id === id) item.is_important = data.is_important;
       });
+      allConversations.forEach(c => {
+        if (c.id === id || (c.latestMessage && c.latestMessage.id === id) || (c.messages && c.messages.some(m => m.id === id))) {
+          c.is_important = data.is_important;
+        }
+      });
       if (emailFolderCache[currentFolder]) {
         emailFolderCache[currentFolder] = [...allEmails];
       }
@@ -1166,12 +1171,28 @@ async function toggleImportant(id, e) {
 
       if (activeEmail && activeEmail.id === id) {
         activeEmail.is_important = data.is_important;
-        const impBtn = document.getElementById('mob-pane-important-btn');
-        if (impBtn) {
-          impBtn.style.color = data.is_important ? '#eab308' : 'var(--text-dim)';
+      }
+      if (activeConversation) {
+        if (activeConversation.id === id || (activeConversation.latestMessage && activeConversation.latestMessage.id === id) || (activeConversation.messages && activeConversation.messages.some(m => m.id === id))) {
+          activeConversation.is_important = data.is_important;
         }
       }
-      showToastNotification(data.is_important ? 'Marked as Important ⭐' : 'Unmarked Important');
+      const impBtn = document.getElementById('mob-pane-important-btn');
+      if (impBtn) {
+        impBtn.style.color = data.is_important ? '#ef4444' : 'var(--text-dim)';
+        const svg = impBtn.querySelector('svg');
+        if (svg) svg.setAttribute('fill', data.is_important ? '#ef4444' : 'none');
+      }
+      if (activeTradEmail && activeTradEmail.id === id) {
+        activeTradEmail.is_important = data.is_important;
+      }
+      const tradImpBtn = document.getElementById('mob-trad-important-btn');
+      if (tradImpBtn) {
+        tradImpBtn.style.color = data.is_important ? '#ef4444' : 'inherit';
+        const svg = tradImpBtn.querySelector('svg');
+        if (svg) svg.setAttribute('fill', data.is_important ? '#ef4444' : 'none');
+      }
+      showToastNotification(data.is_important ? 'Marked as Priority ❤️' : 'Removed from Priority');
     }
   } catch (err) {
     console.error('Toggle important error:', err);
@@ -1880,7 +1901,7 @@ function createMobileTraditionalEmailCard(email) {
           <span>${isStarred ? 'Unstar' : 'Star'}</span>
         </button>
         <button type="button" class="swipe-btn important" onclick="toggleImportant('${email.id}', event)" title="Add to Priority">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="${isImportant ? '#fff' : 'none'}" stroke="currentColor" stroke-width="2.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span>${isImportant ? 'Normal' : 'Priority'}</span>
         </button>
       </div>
@@ -1933,7 +1954,7 @@ function createMobileTraditionalEmailCard(email) {
 
         <div class="trad-email-tags-row">
           ${sourceBadgeHtml}
-          ${isImportant ? '<span class="trad-priority-tag">PRIORITY</span>' : ''}
+          ${isImportant ? '<span class="trad-priority-tag"><svg viewBox="0 0 24 24" width="9" height="9" fill="currentColor" stroke="none" style="margin-right: 2px;"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>PRIORITY</span>' : ''}
           ${hasAtt ? `<span class="trad-att-tag">${attCount} ${attCount === 1 ? 'file' : 'files'}</span>` : ''}
         </div>
       </div>
@@ -2126,6 +2147,7 @@ function openMobileTraditionalEmail(emailId) {
   }
 
   updateTradStarButton(email.is_starred === 1);
+  updateTradImportantButton(email.is_important === 1);
 
   readingView.style.display = 'flex';
   const scrollArea = readingView.querySelector('.trad-reading-scroll-area');
@@ -2153,6 +2175,19 @@ function updateTradStarButton(isStarred) {
     btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="${isStarred ? '#eab308' : 'none'}" stroke="${isStarred ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
     btn.style.color = isStarred ? '#eab308' : 'inherit';
   }
+}
+
+function updateTradImportantButton(isImportant) {
+  const btn = document.getElementById('mob-trad-important-btn');
+  if (btn) {
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="${isImportant ? '#ef4444' : 'none'}" stroke="${isImportant ? '#ef4444' : 'currentColor'}" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
+    btn.style.color = isImportant ? '#ef4444' : 'inherit';
+  }
+}
+
+async function toggleCurrentTradImportant() {
+  if (!activeTradEmail) return;
+  toggleImportant(activeTradEmail.id);
 }
 
 async function toggleCurrentTradStar() {
@@ -2307,7 +2342,7 @@ function createMobileConversationCard(conv) {
           <span>${isStarred ? 'Unstar' : 'Star'}</span>
         </button>
         <button type="button" class="swipe-btn important" onclick="toggleImportant('${latestMsgId}', event)" title="Add to Priority">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="${isImportant ? '#fff' : 'none'}" stroke="currentColor" stroke-width="2.2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           <span>${isImportant ? 'Normal' : 'Priority'}</span>
         </button>
       </div>
@@ -2345,6 +2380,7 @@ function createMobileConversationCard(conv) {
           </div>
 
           <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            ${isImportant ? '<span style="color: #ef4444; display: inline-flex;" title="Priority"><svg viewBox="0 0 24 24" width="13" height="13" fill="#ef4444" stroke="#ef4444" stroke-width="1"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span>' : ''}
             ${isStarred ? '<span style="color: #eab308; display: inline-flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>' : ''}
             ${conv.has_attachments ? '<span style="color: var(--text-dim); display: inline-flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>' : ''}
             ${conv.unread_count > 0 ? `<span class="chat-conv-unread-pill">${conv.unread_count}</span>` : ''}
@@ -2442,6 +2478,15 @@ async function openConversation(convId) {
   const starBtn = document.getElementById('mob-pane-star-btn');
   if (starBtn) {
     starBtn.style.color = conv.is_starred === 1 ? '#f59e0b' : 'var(--text-dim)';
+  }
+
+  // Priority / Heart status
+  const impBtn = document.getElementById('mob-pane-important-btn');
+  if (impBtn) {
+    const isImp = conv.is_important === 1;
+    impBtn.style.color = isImp ? '#ef4444' : 'var(--text-dim)';
+    const svg = impBtn.querySelector('svg');
+    if (svg) svg.setAttribute('fill', isImp ? '#ef4444' : 'none');
   }
 
   // Populate chronological chat timeline
@@ -3618,8 +3663,11 @@ function toggleCurrentStar() {
 }
 
 function toggleCurrentImportant() {
-  if (!activeConversation || !activeConversation.latestMessage) return;
-  toggleImportant(activeConversation.latestMessage.id);
+  if (!activeConversation) return;
+  const msgId = activeConversation.latestMessage ? activeConversation.latestMessage.id : (activeConversation.messages && activeConversation.messages[0] ? activeConversation.messages[0].id : activeConversation.id);
+  if (msgId) {
+    toggleImportant(msgId);
+  }
 }
 
 function deleteCurrentEmail() {

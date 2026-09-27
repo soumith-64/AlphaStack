@@ -262,7 +262,7 @@
       <div class="bulk-actions-toolbar" id="mob-bulk-toolbar" style="display: none; margin: 4px 12px 8px;">
         <span class="bulk-count-badge" id="mob-bulk-count-badge">0 selected</span>
         <button type="button" class="bulk-act-btn" onclick="executeBulkAction('read')" title="Read">Read</button>
-        <button type="button" class="bulk-act-btn" onclick="executeBulkAction('important')" title="Important">⭐ Imp</button>
+        <button type="button" class="bulk-act-btn" onclick="executeBulkAction('important')" title="Priority">❤️ Imp</button>
         <button type="button" class="bulk-act-btn" onclick="executeBulkAction('archive')" title="Archive">Archive</button>
         <button type="button" class="bulk-act-btn danger" onclick="executeBulkAction('delete')" title="Delete">Trash</button>
         <button type="button" class="bulk-act-close" onclick="clearEmailSelection()">✕</button>
@@ -324,6 +324,10 @@
         <!-- Traditional Email View Toggle -->
         <button class="chat-top-action-btn" onclick="openTraditionalViewFromChat()" title="View as Traditional Email" aria-label="Traditional Email">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </button>
+        <!-- Priority / Heart Toggle -->
+        <button class="chat-top-action-btn" id="mob-pane-important-btn" onclick="toggleCurrentImportant()" title="Priority Conversation">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </button>
         <!-- Star Toggle -->
         <button class="chat-top-action-btn" id="mob-pane-star-btn" onclick="toggleCurrentStar()" title="Star Conversation">
@@ -418,6 +422,10 @@
         <!-- Translate Email -->
         <button class="icon-btn" id="mob-trad-trans-btn" onclick="toggleTradEmailTranslation()" title="AI Real-Time Translate">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </button>
+        <!-- Priority / Heart Toggle -->
+        <button class="icon-btn" id="mob-trad-important-btn" onclick="toggleCurrentTradImportant()" title="Priority Message">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </button>
         <!-- Star Toggle -->
         <button class="icon-btn" id="mob-trad-star-btn" onclick="toggleCurrentTradStar()" title="Star Message">
@@ -582,8 +590,8 @@
         <div class="drawer-section-title">QUICK FILTERS</div>
 
         <div class="drawer-item" onclick="switchMobileFolder('IMPORTANT', this)" id="mob-nav-important">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          <span data-i18n="important" style="color: #b45309; font-weight: 700;">Important</span>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="#ef4444" stroke="#ef4444" stroke-width="1"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span data-i18n="important" style="color: #ef4444; font-weight: 700;">Important</span>
         </div>
         <div class="drawer-item" onclick="switchMobileFolder('STARRED', this)" id="mob-nav-starred">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>

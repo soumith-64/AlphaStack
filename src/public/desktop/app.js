@@ -2401,7 +2401,9 @@ async function toggleImportant(id, e) {
         activeEmail.is_important = data.is_important;
         const impBtn = document.getElementById('pane-important-btn');
         if (impBtn) {
-          impBtn.style.color = data.is_important ? '#eab308' : 'var(--text-dim)';
+          impBtn.style.color = data.is_important ? '#ef4444' : 'var(--text-dim)';
+          const svg = impBtn.querySelector('svg');
+          if (svg) svg.setAttribute('fill', data.is_important ? '#ef4444' : 'none');
         }
       }
     }
@@ -2594,7 +2596,7 @@ function createEmailRowElement(email) {
     </div>
     <div class="item-content-preview">
       ${sourceBadgeHtml}
-      ${isImportant ? '<span style="font-size: 10px; font-weight: 800; color: #b45309; background: #fef3c7; padding: 1px 6px; border-radius: 4px; margin-right: 4px;">PRIORITY</span>' : ''}
+      ${isImportant ? '<span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: #e11d48; background: #ffe4e6; padding: 1px 6px; border-radius: 4px; margin-right: 4px;"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>PRIORITY</span>' : ''}
       <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
       <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
     </div>
@@ -2610,8 +2612,8 @@ function createEmailRowElement(email) {
           }
         </svg>
       </button>
-      <button class="quick-action-btn" onclick="toggleImportant('${email.id}', event)" title="${isImportant ? 'Unmark Important' : 'Mark Important'}">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="${isImportant ? '#eab308' : 'none'}" stroke="${isImportant ? '#eab308' : 'currentColor'}" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <button class="quick-action-btn" onclick="toggleImportant('${email.id}', event)" title="${isImportant ? 'Unmark Priority' : 'Mark Priority'}">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="${isImportant ? '#ef4444' : 'none'}" stroke="${isImportant ? '#ef4444' : 'currentColor'}" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
       </button>
       <button class="quick-action-btn" onclick="executeBulkActionOnSingle('${email.id}', 'archive', event)" title="Archive Email">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
@@ -2726,7 +2728,9 @@ function openEmail(emailId) {
   }
   const impBtn = document.getElementById('pane-important-btn');
   if (impBtn) {
-    impBtn.style.color = email.is_important === 1 ? '#eab308' : 'var(--text-dim)';
+    impBtn.style.color = email.is_important === 1 ? '#ef4444' : 'var(--text-dim)';
+    const svg = impBtn.querySelector('svg');
+    if (svg) svg.setAttribute('fill', email.is_important === 1 ? '#ef4444' : 'none');
   }
 }
 

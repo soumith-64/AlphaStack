@@ -1095,7 +1095,7 @@ button {
 .swipe-btn.archive { background: #475569; }
 .swipe-btn.delete { background: #ef4444; }
 .swipe-btn.star { background: #f59e0b; color: #fff; }
-.swipe-btn.important { background: #6366f1; color: #fff; }
+.swipe-btn.important { background: #f43f5e; color: #fff; }
 
 .email-card-surface {
   position: relative;
@@ -3505,10 +3505,13 @@ button {
 }
 
 .trad-priority-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
   font-size: 9px;
   font-weight: 800;
-  color: #b45309;
-  background: #fef3c7;
+  color: #e11d48;
+  background: #ffe4e6;
   padding: 1.5px 6px;
   border-radius: 4px;
 }

@@ -3552,7 +3552,7 @@ button {
 
 .swipe-btn.archive { background: #046A38; }
 .swipe-btn.delete { background: #ef4444; }
-.swipe-btn.important { background: #eab308; }
+.swipe-btn.important { background: #f43f5e; color: #fff; }
 .swipe-btn.star { background: #f59e0b; }
 
 /* ==================== LANGUAGE SELECTOR DROPDOWN ==================== */

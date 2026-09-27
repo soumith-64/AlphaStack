@@ -348,11 +348,11 @@
             <span class="nav-badge" id="inbox-count-badge">0</span>
           </button>
           <button class="nav-item" onclick="switchFolder('IMPORTANT', this)" id="nav-item-important">
-            <span class="nav-icon" style="color: #eab308;">
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            <span class="nav-icon" style="color: #f43f5e;">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             </span>
             <span class="nav-label" data-i18n="important">Important</span>
-            <span class="nav-badge" id="important-count-badge" style="display:none; background: #eab308; color: #fff;">0</span>
+            <span class="nav-badge" id="important-count-badge" style="display:none; background: #f43f5e; color: #fff;">0</span>
           </button>
           <button class="nav-item" onclick="switchFolder('STARRED', this)" id="nav-item-starred">
             <span class="nav-icon">
@@ -467,9 +467,9 @@
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="6"/></svg>
                 <span>Unread</span>
               </button>
-              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('important')" title="Mark as Important">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                <span>Important</span>
+              <button type="button" class="bulk-act-btn" onclick="executeBulkAction('important')" title="Mark as Priority">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="#f43f5e" stroke="#f43f5e" stroke-width="1"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <span>Priority</span>
               </button>
               <button type="button" class="bulk-act-btn" onclick="executeBulkAction('star')" title="Star">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
@@ -599,7 +599,7 @@
               </button>
               <!-- Mark as Priority / Important Toggle -->
               <button class="action-btn" id="pane-important-btn" onclick="toggleCurrentImportant()" title="Mark as Priority">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
               </button>
               <button class="action-btn" id="pane-star-btn" onclick="toggleCurrentStar()" title="Star Message">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
