@@ -2433,7 +2433,10 @@ async function openConversation(convId) {
   if (titleEl) titleEl.innerText = conv.display_title;
 
   const subEl = document.getElementById('mob-conv-subtitle');
-  if (subEl) subEl.innerText = conv.display_subtitle;
+  if (subEl) {
+    const subtitleText = conv.display_subtitle || '⚡ INAI Verified';
+    subEl.innerHTML = `<span class="pulse-dot"></span><span>${escapeHtml(subtitleText)}</span>`;
+  }
 
   // Star status
   const starBtn = document.getElementById('mob-pane-star-btn');
@@ -2492,6 +2495,18 @@ function renderChatTimeline(conv) {
   const timeline = document.getElementById('mob-chat-timeline');
   if (!timeline) return;
   timeline.innerHTML = '';
+
+  // End-to-end verified encryption badge
+  const securityBanner = document.createElement('div');
+  securityBanner.className = 'chat-security-banner';
+  securityBanner.innerHTML = `
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+    <span>Messages & attachments routed securely through verified INAI network</span>
+  `;
+  timeline.appendChild(securityBanner);
 
   const myPhone = currentUser ? currentUser.phone : '';
   const myClean = (myPhone || '').replace(/\D/g, '');
@@ -2643,7 +2658,7 @@ function renderChatTimeline(conv) {
             <span class="chat-timestamp">${timeDisplay}</span>
             ${isOutgoing ? `
               <span class="chat-checks ${msg.is_read === 1 || msg.read_at ? 'read' : 'delivered'}" title="${msg.is_read === 1 || msg.read_at ? 'Read by recipient' : 'Delivered'}">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke-width="2.5">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                   <polyline points="22 10 14.5 17.5 11 14"/>
                 </svg>
@@ -2744,6 +2759,7 @@ function toggleExpandMessage(msgId) {
 }
 
 function closeReadingPane(shouldPopHistory = true) {
+  closeChatOverflow();
   const pane = document.getElementById('reading-pane');
   if (pane) {
     pane.style.setProperty('display', 'none', 'important');
@@ -2756,6 +2772,31 @@ function closeReadingPane(shouldPopHistory = true) {
     window.history.back();
   }
 }
+
+function toggleChatOverflowMenu(event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const menu = document.getElementById('mob-chat-overflow-menu');
+  if (!menu) return;
+  if (menu.style.display === 'none' || !menu.style.display) {
+    menu.style.display = 'flex';
+  } else {
+    menu.style.display = 'none';
+  }
+}
+
+function closeChatOverflow() {
+  const menu = document.getElementById('mob-chat-overflow-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#mob-chat-overflow-menu') && !e.target.closest('.chat-top-action-btn')) {
+    closeChatOverflow();
+  }
+});
 
 function openComposeFromActiveConversation() {
   if (activeConversation) {

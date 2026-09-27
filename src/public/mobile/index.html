@@ -316,27 +316,33 @@
           </div>
         </div>
       </div>
-      <div class="top-bar-right">
-        <!-- Quick Compose New Email -->
-        <button class="icon-btn" onclick="openComposeFromActiveConversation()" title="Compose New Email" aria-label="Compose New Email">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        </button>
+      <div class="top-bar-right" style="position: relative;">
         <!-- View Contact ID Card & Info -->
-        <button class="icon-btn" onclick="openActiveContactInfoModal()" title="Contact Info & Digital ID Card" aria-label="Digital ID">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="17" y1="7" x2="17.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/><line x1="17" y1="17" x2="17.01" y2="17"/></svg>
+        <button class="chat-top-action-btn" onclick="openActiveContactInfoModal()" title="Contact Info & Digital ID Card" aria-label="Digital ID">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><line x1="15" y1="8" x2="17" y2="8"/><line x1="15" y1="12" x2="17" y2="12"/><line x1="7" y1="16" x2="17" y2="16"/></svg>
         </button>
         <!-- Traditional Email View Toggle -->
-        <button class="icon-btn" onclick="openTraditionalViewFromChat()" title="View as Traditional Email" aria-label="Traditional Email">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <button class="chat-top-action-btn" onclick="openTraditionalViewFromChat()" title="View as Traditional Email" aria-label="Traditional Email">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
         </button>
         <!-- Star Toggle -->
-        <button class="icon-btn" id="mob-pane-star-btn" onclick="toggleCurrentStar()" title="Star Conversation">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <button class="chat-top-action-btn" id="mob-pane-star-btn" onclick="toggleCurrentStar()" title="Star Conversation">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
         </button>
-        <!-- Delete Conversation -->
-        <button class="icon-btn danger" onclick="deleteCurrentEmail()" title="Move to Trash">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        <!-- More Options Menu Button -->
+        <button class="chat-top-action-btn" onclick="toggleChatOverflowMenu(event)" title="More Options">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
         </button>
+        <div class="chat-overflow-dropdown" id="mob-chat-overflow-menu" style="display: none;" onclick="event.stopPropagation()">
+          <button type="button" class="overflow-item" onclick="openComposeFromActiveConversation(); closeChatOverflow();">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <span>Compose New Email</span>
+          </button>
+          <button type="button" class="overflow-item danger" onclick="deleteCurrentEmail(); closeChatOverflow();">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span>Delete Conversation</span>
+          </button>
+        </div>
       </div>
     </div>
 
