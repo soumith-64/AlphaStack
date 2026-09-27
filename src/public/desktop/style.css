@@ -1898,6 +1898,25 @@ button {
   border: 1px solid var(--border-light);
   background: var(--bg-surface);
   color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+#pane-translate-btn {
+  width: auto !important;
+  min-width: 36px !important;
+  height: 34px !important;
+  padding: 0 10px !important;
+  gap: 5px !important;
+  white-space: nowrap !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+#pane-translate-btn span {
+  white-space: nowrap !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  display: inline-block !important;
 }
 
 .action-btn:hover {
@@ -2175,6 +2194,69 @@ button {
   border: 1px solid rgba(2, 132, 199, 0.2);
 }
 
+.verify-chip.unreg-inai {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.unreg-header-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.unreg-sms-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(245, 158, 11, 0.35);
+}
+
+.unreg-sms-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  color: #78350f;
+}
+
+.unreg-sms-label input[type="checkbox"] {
+  accent-color: #d97706;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+.textbee-badge-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: #f59e0b;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
 [data-theme="dark"] .verify-chip.verified-inai {
   background: rgba(16, 185, 129, 0.12);
   color: #34d399;
@@ -2191,6 +2273,25 @@ button {
   background: rgba(56, 189, 248, 0.12);
   color: #38bdf8;
   border-color: rgba(56, 189, 248, 0.25);
+}
+
+[data-theme="dark"] .verify-chip.unreg-inai {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .unreg-header-line {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .unreg-sms-label {
+  color: #fef3c7;
+}
+
+[data-theme="dark"] .textbee-badge-tag {
+  background: #d97706;
+  color: #ffffff;
 }
 
 #desk-compose-body {
@@ -3471,8 +3572,69 @@ button {
 
 .id-card-actions-row {
   display: flex;
+  align-items: center;
   gap: 10px;
-  margin-top: 20px;
+  margin-top: 18px;
+}
+
+.id-card-actions-row #btn-copy-id {
+  flex: 1;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  border-radius: 10px;
+  background: var(--green-main, #046A38);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(4, 106, 56, 0.25);
+  transition: all 0.15s ease;
+}
+
+.id-card-actions-row #btn-copy-id:hover {
+  background: #03542c;
+  transform: translateY(-1px);
+}
+
+.id-card-actions-row #btn-share-id,
+.id-card-actions-row .share-btn {
+  width: auto !important;
+  min-width: 96px !important;
+  height: 42px !important;
+  padding: 0 16px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  white-space: nowrap !important;
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border: 1.5px solid var(--border-color, #cbd5e1) !important;
+  background: var(--bg-surface, #ffffff) !important;
+  color: var(--text-main, #0f172a) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+}
+
+.id-card-actions-row #btn-share-id:hover,
+.id-card-actions-row .share-btn:hover {
+  background: var(--bg-subtle, #f8fafc) !important;
+  border-color: var(--green-main, #046A38) !important;
+  color: var(--green-main, #046A38) !important;
+}
+
+[data-theme="dark"] .id-card-actions-row #btn-share-id,
+[data-theme="dark"] .id-card-actions-row .share-btn {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
 }
 
 /* ==================== DESKTOP CONVERSATION THREAD & ID CARD UPGRADES ==================== */

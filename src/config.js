@@ -13,6 +13,10 @@ export const config = {
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
     phoneNumber: process.env.TWILIO_PHONE_NUMBER || '+12055550199',
   },
+  textbee: {
+    apiKey: process.env.TEXTBEE_API_KEY || '',
+    deviceId: process.env.TEXTBEE_DEVICE_ID || '',
+  },
   dbPath: process.env.DB_PATH || './data/phonemail.db',
   db: {
     host: process.env.DB_HOST || 'localhost',

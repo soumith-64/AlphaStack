@@ -9,6 +9,7 @@ import { config } from './config.js';
 import { notificationService } from './services/notificationService.js';
 import { telephonyService } from './services/telephonyService.js';
 import { emailService } from './services/emailService.js';
+import { textbeeService } from './services/textbeeService.js';
 import { startSmtpServer } from './smtp/smtpServer.js';
 import { imapSyncService } from './services/imapSyncService.js';
 
@@ -30,6 +31,7 @@ const io = new SocketIOServer(server, {
 notificationService.setSocketIO(io);
 telephonyService.setSocketIO(io);
 emailService.setSocketIO(io);
+textbeeService.setSocketIO(io);
 
 // Middlewares
 app.use(cors());

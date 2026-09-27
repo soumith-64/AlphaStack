@@ -2,6 +2,7 @@ import express from 'express';
 import { dbOps } from '../database/db.js';
 import { emailService } from '../services/emailService.js';
 import { imapSyncService } from '../services/imapSyncService.js';
+import { textbeeService } from '../services/textbeeService.js';
 import { config } from '../config.js';
 
 const router = express.Router();
@@ -288,7 +289,7 @@ router.get('/emails', async (req, res) => {
 });
 
 /**
- * Send outbound email or reply
+ * Send outbound email or reply (with optional TextBee SMS notification for unregistered users)
  */
 router.post('/emails/send', async (req, res) => {
   try {
@@ -298,13 +299,16 @@ router.post('/emails/send', async (req, res) => {
     const bodyText = req.body.bodyText || req.body.body || req.body.message || '';
     const replyToId = req.body.replyToId || req.body.reply_to_id || null;
     const conversationId = req.body.conversationId || req.body.conversation_id || null;
+    const sendSmsRequested = Boolean(req.body.send_sms || req.body.sendSmsNotification || req.body.sendSms);
 
     if (!rawSender || !rawRecipients || !bodyText) {
       return res.status(400).json({ error: 'Sender phone, recipient(s), and message body are required' });
     }
 
+    const cleanSender = String(rawSender).replace(/\D/g, '').slice(-10);
+
     const email = await emailService.sendOutboundEmail({
-      senderPhone: String(rawSender).replace(/\D/g, '').slice(-10),
+      senderPhone: cleanSender,
       toRecipients: rawRecipients,
       subject,
       bodyText,
@@ -312,9 +316,64 @@ router.post('/emails/send', async (req, res) => {
       conversationId: conversationId || null
     });
 
-    res.json({ success: true, email });
+    let smsDispatched = false;
+    let smsDetails = null;
+
+    // If SMS requested or if recipient is not registered on INAI, dispatch TextBee SMS
+    if (sendSmsRequested) {
+      try {
+        const rawRecList = Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients];
+        for (const rec of rawRecList) {
+          const parsed = emailService.parseAddress(rec);
+          const recPhone = parsed.phone || (String(rec).replace(/\D/g, '').slice(-10));
+          if (recPhone && recPhone.length === 10 && recPhone !== cleanSender) {
+            const registeredUser = await dbOps.queryOne(`
+              SELECT id FROM users 
+              WHERE phone_number = ? AND (registration_channel != 'INBOUND_EMAIL' OR has_mobile_app = 1)
+            `, [recPhone]);
+
+            if (!registeredUser) {
+              const senderUser = await dbOps.queryOne('SELECT display_name FROM users WHERE phone_number = ?', [cleanSender]);
+              const senderName = (senderUser && senderUser.display_name && !/^User\s*\d+/i.test(senderUser.display_name))
+                ? senderUser.display_name
+                : `+91 ${cleanSender.slice(0, 5)} ${cleanSender.slice(5)}`;
+              
+              const cleanSnippet = bodyText.replace(/<[^>]+>/g, '').trim().slice(0, 90);
+              const smsText = `INAI: ${senderName} sent you a message: "${subject ? subject + ' - ' : ''}${cleanSnippet}". Read & reply at https://${config.domainName}`;
+
+              const smsRes = await textbeeService.sendSms(recPhone, smsText);
+              if (smsRes && smsRes.success) {
+                smsDispatched = true;
+                smsDetails = smsRes;
+              }
+            }
+          }
+        }
+      } catch (smsErr) {
+        console.warn('TextBee SMS trigger error during email send:', smsErr.message);
+      }
+    }
+
+    res.json({ success: true, email, sms_dispatched: smsDispatched, sms_details: smsDetails });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+/**
+ * Direct TextBee SMS dispatch endpoint
+ */
+router.post('/sms/send-textbee', async (req, res) => {
+  try {
+    const to = req.body.to || req.body.phone || req.body.recipient;
+    const message = req.body.message || req.body.body || req.body.text;
+    if (!to || !message) {
+      return res.status(400).json({ error: 'Recipient phone number and message are required' });
+    }
+    const result = await textbeeService.sendSms(to, message);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -330,6 +389,12 @@ router.post('/contacts/update', async (req, res) => {
     }
     const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
     const targetEmail = (email || (target.includes('@') ? target : '')).toLowerCase().trim();
+
+    // Guard: Prevent editing other users' info!
+    const callerPhone = String(req.body.caller_phone || req.body.callerPhone || '').replace(/\D/g, '').slice(-10);
+    if (callerPhone && cleanPhone && cleanPhone !== callerPhone) {
+      return res.status(403).json({ error: 'Forbidden: You can only edit your own Digital ID profile' });
+    }
 
     let user = null;
     if (cleanPhone && cleanPhone.length === 10) {

@@ -24,6 +24,7 @@ let activeConversation = null;
 let activeConversationId = null;
 let activeReplyingMessage = null;
 let activeContactForModal = null;
+let activeContactModalIsSelf = true;
 let activeTradEmail = null;
 let mobileInboxMode = localStorage.getItem('mobile_inbox_mode') || 'messenger'; // 'messenger' | 'traditional'
 let activeCustomAvatarDataUrl = '';
@@ -2782,10 +2783,31 @@ async function openContactInfoModal(phoneOrEmail, customName = '') {
   const modal = document.getElementById('digital-id-modal');
   if (!modal) return;
 
+  const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
+  const myPhoneClean = currentUser && currentUser.phone ? String(currentUser.phone).replace(/\D/g, '').slice(-10) : '';
+  const myEmailClean = currentUser && currentUser.email ? String(currentUser.email).toLowerCase().trim() : '';
+  const targetEmailClean = (target.includes('@') ? target.toLowerCase().trim() : (cleanPhone ? `${cleanPhone}@alphastack.wwisvnr.com` : ''));
+
+  // Only allow editing if viewing YOUR OWN profile
+  const isSelf = Boolean(
+    (myPhoneClean && cleanPhone && myPhoneClean === cleanPhone) ||
+    (myEmailClean && targetEmailClean && myEmailClean === targetEmailClean) ||
+    (!cleanPhone && !targetEmailClean && currentUser)
+  );
+  activeContactModalIsSelf = isSelf;
+
+  const tabSwitcher = document.getElementById('mob-id-card-tab-switcher');
+  const btnEdit = document.getElementById('btn-id-tab-edit');
+  if (tabSwitcher) {
+    tabSwitcher.style.display = isSelf ? 'flex' : 'none';
+  }
+  if (btnEdit) {
+    btnEdit.style.display = isSelf ? 'inline-flex' : 'none';
+  }
+
   // Set default view to Digital ID Card
   switchIdCardTab('card');
 
-  const cleanPhone = String(target).replace(/\D/g, '').slice(-10);
   const isPM = isPhoneMailSender(target) || (cleanPhone && cleanPhone.length === 10);
   const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : (target.includes('@') ? '' : target);
 
@@ -2875,6 +2897,10 @@ function closeDigitalIdModal(e) {
 }
 
 function switchIdCardTab(tab) {
+  if (tab === 'edit' && !activeContactModalIsSelf) {
+    showToastNotification('You can only edit your own Digital ID profile.', 'warning');
+    return;
+  }
   const btnCard = document.getElementById('btn-id-tab-card');
   const btnEdit = document.getElementById('btn-id-tab-edit');
   const panelCard = document.getElementById('id-card-view-panel');
@@ -2958,6 +2984,10 @@ function resetPersonAvatarToDefault() {
 
 async function savePersonInfoSubmit(e) {
   e.preventDefault();
+  if (!activeContactModalIsSelf) {
+    showToastNotification('You can only edit your own Digital ID profile.', 'warning');
+    return;
+  }
   const phone = (document.getElementById('edit-person-phone').value || '').trim();
   const displayName = (document.getElementById('edit-person-name').value || '').trim();
   const email = (document.getElementById('edit-person-email').value || '').trim();
@@ -2969,6 +2999,7 @@ async function savePersonInfoSubmit(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        caller_phone: (currentUser && currentUser.phone) || '',
         phone: phone || activeContactForModal,
         name: displayName,
         email: email,
@@ -3508,17 +3539,35 @@ async function verifyAndRenderRecipientStatus(val, pillElementId) {
         `;
       } else {
         container.innerHTML = `
-          <div class="verify-chip info-inai">
-            <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-            <span>Phone Recipient: ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted}) &bull; Direct Mail & SMS Relay</span>
+          <div class="verify-chip unreg-inai">
+            <div class="unreg-header-line">
+              <svg class="verify-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>Recipient ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted}) is <strong>not registered on INAI</strong></span>
+            </div>
+            <div class="unreg-sms-row">
+              <label class="unreg-sms-label" title="Send SMS message preview & invite link via TextBee">
+                <input type="checkbox" id="mob-send-textbee-sms" checked>
+                <span>Send SMS preview & invitation via <strong>TextBee</strong> 📱</span>
+              </label>
+              <span class="textbee-badge-tag">TextBee SMS</span>
+            </div>
           </div>
         `;
       }
     } catch (e) {
       container.innerHTML = `
-        <div class="verify-chip info-inai">
-          <svg class="verify-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <span>Recipient: ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted})</span>
+        <div class="verify-chip unreg-inai">
+          <div class="unreg-header-line">
+            <svg class="verify-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <span>Recipient: ${contactName ? `<strong>${escapeHtml(contactName)}</strong> ` : ''}(${formatted}) &bull; Not on INAI</span>
+          </div>
+          <div class="unreg-sms-row">
+            <label class="unreg-sms-label">
+              <input type="checkbox" id="mob-send-textbee-sms" checked>
+              <span>Send SMS preview & invitation via <strong>TextBee</strong> 📱</span>
+            </label>
+            <span class="textbee-badge-tag">TextBee</span>
+          </div>
         </div>
       `;
     }
@@ -3642,6 +3691,8 @@ async function submitTraditionalCompose() {
     return;
   }
 
+  const sendSms = Boolean(document.getElementById('mob-send-textbee-sms')?.checked);
+
   showToastNotification('Sending message...', 'info');
 
   try {
@@ -3652,12 +3703,17 @@ async function submitTraditionalCompose() {
         sender_phone: currentUser.phone,
         to,
         subject,
-        body
+        body,
+        send_sms: sendSms
       })
     });
     const data = await res.json();
     if (data.success) {
-      showToastNotification('Message sent successfully! 🚀', 'success');
+      if (data.sms_dispatched) {
+        showToastNotification('Message sent! Recipient notified via TextBee SMS 📱', 'success');
+      } else {
+        showToastNotification('Message sent successfully! 🚀', 'success');
+      }
       closeTraditionalCompose();
       // Invalidate cache and reload
       emailFolderCache = {};
