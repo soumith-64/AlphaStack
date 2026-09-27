@@ -551,17 +551,46 @@ function setupSocket() {
       socket = io();
       socket.on('connect', () => {
         if (currentUser && currentUser.phone) {
+          socket.emit('join:user', currentUser.phone);
           socket.emit('join', currentUser.phone);
         }
       });
+      socket.on('email:incoming', (data) => {
+        console.log('⚡ [MOBILE SOCKET] Inbound email received:', data);
+        const senderDisplay = data.from || (data.email && data.email.sender_email) || 'Network Contact';
+        showToastNotification(`📩 New message from ${senderDisplay}!`, 'success');
+        if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+
+        // If current active conversation is open and matches this incoming email, append message live
+        if (activeConversation && data.email) {
+          const emailConvId = data.email.conversation_id || data.conversationId;
+          const counterpartClean = activeConversation.participant_raw ? activeConversation.participant_raw.replace(/\D/g, '').slice(-10) : '';
+          const senderClean = (data.email.sender_email || '').replace(/\D/g, '').slice(-10);
+
+          if (emailConvId === activeConversation.id || (counterpartClean && senderClean && senderClean === counterpartClean)) {
+            const alreadyExists = activeConversation.messages.some(m => m.id === data.email.id);
+            if (!alreadyExists) {
+              activeConversation.messages.push(data.email);
+              renderChatTimeline(activeConversation);
+            }
+          }
+        }
+        emailFolderCache = {};
+        loadEmails(currentFolder);
+      });
+      socket.on('email:new', (data) => {
+        console.log('⚡ [MOBILE SOCKET] email:new event:', data);
+        if (data && data.senderPhone && currentUser && data.senderPhone !== currentUser.phone) {
+          showToastNotification('📩 New email received', 'success');
+        }
+        emailFolderCache = {};
+        loadEmails(currentFolder);
+      });
       socket.on('email:received', (data) => {
-        showToastNotification(`New email from ${formatSenderDisplay(data.sender_email)} ✉️`, 'success');
-        // Invalidate current folder cache and refresh
         emailFolderCache = {};
         loadEmails(currentFolder);
       });
       socket.on('new_email', (data) => {
-        showToastNotification(`New email received ✉️`, 'success');
         emailFolderCache = {};
         loadEmails(currentFolder);
       });
@@ -1579,6 +1608,7 @@ function groupEmailsIntoConversations(emails) {
     }
 
     conv.participant_raw = counterpart;
+    conv.participant_phone = counterpart;
     conv.sender_name = senderName;
 
     const isPhoneMail = isPhoneMailSender(counterpart);
@@ -2623,7 +2653,7 @@ function renderChatTimeline(conv) {
       }
     }
     if (!voiceMailTranscript && msg.body_text) {
-      const txtTransMatch = msg.body_text.match(/Transcription:\s*"?([^"\n]+)"?/i);
+      const txtTransMatch = msg.body_text.match(/"([^"\n]+)"/) || msg.body_text.match(/Transcription:\s*"?([^"\n]+)"?/i);
       if (txtTransMatch) voiceMailTranscript = txtTransMatch[1];
       const durTxtMatch = msg.body_text.match(/Voice Mail\s*\(([^)]+)\)/i);
       if (durTxtMatch) voiceMailDuration = durTxtMatch[1];
@@ -5001,10 +5031,14 @@ async function sendVoiceRecording(context) {
 
           if (!activeConversation) return resolve();
 
-          const to = activeConversation.participant_phone || (activeConversation.messages && activeConversation.messages[0] ? activeConversation.messages[0].sender_email : null);
-          if (!to) return resolve();
+          const to = activeConversation.participant_raw || activeConversation.participant_phone || (activeConversation.latestMessage ? activeConversation.latestMessage.sender_email : null);
+          if (!to) {
+            showToastNotification('Could not determine recipient for this chat', 'error');
+            return resolve();
+          }
 
-          const subject = `🎙️ Voice Mail (${durationStr})`;
+          const cleanSubject = (activeConversation.latest_subject || activeConversation.subject || '').replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
+          const subject = cleanSubject ? `Re: ${cleanSubject}` : `🎙️ Voice Mail (${durationStr})`;
           const body = `🎙️ Voice Mail (${durationStr})${voiceLiveTranscript ? `\n\n"${voiceLiveTranscript}"` : ''}`;
 
           try {

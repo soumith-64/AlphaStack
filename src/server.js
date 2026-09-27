@@ -91,6 +91,12 @@ io.on('connection', (socket) => {
     console.log(`👤 Client joined room: user:${clean}`);
   });
 
+  socket.on('join', (phone) => {
+    const clean = String(phone).replace(/\D/g, '').slice(-10);
+    socket.join(`user:${clean}`);
+    console.log(`👤 Client joined room: user:${clean}`);
+  });
+
   socket.on('disconnect', () => {
     console.log(`🔌 [SOCKET DISCONNECTED] ID: ${socket.id}`);
   });

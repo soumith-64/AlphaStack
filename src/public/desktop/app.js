@@ -2977,7 +2977,22 @@ async function submitDesktopThreadReply() {
   }
 
   const isSentByMe = Boolean(targetEmail.sender_email && currentUser && targetEmail.sender_email.includes(currentUser.phone));
-  const to = isSentByMe ? (targetEmail.recipient_phone || getRecipientsDisplay(targetEmail) || targetEmail.sender_email) : targetEmail.sender_email;
+  let to = '';
+  if (isSentByMe) {
+    if (targetEmail.recipient_phone) {
+      to = targetEmail.recipient_phone;
+    } else if (targetEmail.recipient_emails) {
+      try {
+        const arr = JSON.parse(targetEmail.recipient_emails);
+        if (Array.isArray(arr) && arr.length > 0) to = arr[0];
+      } catch(e) {
+        to = targetEmail.recipient_emails;
+      }
+    }
+    if (!to) to = getRecipientsDisplay(targetEmail) || targetEmail.sender_email;
+  } else {
+    to = targetEmail.sender_email;
+  }
   const cleanSubject = (targetEmail.subject || '').replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
   const subject = `Re: ${cleanSubject}`;
 

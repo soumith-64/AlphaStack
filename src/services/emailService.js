@@ -34,8 +34,14 @@ export const emailService = {
    */
   parseAddress(input) {
     if (!input) return { phone: '', alias: '', full: '', isExternal: false };
-    const raw = String(input).trim().toLowerCase();
+    let raw = String(input).trim().toLowerCase();
     
+    // Check if it has angle brackets: "Name" <user@domain.com>
+    const angleMatch = raw.match(/<([^>]+)>/);
+    if (angleMatch && angleMatch[1]) {
+      raw = angleMatch[1].trim();
+    }
+
     // Check if it has an @
     let localPart = raw;
     let domainPart = '';
@@ -356,6 +362,25 @@ export const emailService = {
       }
     } else {
       await dbOps.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [targetConvId]);
+    }
+
+    // Ensure all conversation participants are registered in conversation_participants
+    for (const rec of rawRecipientsList) {
+      const parsed = this.parseAddress(rec);
+      const pPhone = parsed.phone || rec;
+      if (pPhone) {
+        const cleanP = String(pPhone).replace(/\D/g, '').slice(-10) || pPhone;
+        const exists = await dbOps.queryOne(
+          'SELECT phone_number FROM conversation_participants WHERE conversation_id = ? AND (phone_number = ? OR phone_number LIKE ?)',
+          [targetConvId, cleanP, `%${cleanP}%`]
+        );
+        if (!exists) {
+          await dbOps.execute(
+            'INSERT INTO conversation_participants (conversation_id, user_id, phone_number) VALUES (?, ?, ?)',
+            [targetConvId, null, cleanP]
+          );
+        }
+      }
     }
 
     // Insert email with HTML & inline images
