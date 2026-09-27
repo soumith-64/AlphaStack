@@ -52,28 +52,30 @@
           <span>⚡ Real-Time SMS & WhatsApp OTP</span>
         </div>
 
-        <button type="button" class="phonemail-hero-btn" id="mobile-phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with Phone">
-          <div class="btn-left-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
-            </svg>
-          </div>
-          <div class="btn-content-text">
-            <span class="btn-main-title">Sign In with Phone Number</span>
-            <span class="btn-sub-caption">Real-Time OTP Verification</span>
-          </div>
-          <div class="btn-right-badge">
-            <span class="instant-chip">One-Tap</span>
-            <svg class="btn-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-              <polyline points="12 5 19 12 12 19"></polyline>
-            </svg>
-          </div>
-        </button>
+        <div class="phonemail-hero-wrapper" style="position: relative; width: 100%;">
+          <button type="button" class="phonemail-hero-btn" id="mobile-phonemail-hero-btn" onclick="triggerPhoneEmailLogin()" title="Sign in with Phone">
+            <div class="btn-left-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+            </div>
+            <div class="btn-content-text">
+              <span class="btn-main-title">Sign In with Phone Number</span>
+              <span class="btn-sub-caption">Real-Time OTP Verification</span>
+            </div>
+            <div class="btn-right-badge">
+              <span class="instant-chip">One-Tap</span>
+              <svg class="btn-arrow-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
+              </svg>
+            </div>
+          </button>
 
-        <!-- Hidden Phone.Email Embed SDK Button -->
-        <div class="pe-signin-embed" style="position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; pointer-events: none; overflow: hidden;">
-          <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
+          <!-- Transparent Overlay of Official Phone.Email Button for Native Mobile Gesture Binding -->
+          <div class="pe-signin-embed" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0.001; z-index: 10; overflow: hidden; pointer-events: auto;">
+            <div class="pe_signin_button" data-client-id="13311688567845248231"></div>
+          </div>
         </div>
 
         <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin: 16px 0 6px;">

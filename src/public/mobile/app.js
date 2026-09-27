@@ -552,43 +552,57 @@ async function handleMobilePhoneSubmit(e) {
 
 function triggerPhoneEmailLogin() {
   const btn = document.getElementById('mobile-phonemail-hero-btn');
+  const peBtn = document.getElementById('btn_ph_login') || document.querySelector('.pe_signin_button button');
+
+  // 1. If Phone.Email SDK button is already in DOM, click it
+  if (peBtn) {
+    try {
+      peBtn.click();
+      return;
+    } catch (e) {}
+  }
+
   if (btn) {
     btn.style.opacity = '0.75';
     const subCaption = btn.querySelector('.btn-sub-caption');
-    if (subCaption) subCaption.innerText = 'Opening Phone.Email gateway...';
+    if (subCaption) subCaption.innerText = 'Connecting to Phone.Email gateway...';
   }
 
   const clientId = '13311688567845248231';
-  // Strip any existing query parameters or hash so origin/redirect URL is clean
   const redirectUrl = window.location.href.split('?')[0].split('#')[0];
   const authUrl = `https://auth.phone.email/log-in?client_id=${clientId}&auth_type=8&origin=${encodeURIComponent(redirectUrl)}`;
 
-  // Mobile touch devices strictly block programmatic popups in Safari & Chrome
-  // Direct location navigation is 100% reliable, immune to popup blockers, and provides optimal mobile UX
-  const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
+  const w = 500, h = 600;
+  const left = Math.max(0, (window.screen.width - w) / 2);
+  const top = Math.max(0, (window.screen.height - h) / 2);
 
-  if (isMobile) {
-    window.location.href = authUrl;
-    return;
-  }
-
-  // Desktop or wide-screen fallback: open popup with fallback to top-level navigation
+  // MUST open via window.open so Phone.Email has access to window.opener!
+  // If window.location.href is used, window.opener is null and Phone.Email's Continue button throws an uncaught error
   try {
-    const w = 500, h = 600;
-    const left = Math.max(0, (window.screen.width - w) / 2);
-    const top = Math.max(0, (window.screen.height - h) / 2);
-    const popup = window.open(authUrl, 'peLoginWindow', `toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=${w},height=${h},top=${top},left=${left}`);
+    const popup = window.open(authUrl, 'peLoginWindow', `toolbar=0,scrollbars=0,location=0,statusbar=0,menubar=0,resizable=0,width=${w},height=${h},top=${top},left=${left}`);
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      window.location.href = authUrl;
+      window.open(authUrl, '_blank');
     }
   } catch (err) {
-    window.location.href = authUrl;
+    window.open(authUrl, '_blank');
   }
+
+  setTimeout(() => {
+    if (btn) {
+      btn.style.opacity = '1';
+      const subCaption = btn.querySelector('.btn-sub-caption');
+      if (subCaption) subCaption.innerText = 'Real-Time OTP Verification';
+    }
+  }, 2500);
 }
 
 // Window receiver for official Phone.Email SDK
+let isVerifyingPhoneEmail = false;
 window.phoneEmailListener = async function(userObj) {
   if (!userObj || !userObj.user_json_url) return;
+  if (isVerifyingPhoneEmail) return;
+  isVerifyingPhoneEmail = true;
+
   const user_json_url = userObj.user_json_url;
   console.log('📱 [Mobile Phone.Email Verification Success] JSON URL:', user_json_url);
   showToastNotification('Phone verified via Phone.Email! Entering mailbox...', 'info');
@@ -612,6 +626,7 @@ window.phoneEmailListener = async function(userObj) {
       initAppView();
       showToastNotification(`Welcome to INAI, ${data.user.name || 'User'}! 🇮🇳`, 'success');
     } else {
+      isVerifyingPhoneEmail = false;
       if (btn) {
         btn.style.opacity = '1';
         const subCaption = btn.querySelector('.btn-sub-caption');
@@ -620,6 +635,7 @@ window.phoneEmailListener = async function(userObj) {
       showToastNotification(data.error || 'Failed to authenticate phone number with Phone.Email', 'error');
     }
   } catch (err) {
+    isVerifyingPhoneEmail = false;
     if (btn) {
       btn.style.opacity = '1';
       const subCaption = btn.querySelector('.btn-sub-caption');

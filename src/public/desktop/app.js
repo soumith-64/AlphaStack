@@ -770,8 +770,12 @@ function saveDesktopSession(user) {
   document.documentElement.classList.add('has-saved-session');
 }
 
+let isVerifyingPhoneEmailDesktop = false;
 window.phoneEmailListener = async (userObj) => {
   if (!userObj || !userObj.user_json_url) return;
+  if (isVerifyingPhoneEmailDesktop) return;
+  isVerifyingPhoneEmailDesktop = true;
+
   const { user_json_url } = userObj;
   console.log('📱 [Phone.Email Verification Success] JSON URL:', user_json_url);
   showToastNotification('Phone verified via Phone.Email! Entering mailbox...');
@@ -798,9 +802,11 @@ window.phoneEmailListener = async (userObj) => {
       initDesktopApp();
       showNotify.success(`Welcome to PhoneMail, ${currentUser.name}! 🇮🇳`, 'Signed In');
     } else {
+      isVerifyingPhoneEmailDesktop = false;
       showNotify.error(data.error || 'Failed to authenticate phone number with Phone.Email', 'Auth Failed');
     }
   } catch (err) {
+    isVerifyingPhoneEmailDesktop = false;
     showNotify.error('Verification communication error: ' + err.message, 'Network Error');
   }
 };
@@ -816,25 +822,20 @@ function loadPhoneEmailScript() {
 
 function triggerPhoneEmailLogin() {
   const btn = document.getElementById('phonemail-hero-btn');
-  const peBtn = document.getElementById('btn_ph_login');
+  const peBtn = document.getElementById('btn_ph_login') || document.querySelector('.pe_signin_button button');
+
+  // If the Phone.Email SDK button is already generated, click it
+  if (peBtn) {
+    try {
+      peBtn.click();
+      return;
+    } catch (e) {}
+  }
 
   if (btn) {
     btn.style.opacity = '0.75';
     const subCaption = btn.querySelector('.btn-sub-caption');
     if (subCaption) subCaption.innerText = 'Connecting to Phone.Email secure gateway...';
-  }
-
-  // If the Phone.Email SDK button is already generated, click it
-  if (peBtn) {
-    peBtn.click();
-    setTimeout(() => {
-      if (btn) {
-        btn.style.opacity = '1';
-        const subCaption = btn.querySelector('.btn-sub-caption');
-        if (subCaption) subCaption.innerText = 'Real-Time OTP via SMS & WhatsApp';
-      }
-    }, 2500);
-    return;
   }
 
   // Fallback: open official secure login popup directly
@@ -845,12 +846,12 @@ function triggerPhoneEmailLogin() {
   const left = Math.max(0, (window.screen.width - w) / 2);
   const top = Math.max(0, (window.screen.height - h) / 2);
   try {
-    const popup = window.open(authUrl, 'peLoginWindow', `toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=${w},height=${h},top=${top},left=${left}`);
+    const popup = window.open(authUrl, 'peLoginWindow', `toolbar=0,scrollbars=0,location=0,statusbar=0,menubar=0,resizable=0,width=${w},height=${h},top=${top},left=${left}`);
     if (!popup || popup.closed || typeof popup.closed === 'undefined') {
-      window.location.href = authUrl;
+      window.open(authUrl, '_blank');
     }
   } catch (err) {
-    window.location.href = authUrl;
+    window.open(authUrl, '_blank');
   }
 
   setTimeout(() => {
