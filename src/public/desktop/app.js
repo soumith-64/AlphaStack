@@ -3300,6 +3300,11 @@ function restoreSession() {
   if (saved) {
     try {
       currentUser = JSON.parse(saved);
+      if (currentUser) {
+        currentUser.phone = (currentUser.phone || currentUser.phone_number || '').replace(/\D/g, '').slice(-10);
+        currentUser.name = currentUser.name || currentUser.display_name || (currentUser.phone ? `User ${currentUser.phone}` : 'User');
+        currentUser.email = currentUser.email || currentUser.email_address || `${currentUser.phone}@alphastack.wwisvnr.com`;
+      }
       document.documentElement.classList.add('has-saved-session');
       const auth = document.getElementById('desktop-auth-container');
       const main = document.getElementById('desktop-main-container');

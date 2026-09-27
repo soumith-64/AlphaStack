@@ -313,10 +313,20 @@ router.post('/phone-email-verify', async (req, res) => {
     await dbOps.logTelephony(cleanNumber, 'PHONE_EMAIL_AUTH', `User verified via Phone.Email service: +91 ${cleanNumber}`, 'PHONE_EMAIL');
     const aliases = await dbOps.queryAll('SELECT * FROM aliases WHERE user_id = ?', [user.id]);
 
+    const normalizedUser = {
+      ...user,
+      phone: cleanNumber,
+      phone_number: cleanNumber,
+      name: user.display_name || fullName || `User ${cleanNumber}`,
+      display_name: user.display_name || fullName || `User ${cleanNumber}`,
+      email: user.email_address || `${cleanNumber}@${config.domainName}`,
+      email_address: user.email_address || `${cleanNumber}@${config.domainName}`
+    };
+
     res.json({
       success: true,
       isNewUser,
-      user,
+      user: normalizedUser,
       aliases,
       token: `token_${user.id}_${Date.now()}`
     });
@@ -376,7 +386,16 @@ router.get('/me', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     const aliases = await dbOps.queryAll('SELECT * FROM aliases WHERE user_id = ?', [user.id]);
-    res.json({ user, aliases });
+    const normalizedUser = {
+      ...user,
+      phone: cleanNumber,
+      phone_number: cleanNumber,
+      name: user.display_name || `User ${cleanNumber}`,
+      display_name: user.display_name || `User ${cleanNumber}`,
+      email: user.email_address || `${cleanNumber}@${config.domainName}`,
+      email_address: user.email_address || `${cleanNumber}@${config.domainName}`
+    };
+    res.json({ user: normalizedUser, aliases });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

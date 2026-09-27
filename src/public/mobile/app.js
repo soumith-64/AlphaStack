@@ -148,12 +148,13 @@ function getAvatarUrl(rawIdentifier, displayName = '', customAvatar = null) {
 }
 
 function formatPhoneDisplay(digits, tag = '') {
+  if (!digits || digits === 'undefined') return '';
   const p = String(digits).replace(/\D/g, '').slice(-10);
   if (p.length === 10) {
     const formatted = `+91 ${p.slice(0, 5)} ${p.slice(5)}`;
     return tag ? `${formatted} (.${tag})` : formatted;
   }
-  return digits;
+  return String(digits);
 }
 
 function isPhoneMailSender(rawSender) {
@@ -367,6 +368,29 @@ const showNotify = {
 };
 
 // ==================== AUTH & SESSION RESTORATION ====================
+
+function normalizeMobileUser(user) {
+  if (!user) return null;
+  const rawPhone = user.phone || user.phone_number || '';
+  const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+  const rawName = user.name || user.display_name || '';
+  const cleanName = (rawName && !rawName.startsWith('User ') ? rawName : (user.display_name || `User ${cleanPhone}`)).trim();
+  const rawEmail = user.email || user.email_address || '';
+  const cleanEmail = (rawEmail || (cleanPhone ? `${cleanPhone}@alphastack.wwisvnr.com` : '')).trim();
+
+  return {
+    ...user,
+    id: user.id || `user_${cleanPhone}`,
+    phone: cleanPhone,
+    phone_number: cleanPhone,
+    name: cleanName,
+    display_name: cleanName,
+    email: cleanEmail,
+    email_address: cleanEmail,
+    avatar_url: user.avatar_url || ''
+  };
+}
+
 function restoreSession() {
   // Check if Phone.Email redirected back with user_json_url in query parameters or hash
   const searchStr = window.location.search || (window.location.hash.includes('user_json_url') ? window.location.hash.replace(/^#/, '?') : '');
@@ -393,11 +417,30 @@ function restoreSession() {
                 sessionStorage.getItem('phonemail-mobile-user');
   if (saved) {
     try {
-      const user = JSON.parse(saved);
+      const rawUser = JSON.parse(saved);
+      const user = normalizeMobileUser(rawUser);
       if (user && (user.phone || user.email)) {
         currentUser = user;
+        saveMobileSession(currentUser);
         document.documentElement.classList.add('has-saved-session');
         initAppView();
+
+        // Cross-device profile sync: fetch latest profile & name from database
+        if (currentUser.phone) {
+          fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.user) {
+                const refreshed = normalizeMobileUser({ ...currentUser, ...data.user });
+                saveMobileSession(refreshed);
+                const drawerName = document.getElementById('drawer-username');
+                if (drawerName) drawerName.innerText = refreshed.name || `User ${refreshed.phone}`;
+                const drawerEmail = document.getElementById('drawer-email');
+                if (drawerEmail) drawerEmail.innerText = formatPhoneDisplay(refreshed.phone);
+              }
+            })
+            .catch(() => {});
+        }
         return;
       }
     } catch (e) {}
@@ -412,49 +455,56 @@ function restoreSession() {
 }
 
 function saveMobileSession(user) {
-  currentUser = user;
+  if (!user) return;
+  currentUser = normalizeMobileUser(user);
   const remEl = document.getElementById('mob-remember-me');
   const remember = remEl ? remEl.checked : true;
-  const str = JSON.stringify(user);
+  const str = JSON.stringify(currentUser);
   if (remember) {
     localStorage.setItem('phonemail-mobile-user', str);
     localStorage.setItem('inai_user', str);
     localStorage.setItem('phonemail-user', str);
-    if (user.phone) localStorage.setItem('phonemail_saved_phone', user.phone);
+    if (currentUser.phone) localStorage.setItem('phonemail_saved_phone', currentUser.phone);
   }
   sessionStorage.setItem('phonemail-mobile-user', str);
   document.documentElement.classList.add('has-saved-session');
 }
 
 function initAppView() {
+  if (!currentUser) return;
+  currentUser = normalizeMobileUser(currentUser);
+
   document.getElementById('onboarding-container').style.display = 'none';
   document.getElementById('app-container').style.display = 'flex';
 
+  const formattedPhone = formatPhoneDisplay(currentUser.phone);
+  const displayName = currentUser.name || currentUser.display_name || (currentUser.phone ? `User ${currentUser.phone}` : 'INAI Member');
+
   // Update User Header Info
-  const initials = getInitials(currentUser.name || 'User');
-  const myFallbackSvg = generateDefaultAvatar(currentUser.phone, currentUser.name);
+  const initials = getInitials(displayName);
+  const myFallbackSvg = generateDefaultAvatar(currentUser.phone, displayName);
   const myAvatarUrl = currentUser.avatar_url || myFallbackSvg;
 
   const avatarEl = document.getElementById('mob-user-avatar');
   if (avatarEl) {
     avatarEl.innerHTML = `
-      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">
+      <img src="${myAvatarUrl}" alt="${escapeHtml(displayName)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">
     `;
-    avatarEl.title = `${currentUser.name || 'User'} (+91 ${currentUser.phone})`;
+    avatarEl.title = `${displayName} (${formattedPhone})`;
   }
 
   const drawerAvatar = document.getElementById('mob-drawer-avatar');
   if (drawerAvatar) {
     drawerAvatar.innerHTML = `
-      <img src="${myAvatarUrl}" alt="${escapeHtml(currentUser.name || 'User')}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">
+      <img src="${myAvatarUrl}" alt="${escapeHtml(displayName)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${myFallbackSvg}';">
     `;
   }
 
   const drawerName = document.getElementById('drawer-username');
-  if (drawerName) drawerName.innerText = currentUser.name || 'INAI Member';
+  if (drawerName) drawerName.innerText = displayName;
 
   const drawerEmail = document.getElementById('drawer-email');
-  if (drawerEmail) drawerEmail.innerText = formatPhoneDisplay(currentUser.phone);
+  if (drawerEmail) drawerEmail.innerText = formattedPhone;
 
   // Setup Socket.IO for real-time notifications
   setupSocket();
@@ -467,6 +517,11 @@ function initAppView() {
 
   // Load All Mail with 0-delay instant caching
   loadEmails('ALL');
+
+  // Also load conversations for messenger view
+  if (typeof loadConversations === 'function') {
+    loadConversations();
+  }
 
   // Pre-fetch contacts silently in background for instant autocomplete
   fetchContactsSilently();
