@@ -40,7 +40,8 @@ if (useMysql) {
         'ALTER TABLE users ADD COLUMN bio TEXT',
         'ALTER TABLE emails MODIFY COLUMN body_text LONGTEXT',
         'ALTER TABLE emails MODIFY COLUMN body_html LONGTEXT',
-        'ALTER TABLE emails MODIFY COLUMN recipient_emails LONGTEXT'
+        'ALTER TABLE emails MODIFY COLUMN recipient_emails LONGTEXT',
+        'CREATE TABLE IF NOT EXISTS deleted_email_signatures (signature VARCHAR(191) PRIMARY KEY, message_id VARCHAR(191), sender VARCHAR(191), subject VARCHAR(255), deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
       ];
       for (const m of migrations) {
         try {

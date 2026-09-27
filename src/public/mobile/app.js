@@ -368,6 +368,17 @@ const showNotify = {
 
 // ==================== AUTH & SESSION RESTORATION ====================
 function restoreSession() {
+  // Check if Phone.Email redirected back with user_json_url in query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const userJsonUrl = urlParams.get('user_json_url');
+  if (userJsonUrl) {
+    window.phoneEmailListener({ user_json_url: userJsonUrl });
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch(e) {}
+    return;
+  }
+
   const saved = localStorage.getItem('phonemail-mobile-user') || 
                 localStorage.getItem('inai_user') || 
                 localStorage.getItem('phonemail-user') ||
@@ -532,38 +543,108 @@ async function handleMobilePhoneSubmit(e) {
 }
 
 function triggerPhoneEmailLogin() {
-  const peBtn = document.querySelector('.pe_signin_button');
+  const btn = document.getElementById('mobile-phonemail-hero-btn');
+  // Look for the actual button generated inside the Phone.Email div
+  const peBtn = document.getElementById('btn_ph_login') || document.querySelector('.pe_signin_button button');
+
+  if (btn) {
+    btn.style.opacity = '0.8';
+    const subCaption = btn.querySelector('.btn-sub-caption');
+    if (subCaption) subCaption.innerText = 'Connecting to Phone.Email gateway...';
+  }
+
+  // 1. If Phone.Email SDK button is already generated and ready in DOM, click it
   if (peBtn) {
     peBtn.click();
-  } else {
-    // Fallback: focus phone input
-    const input = document.getElementById('mobile-phone-input');
-    if (input) {
-      input.focus();
-      showToastNotification('Enter your phone number to receive instant OTP');
-    }
+    setTimeout(() => {
+      if (btn) {
+        btn.style.opacity = '1';
+        const subCaption = btn.querySelector('.btn-sub-caption');
+        if (subCaption) subCaption.innerText = 'Real-Time OTP Verification';
+      }
+    }, 2500);
+    return;
   }
+
+  // 2. If SDK button is not generated yet or popup blocker is active, open official sign-in URL directly
+  const clientId = '13311688567845248231';
+  const currentOrigin = window.location.origin;
+  const authUrl = `https://auth.phone.email/sign-in?client_id=${clientId}&auth_type=8&origin=${encodeURIComponent(currentOrigin)}`;
+
+  try {
+    const w = 480, h = 640;
+    const left = (window.screen.width - w) / 2;
+    const top = (window.screen.height - h) / 2;
+    const popup = window.open(authUrl, 'pe_auth_popup', `toolbar=0,scrollbars=1,location=0,statusbar=0,menubar=0,resizable=1,width=${w},height=${h},top=${top},left=${left}`);
+    
+    // Check if popup was blocked by mobile browser -> navigate in same window
+    if (!popup || popup.closed || typeof popup.closed === 'undefined') {
+      window.location.href = authUrl;
+    }
+  } catch (err) {
+    window.location.href = authUrl;
+  }
+
+  setTimeout(() => {
+    if (btn) {
+      btn.style.opacity = '1';
+      const subCaption = btn.querySelector('.btn-sub-caption');
+      if (subCaption) subCaption.innerText = 'Real-Time OTP Verification';
+    }
+  }, 2500);
 }
 
 // Window receiver for official Phone.Email SDK
-window.phoneEmailReceiver = async function(userObj) {
+window.phoneEmailListener = async function(userObj) {
   if (!userObj || !userObj.user_json_url) return;
+  const user_json_url = userObj.user_json_url;
+  console.log('📱 [Mobile Phone.Email Verification Success] JSON URL:', user_json_url);
+  showToastNotification('Phone verified via Phone.Email! Entering mailbox...', 'info');
+
   try {
     const res = await fetch('/api/auth/phone-email-verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_json_url: userObj.user_json_url })
+      body: JSON.stringify({ user_json_url, clientType: 'MOBILE_APP' })
     });
     const data = await res.json();
-    if (data.success && data.user) {
+    if (res.ok && data.success && data.user) {
       saveMobileSession(data.user);
       initAppView();
-      showToastNotification(`Welcome back, ${data.user.name || 'User'}! 🇮🇳`, 'success');
+      showToastNotification(`Welcome to INAI, ${data.user.name || 'User'}! 🇮🇳`, 'success');
+    } else {
+      showToastNotification(data.error || 'Failed to authenticate phone number with Phone.Email', 'error');
     }
   } catch (err) {
-    showToastNotification('Authentication failed', 'error');
+    showToastNotification('Authentication communication error: ' + err.message, 'error');
   }
 };
+// Alias for backwards compatibility
+window.phoneEmailReceiver = window.phoneEmailListener;
+
+// Universal fallback listener for popup postMessage
+window.addEventListener('message', (event) => {
+  if (!event || !event.data) return;
+  if (event.data.user_json_url) {
+    window.phoneEmailListener({ user_json_url: event.data.user_json_url });
+  } else if (typeof event.data === 'string' && event.data.includes('user_json_url')) {
+    try {
+      const parsed = JSON.parse(event.data);
+      if (parsed && parsed.user_json_url) {
+        window.phoneEmailListener({ user_json_url: parsed.user_json_url });
+      }
+    } catch (e) {}
+  }
+});
+
+function loadPhoneEmailScript() {
+  if (document.getElementById('pe-signin-script')) return;
+  const script = document.createElement('script');
+  script.id = 'pe-signin-script';
+  script.src = 'https://www.phone.email/sign_in_button_v1.js';
+  script.async = true;
+  document.body.appendChild(script);
+}
 
 let otpTimerInterval = null;
 function startOtpTimer() {
@@ -4231,7 +4312,9 @@ document.addEventListener('click', (e) => {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     restoreSession();
+    loadPhoneEmailScript();
   });
 } else {
   restoreSession();
+  loadPhoneEmailScript();
 }
