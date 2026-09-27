@@ -2118,13 +2118,20 @@ button {
 
 /* ==================== WHATSAPP-STYLE CONVERSATION SCREEN ==================== */
 .whatsapp-chat-screen {
-  position: fixed;
-  top: 0; left: 0; right: 0; bottom: 0;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  height: -webkit-fill-available !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
   background: #eae6df;
   z-index: 1200;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
+  display: flex !important;
+  flex-direction: column !important;
   overflow: hidden;
 }
 
@@ -2136,11 +2143,13 @@ button {
   background: #046A38;
   color: #ffffff;
   padding: 10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
   z-index: 10;
+  flex-shrink: 0;
 }
 
 .top-bar-left {
@@ -2240,7 +2249,8 @@ button {
 
 /* WhatsApp Chat Timeline */
 .whatsapp-timeline-container {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 14px 20px;
   display: flex;
@@ -2671,9 +2681,27 @@ button {
 .whatsapp-bottom-dock {
   background: var(--bg-surface);
   border-top: 1px solid var(--border-light);
-  padding: 8px 10px env(safe-area-inset-bottom, 8px);
+  padding: 8px 10px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
   position: relative;
-  z-index: 20;
+  z-index: 30;
+  flex-shrink: 0;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="dark"] .whatsapp-bottom-dock {
+  background: #1f2c34;
+  border-top-color: #2a3942;
+}
+
+[data-theme="dark"] .whatsapp-textarea {
+  background: #2a3942;
+  color: #e9edef;
+  border-color: #3b4a54;
+}
+
+[data-theme="dark"] .whatsapp-textarea::placeholder {
+  color: #8696a0;
 }
 
 /* Quoted Reply Banner above dock */

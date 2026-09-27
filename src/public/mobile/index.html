@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>INAI — 143 · Oru Ping, Oru Bond.</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="style.css?v=4">
   <!-- Instant Pre-render Session Persistence: Prevents login flash on reload -->
   <script>
     (function() {
@@ -317,6 +317,10 @@
         </div>
       </div>
       <div class="top-bar-right">
+        <!-- Quick Compose New Email -->
+        <button class="icon-btn" onclick="openComposeFromActiveConversation()" title="Compose New Email" aria-label="Compose New Email">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </button>
         <!-- View Contact ID Card & Info -->
         <button class="icon-btn" onclick="openActiveContactInfoModal()" title="Contact Info & Digital ID Card" aria-label="Digital ID">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="7" y1="7" x2="7.01" y2="7"/><line x1="17" y1="7" x2="17.01" y2="7"/><line x1="7" y1="17" x2="7.01" y2="17"/><line x1="17" y1="17" x2="17.01" y2="17"/></svg>
@@ -362,7 +366,7 @@
           <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
         </button>
 
-        <textarea id="mob-chat-input" class="whatsapp-textarea" rows="1" placeholder="Type an email message..." onkeydown="handleChatInputKey(event)" oninput="autoExpandChatInput(this)"></textarea>
+        <textarea id="mob-chat-input" class="whatsapp-textarea" rows="1" placeholder="Type a message or reply..." onkeydown="handleChatInputKey(event)" oninput="autoExpandChatInput(this)"></textarea>
 
         <!-- Smart Translate Draft Button -->
         <button type="button" class="whatsapp-tool-btn" id="mob-chat-translate-btn" onclick="triggerSmartTranslateDraft('chat')" title="AI Smart Translate Draft">

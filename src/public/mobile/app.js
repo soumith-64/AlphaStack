@@ -2423,6 +2423,16 @@ async function openConversation(convId) {
   if (input) {
     input.value = '';
     input.style.height = 'auto';
+    if (!input._hasScrollHook) {
+      input._hasScrollHook = true;
+      input.addEventListener('focus', () => {
+        setTimeout(() => {
+          const tl = document.getElementById('mob-chat-timeline');
+          if (tl) tl.scrollTop = tl.scrollHeight;
+          input.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }, 250);
+      });
+    }
   }
 
   // Show WhatsApp chat pane
@@ -2435,6 +2445,9 @@ async function openConversation(convId) {
     setTimeout(() => {
       timeline.scrollTop = timeline.scrollHeight;
     }, 60);
+    setTimeout(() => {
+      timeline.scrollTop = timeline.scrollHeight;
+    }, 220);
   }
 }
 
@@ -2699,6 +2712,15 @@ function closeReadingPane() {
   activeConversation = null;
   activeConversationId = null;
   activeReplyingMessage = null;
+}
+
+function openComposeFromActiveConversation() {
+  if (activeConversation) {
+    const to = activeConversation.participant_raw || (activeConversation.latestMessage ? activeConversation.latestMessage.sender_email : '');
+    openTraditionalCompose(to);
+  } else {
+    openTraditionalCompose();
+  }
 }
 
 // ==================== REPLY BEHAVIOR & CONSTRAINTS ====================
