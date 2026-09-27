@@ -2832,6 +2832,25 @@ button {
   word-break: break-word;
 }
 
+.trad-email-body-content img,
+.email-body-html-wrap img,
+.email-body-html img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 8px;
+  display: block;
+  margin: 12px 0;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+}
+
+.email-body-text-fallback {
+  background: var(--bg-surface, #ffffff);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-main, #1e293b);
+}
+
 .trad-attachments-cluster {
   display: flex;
   flex-wrap: wrap;

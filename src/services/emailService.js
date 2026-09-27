@@ -186,15 +186,25 @@ export const emailService = {
 
     // Deduplication check: prevent identical emails from being re-inserted
     const duplicate = await dbOps.queryOne(`
-      SELECT id FROM emails 
+      SELECT id, LENGTH(body_html) as len_html FROM emails 
       WHERE (sender_email = ? OR sender_email LIKE ?) 
         AND subject = ? 
-        AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
       LIMIT 1
-    `, [cleanSender, `%${cleanSender}%`, cleanSubject, cleanText, textSnippet, `${textSnippet}%`]);
+    `, [cleanSender, `%${cleanSender}%`, cleanSubject]);
 
     if (duplicate) {
-      console.log(`⚠️ [INBOUND DEDUPLICATION] Email already exists in DB (${duplicate.id}). Skipping re-insertion.`);
+      const curLen = duplicate.len_html || 0;
+      const newLen = (html || '').length;
+      if (curLen <= 65535 && newLen > curLen) {
+        console.log(`🔄 [INBOUND DEDUPLICATION] Healing truncated email ${duplicate.id} (${curLen} -> ${newLen} bytes)...`);
+        await dbOps.execute(`UPDATE emails SET body_html = ?, body_text = ? WHERE id = ?`, [
+          html,
+          cleanText,
+          duplicate.id
+        ]);
+      } else {
+        console.log(`⚠️ [INBOUND DEDUPLICATION] Email already exists in DB (${duplicate.id}). Skipping re-insertion.`);
+      }
       return duplicate;
     }
 

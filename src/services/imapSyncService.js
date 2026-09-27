@@ -147,6 +147,21 @@ export const imapSyncService = {
             const cleanText = (parsed.text || '').trim();
             const textSnippet = cleanText.substring(0, 50);
 
+            let finalHtml = parsed.html || parsed.textAsHtml || parsed.text || '';
+
+            // Convert CID inline attachments to data URIs so web browsers can render them
+            if (parsed.attachments && Array.isArray(parsed.attachments)) {
+              for (const att of parsed.attachments) {
+                if (att.cid && att.content && att.contentType) {
+                  const cleanCid = String(att.cid).replace(/[<>]/g, '').trim();
+                  const base64Data = `data:${att.contentType};base64,${att.content.toString('base64')}`;
+                  const re1 = new RegExp(`cid:${cleanCid}`, 'gi');
+                  const re2 = new RegExp(`cid:<${cleanCid}>`, 'gi');
+                  finalHtml = finalHtml.replace(re1, base64Data).replace(re2, base64Data);
+                }
+              }
+            }
+
             // Check persistent deleted list (never re-download emails deleted by user)
             const wasDeleted = await dbOps.isEmailDeleted(cleanFrom, cleanSub);
             if (wasDeleted) {
@@ -159,14 +174,23 @@ export const imapSyncService = {
 
             // Also check if this email already exists anywhere (INBOX, TRASH, ARCHIVE, etc.)
             const existing = await dbOps.queryOne(`
-              SELECT id, folder FROM emails 
+              SELECT id, folder, LENGTH(body_html) as len_html FROM emails 
               WHERE (sender_email = ? OR sender_email LIKE ?) 
                 AND subject = ? 
-                AND (body_text = ? OR (LENGTH(?) > 0 AND body_text LIKE ?))
               LIMIT 1
-            `, [cleanFrom, `%${cleanFrom}%`, cleanSub, cleanText, textSnippet, `${textSnippet}%`]);
+            `, [cleanFrom, `%${cleanFrom}%`, cleanSub]);
 
             if (existing) {
+              const currentLen = existing.len_html || 0;
+              const newHtmlLen = (finalHtml || '').length;
+              if (currentLen <= 65535 && newHtmlLen > currentLen) {
+                console.log(`🔄 [IMAP SYNC] Updating truncated email ${existing.id} (${currentLen} -> ${newHtmlLen} bytes)...`);
+                await dbOps.execute(`UPDATE emails SET body_html = ?, body_text = ? WHERE id = ?`, [
+                  finalHtml,
+                  cleanText,
+                  existing.id
+                ]);
+              }
               return;
             }
 
@@ -187,7 +211,7 @@ export const imapSyncService = {
               to: toAddress || 'admin@alphastack.wwisvnr.com',
               subject: parsed.subject || '(No Subject)',
               text: parsed.text || '',
-              html: parsed.html || parsed.textAsHtml || parsed.text || '',
+              html: finalHtml,
               attachments: (parsed.attachments || []).map(a => ({
                 filename: a.filename,
                 contentType: a.contentType,

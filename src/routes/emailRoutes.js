@@ -652,6 +652,26 @@ router.post('/emails/sync', async (req, res) => {
 });
 
 /**
+ * Auto-heal truncated emails and re-sync full LONGTEXT from Hostinger IMAP
+ */
+router.post('/emails/heal-truncated', async (req, res) => {
+  try {
+    if (mysqlPool) {
+      try {
+        await mysqlPool.execute('ALTER TABLE emails MODIFY COLUMN body_text LONGTEXT');
+        await mysqlPool.execute('ALTER TABLE emails MODIFY COLUMN body_html LONGTEXT');
+        await mysqlPool.execute('ALTER TABLE emails MODIFY COLUMN recipient_emails LONGTEXT');
+      } catch (e) {}
+    }
+    await dbOps.execute('DELETE FROM emails WHERE LENGTH(body_html) = 65535');
+    const result = await imapSyncService.syncHostingerMailbox();
+    res.json({ success: true, message: 'Truncated emails healed and re-synced successfully', result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * User Network Contacts (Only returns user's actual conversation contacts or searched registered PhoneMail users)
  */
 router.get('/contacts', async (req, res) => {

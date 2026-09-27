@@ -2457,6 +2457,56 @@ function openEmail(emailId) {
   }
 }
 
+function getFormattedEmailBody(email) {
+  if (!email) return '<span style="color: var(--text-dim); font-style: italic;">(No Content)</span>';
+
+  let html = (email.body_html || '').trim();
+  let text = (email.body_text || '').trim();
+
+  // If HTML is present
+  if (html) {
+    // 1. Repair truncated HTML (e.g. unclosed <img> tag or unclosed quotes)
+    const lastImgOpen = html.lastIndexOf('<img');
+    if (lastImgOpen !== -1) {
+      const lastImgClose = html.indexOf('>', lastImgOpen);
+      if (lastImgClose === -1) {
+        const afterImg = html.substring(lastImgOpen);
+        const quoteCount = (afterImg.match(/"/g) || []).length;
+        if (quoteCount % 2 === 1) {
+          html += '">';
+        } else {
+          html += '>';
+        }
+      }
+    }
+
+    // 2. Check if text content is missing from HTML
+    // (e.g. if HTML was truncated right after an image or has only whitespace)
+    const strippedHtmlText = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const cleanPlain = text.replace(/\[image:[^\]]*\]/gi, '').replace(/\s+/g, ' ').trim();
+
+    if (cleanPlain.length > 80 && strippedHtmlText.length < 40) {
+      // The HTML has an image or layout but lost its text body!
+      const formattedText = escapeHtml(text).replace(/\n/g, '<br>');
+      return `
+        <div class="email-body-html-wrap">${html}</div>
+        <div class="email-body-text-fallback" style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--border-color, #e2e8f0); line-height: 1.6; color: var(--text-main);">
+          ${formattedText}
+        </div>
+      `;
+    }
+
+    return html;
+  }
+
+  // Fallback to plain text
+  if (text) {
+    return escapeHtml(text).replace(/\n/g, '<br>');
+  }
+
+  return '<span style="color: var(--text-dim); font-style: italic;">(No Content)</span>';
+}
+
 function renderDesktopEmailReadingView(email) {
   const container = document.getElementById('reading-thread-container');
   if (!container) return;
@@ -2495,7 +2545,7 @@ function renderDesktopEmailReadingView(email) {
     `;
   }
 
-  const rawBody = email.body_html || escapeHtml(email.body_text || '').replace(/\n/g, '<br>');
+  const rawBody = getFormattedEmailBody(email);
 
   const card = document.createElement('div');
   card.className = `thread-message-card ${isSentByMe ? 'outgoing' : 'incoming'}`;

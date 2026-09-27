@@ -3602,6 +3602,25 @@ button {
   word-break: break-word;
 }
 
+.thread-card-body img,
+.email-body-html-wrap img,
+.email-body-html img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 8px;
+  display: block;
+  margin: 14px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.email-body-text-fallback {
+  background: var(--bg-surface, #ffffff);
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-main, #1e293b);
+}
+
 .thread-card-footer {
   display: flex;
   align-items: center;

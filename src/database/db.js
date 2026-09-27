@@ -37,7 +37,10 @@ if (useMysql) {
         'ALTER TABLE users ADD COLUMN avatar_url VARCHAR(255)',
         'ALTER TABLE conversation_participants MODIFY COLUMN phone_number VARCHAR(191)',
         'ALTER TABLE conversations MODIFY COLUMN participant_phone VARCHAR(191)',
-        'ALTER TABLE users ADD COLUMN bio TEXT'
+        'ALTER TABLE users ADD COLUMN bio TEXT',
+        'ALTER TABLE emails MODIFY COLUMN body_text LONGTEXT',
+        'ALTER TABLE emails MODIFY COLUMN body_html LONGTEXT',
+        'ALTER TABLE emails MODIFY COLUMN recipient_emails LONGTEXT'
       ];
       for (const m of migrations) {
         try {
@@ -47,6 +50,19 @@ if (useMysql) {
           // ignore ER_DUP_FIELDNAME (1060) or existing columns
         }
       }
+
+      // Auto-heal emails truncated at old 65KB MySQL TEXT limit so IMAP re-fetches full content
+      try {
+        const [truncated] = await mysqlPool.execute(
+          "SELECT id, subject FROM emails WHERE LENGTH(body_html) = 65535"
+        );
+        if (truncated && truncated.length > 0) {
+          console.log(`⚠️ [MySQL Migration] Found ${truncated.length} email(s) truncated at 65KB limit. Resetting for clean re-sync.`);
+          for (const row of truncated) {
+            await mysqlPool.execute('DELETE FROM emails WHERE id = ?', [row.id]);
+          }
+        }
+      } catch (truncErr) {}
     })().catch(e => console.warn('MySQL schema check notice:', e.message));
   } catch (err) {
     console.error('❌ [MySQL Pool Creation Error]:', err.message);
