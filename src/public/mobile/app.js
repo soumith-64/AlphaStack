@@ -2005,9 +2005,9 @@ function getFormattedEmailBody(email) {
 }
 
 function openMobileTraditionalEmail(emailId) {
-  let email = allEmails.find(e => e.id === emailId);
+  let email = allEmails.find(e => String(e.id) === String(emailId));
   if (!email && activeConversation && activeConversation.messages) {
-    email = activeConversation.messages.find(m => m.id === emailId);
+    email = activeConversation.messages.find(m => String(m.id) === String(emailId));
   }
   if (!email) return;
 
@@ -2112,12 +2112,21 @@ function openMobileTraditionalEmail(emailId) {
   readingView.style.display = 'flex';
   const scrollArea = readingView.querySelector('.trad-reading-scroll-area');
   if (scrollArea) scrollArea.scrollTop = 0;
+
+  try {
+    if (!window.history.state || window.history.state.view !== 'traditional_reading') {
+      window.history.pushState({ view: 'traditional_reading', emailId: email.id }, '');
+    }
+  } catch(e) {}
 }
 
-function closeMobileTraditionalReading() {
+function closeMobileTraditionalReading(shouldPopHistory = true) {
   const readingView = document.getElementById('mob-traditional-reading-view');
   if (readingView) readingView.style.display = 'none';
   activeTradEmail = null;
+  if (shouldPopHistory && window.history.state && window.history.state.view === 'traditional_reading') {
+    window.history.back();
+  }
 }
 
 function updateTradStarButton(isStarred) {
@@ -2439,6 +2448,13 @@ async function openConversation(convId) {
   const pane = document.getElementById('reading-pane');
   if (pane) pane.style.display = 'flex';
 
+  // Push history state so iOS edge-swipe and browser back work seamlessly
+  try {
+    if (!window.history.state || window.history.state.view !== 'conversation') {
+      window.history.pushState({ view: 'conversation', convId: conv.id }, '');
+    }
+  } catch(e) {}
+
   // Scroll timeline to bottom
   const timeline = document.getElementById('mob-chat-timeline');
   if (timeline) {
@@ -2644,10 +2660,10 @@ function toggleExpandMessage(msgId) {
 
   let msg = null;
   if (activeConversation && activeConversation.messages) {
-    msg = activeConversation.messages.find(m => m.id === msgId);
+    msg = activeConversation.messages.find(m => String(m.id) === String(msgId));
   }
   if (!msg) {
-    msg = allEmails.find(e => e.id === msgId);
+    msg = allEmails.find(e => String(e.id) === String(msgId));
   }
   if (!msg) return;
 
@@ -2706,12 +2722,15 @@ function toggleExpandMessage(msgId) {
   }
 }
 
-function closeReadingPane() {
+function closeReadingPane(shouldPopHistory = true) {
   const pane = document.getElementById('reading-pane');
   if (pane) pane.style.display = 'none';
   activeConversation = null;
   activeConversationId = null;
   activeReplyingMessage = null;
+  if (shouldPopHistory && window.history.state && window.history.state.view === 'conversation') {
+    window.history.back();
+  }
 }
 
 function openComposeFromActiveConversation() {
@@ -2728,7 +2747,7 @@ function triggerReplyToMessage(msgId, e) {
   if (e) e.stopPropagation();
 
   if (!activeConversation) return;
-  const msg = activeConversation.messages.find(m => m.id === msgId);
+  const msg = activeConversation.messages.find(m => String(m.id) === String(msgId));
   if (!msg) return;
 
   // Single-reply check
@@ -4407,6 +4426,50 @@ document.addEventListener('click', (e) => {
   if (img && img.src && !img.closest('#mob-image-lightbox')) {
     e.stopPropagation();
     openImageLightbox(img.src, img.alt);
+  }
+});
+
+// ==================== BROWSER HISTORY & BACK GESTURE SUPPORT ====================
+window.addEventListener('popstate', (e) => {
+  const readingPane = document.getElementById('reading-pane');
+  const tradView = document.getElementById('mob-traditional-reading-view');
+  const modalWrapper = document.getElementById('traditional-modal');
+  const infoModal = document.getElementById('mob-contact-info-modal');
+
+  if (modalWrapper && modalWrapper.style.display === 'flex') {
+    closeTraditionalCompose();
+    return;
+  }
+  if (infoModal && infoModal.style.display === 'flex') {
+    closeContactInfoModal();
+    return;
+  }
+  if (tradView && tradView.style.display === 'flex') {
+    closeMobileTraditionalReading(false);
+    return;
+  }
+  if (readingPane && readingPane.style.display === 'flex') {
+    closeReadingPane(false);
+    return;
+  }
+});
+
+// Horizontal swipe gesture on chat top bar to easily exit thread
+document.addEventListener('DOMContentLoaded', () => {
+  const topBar = document.querySelector('.whatsapp-top-bar');
+  if (topBar) {
+    let startX = 0;
+    topBar.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches[0]) startX = e.touches[0].clientX;
+    }, { passive: true });
+    topBar.addEventListener('touchend', (e) => {
+      if (e.changedTouches && e.changedTouches[0]) {
+        const diffX = e.changedTouches[0].clientX - startX;
+        if (diffX > 60) {
+          closeReadingPane();
+        }
+      }
+    }, { passive: true });
   }
 });
 
