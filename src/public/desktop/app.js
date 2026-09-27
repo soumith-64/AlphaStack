@@ -3679,3 +3679,189 @@ function shareDigitalIdCard() {
   }
 }
 
+// ==================== FIND FRIENDS ON INAI (DESKTOP) ====================
+function openFindFriendsModal() {
+  const modal = document.getElementById('find-friends-modal');
+  if (modal) modal.style.display = 'flex';
+  const input = document.getElementById('find-friends-manual-input');
+  if (input) input.value = '';
+}
+
+function closeFindFriendsModal(e) {
+  if (e && e.target && e.target.closest('.modal-card') && !e.target.classList.contains('close-modal-btn')) return;
+  const modal = document.getElementById('find-friends-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function selectDeviceContactsForFriends() {
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const props = ['name', 'tel'];
+      const opts = { multiple: true };
+      const selected = await navigator.contacts.select(props, opts);
+      if (selected && selected.length > 0) {
+        processSelectedContactsForFriends(selected);
+      }
+    } catch (err) {
+      showToastNotification('Could not access device contacts. Please use manual entry below.', 'info');
+    }
+  } else {
+    showToastNotification('Device contact picker available on supported mobile/Chrome browsers. Enter numbers below.', 'info');
+    const input = document.getElementById('find-friends-manual-input');
+    if (input) input.focus();
+  }
+}
+
+async function checkManualFriendsInput() {
+  const input = document.getElementById('find-friends-manual-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    showToastNotification('Please enter at least one phone number', 'warning');
+    return;
+  }
+
+  const tokens = val.split(/[,;\n\s]+/).filter(Boolean);
+  const candidates = [];
+  tokens.forEach(tok => {
+    const clean = tok.replace(/\D/g, '').slice(-10);
+    if (clean.length === 10) {
+      candidates.push({
+        name: '',
+        rawPhone: tok,
+        cleanPhone: clean
+      });
+    }
+  });
+
+  if (candidates.length === 0) {
+    showToastNotification('Please enter valid 10-digit mobile numbers', 'warning');
+    return;
+  }
+
+  await queryAndRenderFriendsDesktop(candidates);
+}
+
+async function processSelectedContactsForFriends(deviceContacts) {
+  const candidates = [];
+  deviceContacts.forEach(c => {
+    const name = Array.isArray(c.name) ? c.name[0] : (c.name || '');
+    const phones = Array.isArray(c.tel) ? c.tel : [c.tel];
+    phones.forEach(p => {
+      if (!p) return;
+      const clean = String(p).replace(/\D/g, '').slice(-10);
+      if (clean.length === 10) {
+        candidates.push({
+          name: name,
+          rawPhone: p,
+          cleanPhone: clean
+        });
+      }
+    });
+  });
+
+  if (candidates.length === 0) {
+    showToastNotification('No valid 10-digit phone numbers found in contacts', 'warning');
+    return;
+  }
+
+  await queryAndRenderFriendsDesktop(candidates);
+}
+
+async function queryAndRenderFriendsDesktop(candidates) {
+  const resultsContainer = document.getElementById('find-friends-results');
+  if (!resultsContainer) return;
+
+  resultsContainer.innerHTML = `
+    <div style="text-align: center; padding: 25px 10px; color: var(--text-dim);">
+      <div style="margin-bottom: 8px;">🔍 Checking INAI network...</div>
+      <div style="font-size: 11.5px;">Verifying contacts on PhoneMail infrastructure</div>
+    </div>
+  `;
+
+  const uniqueMap = new Map();
+  candidates.forEach(c => {
+    if (!uniqueMap.has(c.cleanPhone)) uniqueMap.set(c.cleanPhone, c);
+  });
+  const uniqueCandidates = Array.from(uniqueMap.values());
+  const phoneNumbers = uniqueCandidates.map(c => c.cleanPhone);
+
+  try {
+    const res = await fetch('/api/contacts/filter-phonemail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumbers })
+    });
+    const data = await res.json();
+    const registeredList = data.registeredContacts || [];
+    const registeredMap = new Map(registeredList.map(r => [r.phone_number, r]));
+
+    let html = '';
+    uniqueCandidates.forEach(cand => {
+      const isRegistered = registeredMap.has(cand.cleanPhone);
+      const regUser = isRegistered ? registeredMap.get(cand.cleanPhone) : null;
+      const displayName = (regUser && regUser.display_name) || cand.name || `User ${cand.cleanPhone}`;
+      const formattedPhone = `+91 ${cand.cleanPhone.substring(0, 5)} ${cand.cleanPhone.substring(5)}`;
+
+      if (isRegistered) {
+        html += `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: rgba(4,106,56,0.06); border: 1px solid rgba(4,106,56,0.2); border-radius: 10px;">
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">${escapeHtml(displayName)}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">${escapeHtml(formattedPhone)}</div>
+              <span style="display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 700; color: #046A38;">🟢 On INAI</span>
+            </div>
+            <button type="button" class="btn-primary" style="padding: 7px 14px; font-size: 12px;" onclick="messageInaiContactDesktop('${cand.cleanPhone}', '${escapeHtml(displayName)}')">Message</button>
+          </div>
+        `;
+      } else {
+        html += `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; background: var(--bg-hover); border: 1px solid var(--border-light); border-radius: 10px;">
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px; color: var(--text-main);">${escapeHtml(displayName)}</div>
+              <div style="font-size: 12px; color: var(--text-muted);">${escapeHtml(formattedPhone)}</div>
+              <span style="display: inline-block; margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--text-dim);">⚪ Not on INAI</span>
+            </div>
+            <button type="button" class="btn-secondary" style="padding: 7px 14px; font-size: 12px;" onclick="inviteFriendDesktop('${escapeHtml(displayName)}', '${cand.cleanPhone}')">Invite</button>
+          </div>
+        `;
+      }
+    });
+
+    resultsContainer.innerHTML = html;
+  } catch (err) {
+    resultsContainer.innerHTML = `
+      <div style="text-align: center; color: #ef4444; padding: 20px 10px;">
+        Failed to check contacts. Please try again.
+      </div>
+    `;
+  }
+}
+
+function messageInaiContactDesktop(phone, displayName) {
+  closeFindFriendsModal();
+  openComposeModal();
+  const toInput = document.getElementById('desk-compose-to');
+  if (toInput) toInput.value = `${phone}@alphastack.wwisvnr.com`;
+  const subjInput = document.getElementById('desk-compose-subject');
+  if (subjInput) subjInput.value = 'Hello via INAI';
+  const bodyInput = document.getElementById('desk-compose-body');
+  if (bodyInput) bodyInput.focus();
+  showToastNotification(`Direct email opened for ${displayName} ✓`, 'success');
+}
+
+function inviteFriendDesktop(name, phone) {
+  const inviteText = `Hey ${name || 'there'}! I'm using INAI (PhoneMail) for instant, secure communication by phone number. Join me at ${window.location.origin}/desktop/`;
+  if (navigator.share) {
+    navigator.share({
+      title: 'Join me on INAI',
+      text: inviteText,
+      url: `${window.location.origin}/desktop/`
+    }).catch(() => {});
+  } else {
+    const waUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(inviteText)}`;
+    window.open(waUrl, '_blank');
+  }
+  showToastNotification(`Invite prepared for ${name || phone} ✓`, 'info');
+}
+

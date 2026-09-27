@@ -28,6 +28,14 @@ let activeTradEmail = null;
 let mobileInboxMode = localStorage.getItem('mobile_inbox_mode') || 'messenger'; // 'messenger' | 'traditional'
 let activeCustomAvatarDataUrl = '';
 
+// Date Filter State
+let activeDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+let customDateStart = '';
+let customDateEnd = '';
+
+// Smart Translation Draft Preview State
+let smartDraftTranslation = null;
+
 // ==================== PERSISTENCE & FORMATTING HELPERS ====================
 function escapeHtml(str) {
   if (!str) return '';
@@ -862,7 +870,8 @@ async function executeBulkAction(action) {
   }
 }
 
-async function executeBulkActionOnSingle(id, action) {
+async function executeBulkActionOnSingle(id, action, e) {
+  if (e && e.stopPropagation) e.stopPropagation();
   try {
     await fetch('/api/emails/bulk', {
       method: 'POST',
@@ -948,6 +957,175 @@ async function toggleStar(id, e) {
       }
     }
   } catch (err) {}
+}
+
+/**
+ * Universal Mobile Card Swipe Gesture Handler
+ * Enables smooth 60fps horizontal swiping for both:
+ * 1. Traditional email cards (Gmail view)
+ * 2. WhatsApp conversation cards (Messenger view)
+ * Swiping Right -> Reveals Star & Priority actions
+ * Swiping Left  -> Reveals Archive & Delete actions
+ */
+function enableCardSwipeGestures(cardWrapper, surface, onOpenItem) {
+  let startX = 0;
+  let startY = 0;
+  let currentX = 0;
+  let currentY = 0;
+  let isSwiping = false;
+  let isHorizontal = false;
+  let currentTranslate = 0;
+  const maxOpen = 136; // 2 action buttons * 68px width
+
+  // Touch device events
+  surface.addEventListener('touchstart', (e) => {
+    // Close other swiped cards
+    document.querySelectorAll('.chat-conv-surface, .traditional-email-surface').forEach(el => {
+      if (el !== surface && el.dataset.swiped === 'true') {
+        el.style.transition = 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)';
+        el.style.transform = 'translateX(0px)';
+        el.dataset.swiped = 'false';
+        el.dataset.translateOffset = '0';
+      }
+    });
+
+    const touch = e.touches[0];
+    startX = touch.clientX;
+    startY = touch.clientY;
+    currentX = startX;
+    currentY = startY;
+    isSwiping = false;
+    isHorizontal = false;
+    currentTranslate = surface.dataset.swiped === 'true' ? (parseFloat(surface.dataset.translateOffset) || 0) : 0;
+  }, { passive: true });
+
+  surface.addEventListener('touchmove', (e) => {
+    const touch = e.touches[0];
+    currentX = touch.clientX;
+    currentY = touch.clientY;
+    const dx = currentX - startX;
+    const dy = currentY - startY;
+
+    if (!isSwiping) {
+      if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) {
+        isSwiping = true;
+        isHorizontal = true;
+      } else if (Math.abs(dy) > 8) {
+        isSwiping = true;
+        isHorizontal = false;
+      }
+    }
+
+    if (isHorizontal) {
+      if (e.cancelable) e.preventDefault();
+      let targetX = currentTranslate + dx;
+      if (targetX > maxOpen) targetX = maxOpen + (targetX - maxOpen) * 0.2;
+      if (targetX < -maxOpen) targetX = -maxOpen + (targetX + maxOpen) * 0.2;
+      surface.style.transition = 'none';
+      surface.style.transform = `translateX(${targetX}px)`;
+    }
+  }, { passive: false });
+
+  surface.addEventListener('touchend', () => {
+    if (!isHorizontal) return;
+    surface.style.transition = 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)';
+    const totalDx = currentTranslate + (currentX - startX);
+    if (totalDx > 60) {
+      // Swiped right -> Reveal Star & Priority
+      surface.style.transform = `translateX(${maxOpen}px)`;
+      surface.dataset.swiped = 'true';
+      surface.dataset.translateOffset = String(maxOpen);
+    } else if (totalDx < -60) {
+      // Swiped left -> Reveal Archive & Delete
+      surface.style.transform = `translateX(-${maxOpen}px)`;
+      surface.dataset.swiped = 'true';
+      surface.dataset.translateOffset = String(-maxOpen);
+    } else {
+      // Snap closed
+      surface.style.transform = 'translateX(0px)';
+      surface.dataset.swiped = 'false';
+      surface.dataset.translateOffset = '0';
+    }
+    isHorizontal = false;
+    isSwiping = false;
+  });
+
+  // Desktop mouse drag emulation for testing & devtools
+  let isMouseDown = false;
+  surface.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    startX = e.clientX;
+    startY = e.clientY;
+    currentX = startX;
+    currentY = startY;
+    isMouseDown = true;
+    isSwiping = false;
+    isHorizontal = false;
+    currentTranslate = surface.dataset.swiped === 'true' ? (parseFloat(surface.dataset.translateOffset) || 0) : 0;
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isMouseDown) return;
+    currentX = e.clientX;
+    currentY = e.clientY;
+    const dx = currentX - startX;
+    const dy = currentY - startY;
+
+    if (!isSwiping) {
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+        isSwiping = true;
+        isHorizontal = true;
+      }
+    }
+
+    if (isHorizontal) {
+      let targetX = currentTranslate + dx;
+      if (targetX > maxOpen) targetX = maxOpen + (targetX - maxOpen) * 0.2;
+      if (targetX < -maxOpen) targetX = -maxOpen + (targetX + maxOpen) * 0.2;
+      surface.style.transition = 'none';
+      surface.style.transform = `translateX(${targetX}px)`;
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isMouseDown) return;
+    isMouseDown = false;
+    if (isHorizontal) {
+      surface.style.transition = 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)';
+      const totalDx = currentTranslate + (currentX - startX);
+      if (totalDx > 60) {
+        surface.style.transform = `translateX(${maxOpen}px)`;
+        surface.dataset.swiped = 'true';
+        surface.dataset.translateOffset = String(maxOpen);
+      } else if (totalDx < -60) {
+        surface.style.transform = `translateX(-${maxOpen}px)`;
+        surface.dataset.swiped = 'true';
+        surface.dataset.translateOffset = String(-maxOpen);
+      } else {
+        surface.style.transform = 'translateX(0px)';
+        surface.dataset.swiped = 'false';
+        surface.dataset.translateOffset = '0';
+      }
+      isHorizontal = false;
+      isSwiping = false;
+    }
+  });
+
+  // Tap / click handler
+  surface.addEventListener('click', (e) => {
+    if (surface.dataset.swiped === 'true') {
+      e.stopPropagation();
+      e.preventDefault();
+      surface.style.transition = 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)';
+      surface.style.transform = 'translateX(0px)';
+      surface.dataset.swiped = 'false';
+      surface.dataset.translateOffset = '0';
+      return;
+    }
+    if (typeof onOpenItem === 'function') {
+      onOpenItem();
+    }
+  });
 }
 
 // ==================== CONVERSATION THREADING & UTILITIES ====================
@@ -1299,6 +1477,11 @@ function renderEmailList(emails) {
       filteredEmails = filteredEmails.filter(e => e.is_starred === 1 || e.is_important === 1);
     }
 
+    // Date Filter in Traditional View
+    if (activeDateFilter !== 'all') {
+      filteredEmails = filteredEmails.filter(e => isDateInFilter(e.created_at));
+    }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filteredEmails = filteredEmails.filter(e => 
@@ -1310,13 +1493,19 @@ function renderEmailList(emails) {
     }
 
     if (filteredEmails.length === 0) {
+      let emptyMsg = `No messages in ${getFolderFriendlyName(currentFolder)}.`;
+      if (activeQuickFilter === 'unread') emptyMsg = 'No unread emails.';
+      else if (activeQuickFilter === 'attachments') emptyMsg = 'No emails with attachments.';
+      else if (activeQuickFilter === 'favorites') emptyMsg = 'No starred or favorite emails.';
+      else if (activeDateFilter !== 'all') emptyMsg = `No emails matching date filter (${getDatePresetLabel(activeDateFilter)}).`;
+
       container.innerHTML = `
         <div style="text-align: center; color: var(--text-dim); padding: 50px 20px;">
           <div style="margin-bottom: 12px;">
             <svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
           </div>
           <h3 style="font-size: 15px; color: var(--text-main); margin-bottom: 4px;">No Emails Found</h3>
-          <p style="font-size: 12.5px;">No messages in ${getFolderFriendlyName(currentFolder)}.</p>
+          <p style="font-size: 12.5px;">${emptyMsg}</p>
         </div>
       `;
       return;
@@ -1350,6 +1539,11 @@ function renderEmailList(emails) {
     filtered = filtered.filter(c => c.is_starred === 1 || c.is_important === 1);
   }
 
+  // Date Filter in Messenger View
+  if (activeDateFilter !== 'all') {
+    filtered = filtered.filter(c => isDateInFilter(c.created_at || (c.latestMessage && c.latestMessage.created_at)));
+  }
+
   // 3. Search query
   if (searchTerm) {
     filtered = filtered.filter(c => {
@@ -1369,6 +1563,7 @@ function renderEmailList(emails) {
     if (activeQuickFilter === 'unread') emptyMsg = 'No unread conversations.';
     else if (activeQuickFilter === 'attachments') emptyMsg = 'No conversations with attachments.';
     else if (activeQuickFilter === 'favorites') emptyMsg = 'No starred or favorite conversations.';
+    else if (activeDateFilter !== 'all') emptyMsg = `No conversations matching date filter (${getDatePresetLabel(activeDateFilter)}).`;
 
     container.innerHTML = `
       <div style="text-align: center; color: var(--text-dim); padding: 50px 20px;">
@@ -1428,8 +1623,31 @@ function createMobileTraditionalEmailCard(email) {
   const hasAtt = email.has_attachments || (email.attachments && email.attachments.length > 0);
   const attCount = email.attachments ? email.attachments.length : (email.has_attachments ? 1 : 0);
 
-  // Traditional Email Card (Mobile Gmail Style)
+  // Traditional Email Card with Interactive Swipe Actions Underlay
   cardWrapper.innerHTML = `
+    <div class="swipe-actions-underlay">
+      <div class="swipe-right-actions">
+        <button type="button" class="swipe-btn star" onclick="toggleStar('${email.id}', event)" title="Star / Unstar">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#fff' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>${isStarred ? 'Unstar' : 'Star'}</span>
+        </button>
+        <button type="button" class="swipe-btn important" onclick="toggleImportant('${email.id}', event)" title="Add to Priority">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>${isImportant ? 'Normal' : 'Priority'}</span>
+        </button>
+      </div>
+      <div class="swipe-left-actions">
+        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnSingle('${email.id}', 'archive', event)" title="Archive Email">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          <span>Archive</span>
+        </button>
+        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnSingle('${email.id}', 'delete', event)" title="Delete Email">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
+
     <div class="traditional-email-surface ${email.is_read === 0 ? 'unread' : ''} ${isSelected ? 'selected' : ''}">
       <div class="email-checkbox-wrap" onclick="toggleEmailSelection('${email.id}', event)">
         <label class="custom-checkbox" onclick="event.stopPropagation()">
@@ -1475,7 +1693,7 @@ function createMobileTraditionalEmailCard(email) {
   `;
 
   const surface = cardWrapper.querySelector('.traditional-email-surface');
-  surface.addEventListener('click', (e) => {
+  enableCardSwipeGestures(cardWrapper, surface, () => {
     openMobileTraditionalEmail(email.id);
   });
 
@@ -1683,32 +1901,28 @@ async function toggleTradEmailTranslation() {
     return;
   }
 
-  const targetLang = currentLanguage === 'en' ? 'hi' : currentLanguage;
+  const targetLang = getSmartTranslationTarget() || (currentLanguage === 'en' ? 'hi' : currentLanguage);
   showToastNotification(`Translating to ${targetLang.toUpperCase()}...`, 'info');
 
   try {
     const plainText = (activeTradEmail.body_text || bodyEl.innerText || '').trim();
     const cleanSubj = activeTradEmail.subject || '';
 
-    const transUrl = (text, tl) => 
-      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
-
     const [subjRes, bodyRes] = await Promise.all([
-      fetch(transUrl(cleanSubj, targetLang)).then(r => r.json()).catch(() => null),
-      fetch(transUrl(plainText.substring(0, 1500), targetLang)).then(r => r.json()).catch(() => null)
+      fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanSubj, targetLang })
+      }).then(r => r.json()).catch(() => null),
+      fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plainText, targetLang })
+      }).then(r => r.json()).catch(() => null)
     ]);
 
-    let translatedSubject = cleanSubj;
-    if (subjRes && subjRes[0]) {
-      translatedSubject = subjRes[0].map(s => s[0]).join('');
-    }
-
-    let translatedBody = '';
-    if (bodyRes && bodyRes[0]) {
-      translatedBody = bodyRes[0].map(s => s[0]).join('').replace(/\n/g, '<br>');
-    } else {
-      translatedBody = plainText.replace(/\n/g, '<br>');
-    }
+    const translatedSubject = (subjRes && subjRes.translatedText) ? subjRes.translatedText : cleanSubj;
+    const translatedBody = (bodyRes && bodyRes.translatedText) ? bodyRes.translatedText.replace(/\n/g, '<br>') : plainText.replace(/\n/g, '<br>');
 
     subjEl.innerHTML = `<span style="font-size:11px; background: rgba(37,99,235,0.12); color: #2563eb; padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-right: 6px;">AI ${targetLang.toUpperCase()}</span> ` + escapeHtml(translatedSubject);
     bodyEl.innerHTML = `
@@ -1728,6 +1942,8 @@ async function toggleTradEmailTranslation() {
 function createMobileConversationCard(conv) {
   const cardWrapper = document.createElement('div');
   const isStarred = conv.is_starred === 1;
+  const isImportant = conv.is_important === 1;
+  const latestMsgId = conv.latestMessage ? conv.latestMessage.id : (conv.messages && conv.messages[0] ? conv.messages[0].id : conv.id);
 
   cardWrapper.id = `mob-conv-${conv.id}`;
   cardWrapper.dataset.id = conv.id;
@@ -1746,8 +1962,31 @@ function createMobileConversationCard(conv) {
   const convFallbackSvg = generateDefaultAvatar(conv.participant_raw, conv.display_title);
   const convAvatarUrl = conv.avatar_url || convFallbackSvg;
 
-  // Pure WhatsApp Messenger Card: 48px avatar + online dot + ✓✓ checkmark + clean snippet + green unread pill
+  // Pure WhatsApp Messenger Card with Interactive Swipe Actions Underlay
   cardWrapper.innerHTML = `
+    <div class="swipe-actions-underlay">
+      <div class="swipe-right-actions">
+        <button type="button" class="swipe-btn star" onclick="toggleStar('${latestMsgId}', event)" title="Star / Unstar">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="${isStarred ? '#fff' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          <span>${isStarred ? 'Unstar' : 'Star'}</span>
+        </button>
+        <button type="button" class="swipe-btn important" onclick="toggleImportant('${latestMsgId}', event)" title="Add to Priority">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>${isImportant ? 'Normal' : 'Priority'}</span>
+        </button>
+      </div>
+      <div class="swipe-left-actions">
+        <button type="button" class="swipe-btn archive" onclick="executeBulkActionOnConversation('${conv.id}', 'archive', event)" title="Archive Conversation">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          <span>Archive</span>
+        </button>
+        <button type="button" class="swipe-btn delete" onclick="executeBulkActionOnConversation('${conv.id}', 'delete', event)" title="Delete Conversation">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          <span>Delete</span>
+        </button>
+      </div>
+    </div>
+
     <div class="chat-conv-surface ${conv.unread_count > 0 ? 'unread' : ''}">
       <div class="chat-conv-avatar-box" onclick="openContactInfoModal('${escapeHtml(conv.participant_raw)}'); event.stopPropagation();" title="View Digital ID Card">
         <img src="${convAvatarUrl}" alt="${escapeHtml(conv.display_title)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${convFallbackSvg}';">
@@ -1779,7 +2018,8 @@ function createMobileConversationCard(conv) {
     </div>
   `;
 
-  cardWrapper.addEventListener('click', () => {
+  const surface = cardWrapper.querySelector('.chat-conv-surface');
+  enableCardSwipeGestures(cardWrapper, surface, () => {
     openConversation(conv.id);
   });
 
@@ -2517,6 +2757,12 @@ function openMobileProfileSettings() {
 
   if (langSelect) langSelect.value = currentLanguage;
 
+  const transLangSelect = document.getElementById('mob-settings-trans-lang');
+  if (transLangSelect) transLangSelect.value = getSmartTranslationTarget();
+
+  const autoTransToggle = document.getElementById('mob-auto-translate-toggle');
+  if (autoTransToggle) autoTransToggle.checked = localStorage.getItem('inai_auto_translate_suggest') === 'true';
+
   initMobileReadReceipts();
   modal.style.display = 'flex';
 }
@@ -2801,36 +3047,32 @@ async function toggleMessageTranslation() {
     subjEl.innerText = originalMessageSubject;
     bodyEl.innerHTML = originalMessageBody;
     isMessageTranslated = false;
-    showToastNotification('Original message restored');
+    showToastNotification('Original message restored', 'info');
     return;
   }
 
-  const targetLang = currentLanguage === 'en' ? 'hi' : currentLanguage;
-  showToastNotification(`Translating to ${targetLang.toUpperCase()}...`);
+  const targetLang = getSmartTranslationTarget() || (currentLanguage === 'en' ? 'hi' : currentLanguage);
+  showToastNotification(`Translating to ${targetLang.toUpperCase()}...`, 'info');
 
   try {
     const plainText = (activeEmail.body_text || bodyEl.innerText || '').trim();
     const cleanSubj = activeEmail.subject || '';
 
-    const transUrl = (text, tl) => 
-      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
-
     const [subjRes, bodyRes] = await Promise.all([
-      fetch(transUrl(cleanSubj, targetLang)).then(r => r.json()).catch(() => null),
-      fetch(transUrl(plainText.substring(0, 1500), targetLang)).then(r => r.json()).catch(() => null)
+      fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: cleanSubj, targetLang })
+      }).then(r => r.json()).catch(() => null),
+      fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: plainText, targetLang })
+      }).then(r => r.json()).catch(() => null)
     ]);
 
-    let translatedSubject = cleanSubj;
-    if (subjRes && subjRes[0]) {
-      translatedSubject = subjRes[0].map(s => s[0]).join('');
-    }
-
-    let translatedBody = '';
-    if (bodyRes && bodyRes[0]) {
-      translatedBody = bodyRes[0].map(s => s[0]).join('').replace(/\n/g, '<br>');
-    } else {
-      translatedBody = plainText.replace(/\n/g, '<br>');
-    }
+    const translatedSubject = (subjRes && subjRes.translatedText) ? subjRes.translatedText : cleanSubj;
+    const translatedBody = (bodyRes && bodyRes.translatedText) ? bodyRes.translatedText.replace(/\n/g, '<br>') : plainText.replace(/\n/g, '<br>');
 
     subjEl.innerHTML = `<span style="font-size:11px; background: rgba(4,106,56,0.12); color: var(--green-main); padding: 2px 6px; border-radius: 4px; vertical-align: middle; margin-right: 6px;">AI ${targetLang.toUpperCase()}</span> ` + escapeHtml(translatedSubject);
     bodyEl.innerHTML = `
@@ -2843,7 +3085,7 @@ async function toggleMessageTranslation() {
     isMessageTranslated = true;
     showToastNotification(`Translated message to ${targetLang.toUpperCase()} ✓`, 'success');
   } catch (err) {
-    showToastNotification('Translation failed, showing original');
+    showToastNotification('Translation failed, showing original', 'warning');
   }
 }
 
@@ -2966,6 +3208,498 @@ async function submitTraditionalCompose() {
   } catch (err) {
     showToastNotification('Failed to send message', 'error');
   }
+}
+
+// ==================== DATE FILTER MODAL & HANDLERS ====================
+function openDateFilterModal() {
+  const modal = document.getElementById('mob-date-filter-modal');
+  if (modal) modal.style.display = 'flex';
+  updateDateFilterUI();
+}
+
+function closeDateFilterModal(e) {
+  if (e && e.target && e.target.closest('.modal-card') && !e.target.classList.contains('close-modal-btn')) return;
+  const modal = document.getElementById('mob-date-filter-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function selectDatePreset(preset) {
+  activeDateFilter = preset;
+  updateDateFilterUI();
+  closeDateFilterModal();
+  renderEmailList(allEmails);
+  showToastNotification(`Filtered by: ${getDatePresetLabel(preset)}`, 'info');
+}
+
+function applyCustomDateFilter() {
+  const startEl = document.getElementById('mob-custom-date-start');
+  const endEl = document.getElementById('mob-custom-date-end');
+  const startVal = startEl ? startEl.value : '';
+  const endVal = endEl ? endEl.value : '';
+
+  if (!startVal && !endVal) {
+    showToastNotification('Please select a start or end date', 'warning');
+    return;
+  }
+
+  activeDateFilter = 'custom';
+  customDateStart = startVal;
+  customDateEnd = endVal;
+  updateDateFilterUI();
+  closeDateFilterModal();
+  renderEmailList(allEmails);
+  showToastNotification('Custom date filter applied ✓', 'success');
+}
+
+function getDatePresetLabel(p) {
+  switch (p) {
+    case 'today': return 'Today';
+    case 'yesterday': return 'Yesterday';
+    case 'week': return 'Last 7 Days';
+    case 'month': return 'Last 30 Days';
+    case 'custom': return 'Custom Range';
+    default: return 'All Dates';
+  }
+}
+
+function updateDateFilterUI() {
+  // Update modal active button
+  ['all', 'today', 'yesterday', 'week', 'month'].forEach(p => {
+    const btn = document.getElementById(`btn-date-${p}`);
+    if (btn) {
+      if (activeDateFilter === p) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+
+  // Update quick filter pill
+  const pill = document.getElementById('pill-filter-date');
+  const pillText = document.getElementById('pill-date-text');
+  const pillBadge = document.getElementById('badge-date-active');
+
+  if (pill && pillText) {
+    if (activeDateFilter === 'all') {
+      pillText.innerText = 'Date';
+      pill.classList.remove('active', 'active-date');
+      if (pillBadge) pillBadge.style.display = 'none';
+    } else {
+      pillText.innerText = getDatePresetLabel(activeDateFilter);
+      pill.classList.add('active', 'active-date');
+      if (pillBadge) pillBadge.style.display = 'inline-block';
+    }
+  }
+}
+
+function isDateInFilter(dateVal) {
+  if (activeDateFilter === 'all') return true;
+  if (!dateVal) return false;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const endOfToday = startOfToday + 86400000;
+  const t = d.getTime();
+
+  if (activeDateFilter === 'today') {
+    return t >= startOfToday && t < endOfToday;
+  }
+  if (activeDateFilter === 'yesterday') {
+    const startOfYesterday = startOfToday - 86400000;
+    return t >= startOfYesterday && t < startOfToday;
+  }
+  if (activeDateFilter === 'week') {
+    const startOfWeek = startOfToday - 7 * 86400000;
+    return t >= startOfWeek;
+  }
+  if (activeDateFilter === 'month') {
+    const startOfMonth = startOfToday - 30 * 86400000;
+    return t >= startOfMonth;
+  }
+  if (activeDateFilter === 'custom') {
+    if (customDateStart) {
+      const cStart = new Date(customDateStart).getTime();
+      if (t < cStart) return false;
+    }
+    if (customDateEnd) {
+      const cEnd = new Date(customDateEnd).getTime() + 86400000;
+      if (t >= cEnd) return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+// ==================== SMART LANGUAGE TRANSLATION & PREFERENCES ====================
+function setSmartTranslationTarget(lang) {
+  localStorage.setItem('inai_trans_target_lang', lang || 'en');
+  showToastNotification(`Default translation target set to ${(lang || 'en').toUpperCase()} ✓`, 'info');
+}
+
+function getSmartTranslationTarget() {
+  return localStorage.getItem('inai_trans_target_lang') || 'en';
+}
+
+function toggleAutoTranslatePreference(checked) {
+  localStorage.setItem('inai_auto_translate_suggest', checked ? 'true' : 'false');
+  showToastNotification(`Smart translation suggestions ${checked ? 'enabled' : 'disabled'}`, 'info');
+}
+
+async function triggerSmartTranslateDraft(context) {
+  const isChat = context === 'chat';
+  const inputEl = isChat ? document.getElementById('mob-chat-input') : document.getElementById('trad-body');
+  const previewWrap = isChat ? document.getElementById('mob-chat-trans-preview-wrap') : document.getElementById('mob-trad-trans-preview-wrap');
+
+  if (!inputEl || !previewWrap) return;
+  const text = inputEl.value.trim();
+  if (!text) {
+    showToastNotification('Please type your draft message first', 'info');
+    return;
+  }
+
+  const targetLang = getSmartTranslationTarget();
+  previewWrap.style.display = 'block';
+  previewWrap.innerHTML = `
+    <div class="smart-trans-preview-card">
+      <div style="padding: 12px; text-align: center; color: var(--text-dim); font-size: 12px;">
+        ⚡ Translating draft with AI to ${targetLang.toUpperCase()}...
+      </div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: text,
+        targetLang: targetLang,
+        sourceLang: 'auto'
+      })
+    });
+    const data = await res.json();
+    if (!data.success && !data.translatedText) {
+      throw new Error(data.error || 'Translation failed');
+    }
+
+    smartDraftTranslation = {
+      context,
+      originalText: text,
+      translatedText: data.translatedText || text,
+      targetLang: data.targetLang || targetLang,
+      detectedSourceLang: data.detectedSourceLang || 'auto'
+    };
+
+    previewWrap.innerHTML = `
+      <div class="smart-trans-preview-card">
+        <div class="smart-trans-header">
+          <div class="smart-trans-title">
+            <span class="tiranga-tag-mini">AI SMART TRANSLATION</span>
+            <span>Preview before sending</span>
+          </div>
+          <button type="button" class="smart-trans-close" onclick="closeDraftTransPreview('${context}')" title="Close Preview">✕</button>
+        </div>
+        <div class="smart-trans-content">
+          <div class="smart-trans-box original">
+            <div class="smart-trans-label">ORIGINAL (${(data.detectedSourceLang || 'DETECTED').toUpperCase()})</div>
+            <div class="smart-trans-text">${escapeHtml(text)}</div>
+          </div>
+          <div class="smart-trans-arrow">↓</div>
+          <div class="smart-trans-box translated">
+            <div class="smart-trans-label">TRANSLATED (${(data.targetLang || targetLang).toUpperCase()})</div>
+            <div class="smart-trans-text">${escapeHtml(data.translatedText || text)}</div>
+          </div>
+        </div>
+        <div class="smart-trans-actions">
+          <button type="button" class="smart-trans-btn btn-send-trans" onclick="sendTranslatedDraft('${context}', 'translated')">
+            Send Translated ✓
+          </button>
+          <button type="button" class="smart-trans-btn btn-send-both" onclick="sendTranslatedDraft('${context}', 'both')">
+            Send Both (Original + Translation)
+          </button>
+          <button type="button" class="smart-trans-btn btn-apply-text" onclick="applyTranslatedDraftToEditor('${context}')">
+            Insert in Editor
+          </button>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    previewWrap.innerHTML = `
+      <div class="smart-trans-preview-card" style="padding: 10px 14px; font-size: 12px; color: #ef4444; display: flex; align-items: center; justify-content: space-between;">
+        <span>Translation temporarily unavailable. Original text preserved.</span>
+        <button type="button" class="smart-trans-close" onclick="closeDraftTransPreview('${context}')">✕</button>
+      </div>
+    `;
+  }
+}
+
+function closeDraftTransPreview(context) {
+  const isChat = context === 'chat';
+  const previewWrap = isChat ? document.getElementById('mob-chat-trans-preview-wrap') : document.getElementById('mob-trad-trans-preview-wrap');
+  if (previewWrap) {
+    previewWrap.style.display = 'none';
+    previewWrap.innerHTML = '';
+  }
+  smartDraftTranslation = null;
+}
+
+function applyTranslatedDraftToEditor(context) {
+  if (!smartDraftTranslation) return;
+  const isChat = context === 'chat';
+  const inputEl = isChat ? document.getElementById('mob-chat-input') : document.getElementById('trad-body');
+  if (inputEl) {
+    inputEl.value = smartDraftTranslation.translatedText;
+    if (isChat) autoExpandChatInput(inputEl);
+  }
+  closeDraftTransPreview(context);
+  showToastNotification('Translation inserted into draft ✓', 'success');
+}
+
+async function sendTranslatedDraft(context, mode) {
+  if (!smartDraftTranslation) return;
+  const isChat = context === 'chat';
+  const inputEl = isChat ? document.getElementById('mob-chat-input') : document.getElementById('trad-body');
+  if (!inputEl) return;
+
+  let finalBody = '';
+  if (mode === 'translated') {
+    finalBody = smartDraftTranslation.translatedText;
+  } else if (mode === 'both') {
+    finalBody = `${smartDraftTranslation.originalText}\n\n---\n[Translated to ${smartDraftTranslation.targetLang.toUpperCase()}]:\n${smartDraftTranslation.translatedText}`;
+  } else {
+    finalBody = smartDraftTranslation.originalText;
+  }
+
+  inputEl.value = finalBody;
+  closeDraftTransPreview(context);
+
+  if (isChat) {
+    submitChatMessage();
+  } else {
+    submitTraditionalCompose();
+  }
+}
+
+// ==================== FEATURE 1: FIND FRIENDS ON INAI ====================
+function openFindFriendsModal() {
+  const modal = document.getElementById('find-friends-modal');
+  if (modal) modal.style.display = 'flex';
+  const input = document.getElementById('find-friends-manual-input');
+  if (input) input.value = '';
+}
+
+function closeFindFriendsModal(e) {
+  if (e && e.target && e.target.closest('.modal-card') && !e.target.classList.contains('close-modal-btn')) return;
+  const modal = document.getElementById('find-friends-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function selectDeviceContactsForFriends() {
+  if ('contacts' in navigator && 'ContactsManager' in window) {
+    try {
+      const props = ['name', 'tel'];
+      const opts = { multiple: true };
+      const selected = await navigator.contacts.select(props, opts);
+      if (selected && selected.length > 0) {
+        processSelectedContactsForFriends(selected);
+      }
+    } catch (err) {
+      console.warn('Contact picker cancelled or failed:', err);
+      showToastNotification('Could not access contacts. You can enter phone numbers below.', 'info');
+    }
+  } else {
+    showToastNotification('Native contact picker is not supported on this browser. Please enter phone number(s) below.', 'info');
+    const input = document.getElementById('find-friends-manual-input');
+    if (input) input.focus();
+  }
+}
+
+async function checkManualFriendsInput() {
+  const input = document.getElementById('find-friends-manual-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    showToastNotification('Please enter at least one phone number', 'warning');
+    return;
+  }
+
+  const tokens = val.split(/[,;\n\s]+/).filter(Boolean);
+  const candidates = [];
+  tokens.forEach(tok => {
+    const clean = tok.replace(/\D/g, '').slice(-10);
+    if (clean.length === 10) {
+      candidates.push({
+        name: '',
+        rawPhone: tok,
+        cleanPhone: clean
+      });
+    }
+  });
+
+  if (candidates.length === 0) {
+    showToastNotification('Please enter valid 10-digit mobile numbers', 'warning');
+    return;
+  }
+
+  await queryAndRenderFriends(candidates);
+}
+
+async function processSelectedContactsForFriends(deviceContacts) {
+  const candidates = [];
+  deviceContacts.forEach(c => {
+    const name = Array.isArray(c.name) ? c.name[0] : (c.name || '');
+    const phones = Array.isArray(c.tel) ? c.tel : [c.tel];
+    phones.forEach(p => {
+      if (!p) return;
+      const clean = String(p).replace(/\D/g, '').slice(-10);
+      if (clean.length === 10) {
+        candidates.push({
+          name: name,
+          rawPhone: p,
+          cleanPhone: clean
+        });
+      }
+    });
+  });
+
+  if (candidates.length === 0) {
+    showToastNotification('No valid 10-digit phone numbers found in selected contacts', 'warning');
+    return;
+  }
+
+  await queryAndRenderFriends(candidates);
+}
+
+async function queryAndRenderFriends(candidates) {
+  const resultsContainer = document.getElementById('find-friends-results');
+  if (!resultsContainer) return;
+
+  resultsContainer.innerHTML = `
+    <div style="text-align: center; padding: 25px 10px; color: var(--text-dim);">
+      <div style="margin-bottom: 8px;">🔍 Checking INAI network...</div>
+      <div style="font-size: 11.5px;">Verifying contacts on PhoneMail infrastructure</div>
+    </div>
+  `;
+
+  // Deduplicate by cleanPhone
+  const uniqueMap = new Map();
+  candidates.forEach(c => {
+    if (!uniqueMap.has(c.cleanPhone)) {
+      uniqueMap.set(c.cleanPhone, c);
+    }
+  });
+  const uniqueCandidates = Array.from(uniqueMap.values());
+  const phoneNumbers = uniqueCandidates.map(c => c.cleanPhone);
+
+  try {
+    const res = await fetch('/api/contacts/filter-phonemail', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneNumbers })
+    });
+    const data = await res.json();
+    const registeredList = data.registeredContacts || [];
+    const registeredMap = new Map(registeredList.map(r => [r.phone_number, r]));
+
+    // Render results with exact requested UI format
+    let html = '';
+    uniqueCandidates.forEach(cand => {
+      const isRegistered = registeredMap.has(cand.cleanPhone);
+      const regUser = isRegistered ? registeredMap.get(cand.cleanPhone) : null;
+      const displayName = (regUser && regUser.display_name) || cand.name || `User ${cand.cleanPhone}`;
+      const formattedPhone = `+91 ${cand.cleanPhone.substring(0, 5)} ${cand.cleanPhone.substring(5)}`;
+
+      if (isRegistered) {
+        html += `
+          <div class="friend-result-card on-inai">
+            <div class="friend-info">
+              <div class="friend-name-row">
+                <span class="friend-name">${escapeHtml(displayName)}</span>
+              </div>
+              <div class="friend-phone">${escapeHtml(formattedPhone)}</div>
+              <div class="friend-status-row" style="margin-top: 3px;">
+                <span class="friend-badge inai">🟢 On INAI</span>
+              </div>
+            </div>
+            <div class="friend-action-wrap">
+              <button type="button" class="friend-action-btn message-btn" onclick="messageInaiContact('${cand.cleanPhone}', '${escapeHtml(displayName)}')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>Message</span>
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        html += `
+          <div class="friend-result-card not-on-inai">
+            <div class="friend-info">
+              <div class="friend-name-row">
+                <span class="friend-name">${escapeHtml(displayName)}</span>
+              </div>
+              <div class="friend-phone">${escapeHtml(formattedPhone)}</div>
+              <div class="friend-status-row" style="margin-top: 3px;">
+                <span class="friend-badge not-inai">⚪ Not on INAI</span>
+              </div>
+            </div>
+            <div class="friend-action-wrap">
+              <button type="button" class="friend-action-btn invite-btn" onclick="inviteFriend('${escapeHtml(displayName)}', '${cand.cleanPhone}')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                <span>Invite</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    });
+
+    resultsContainer.innerHTML = html;
+  } catch (err) {
+    resultsContainer.innerHTML = `
+      <div style="text-align: center; color: #ef4444; padding: 20px 10px;">
+        Failed to check contacts. Please try again.
+      </div>
+    `;
+  }
+}
+
+function messageInaiContact(phone, displayName) {
+  closeFindFriendsModal();
+  // Check if conversation already exists
+  const existingConv = allConversations.find(c => {
+    return (c.participant_raw && c.participant_raw.includes(phone)) ||
+           (c.key && c.key.includes(phone)) ||
+           (c.participant_phone === phone);
+  });
+
+  if (existingConv) {
+    openConversation(existingConv.id);
+    showToastNotification(`Opened conversation with ${displayName} ✓`, 'success');
+  } else {
+    // Open traditional compose prefilled with recipient
+    const tradTo = document.getElementById('trad-to');
+    if (tradTo) {
+      tradTo.value = `${phone}@alphastack.wwisvnr.com`;
+    }
+    const tradSubj = document.getElementById('trad-subject');
+    if (tradSubj) tradSubj.value = 'Hello via INAI';
+    openTraditionalCompose();
+    showToastNotification(`New conversation with ${displayName} ✓`, 'success');
+  }
+}
+
+function inviteFriend(name, phone) {
+  const inviteText = `Hey ${name || 'there'}! I'm using INAI (PhoneMail) for instant, secure communication by phone number. Join me at ${window.location.origin}/mobile/`;
+  if (navigator.share) {
+    navigator.share({
+      title: 'Join me on INAI',
+      text: inviteText,
+      url: `${window.location.origin}/mobile/`
+    }).catch(() => {});
+  } else {
+    const waUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(inviteText)}`;
+    window.open(waUrl, '_blank');
+  }
+  showToastNotification(`Invitation prepared for ${name || phone} ✓`, 'info');
 }
 
 // ==================== INITIALIZATION ====================

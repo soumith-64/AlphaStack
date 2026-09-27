@@ -404,6 +404,16 @@
             <span class="chip-status">Active</span>
           </div>
         </div>
+
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-group-title">PEOPLE & NETWORK</div>
+        <button class="nav-item" onclick="openFindFriendsModal()" style="color: #046A38; font-weight: 700; width: 100%;">
+          <span class="nav-icon" style="color: #046A38;">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="nav-label">Find Friends on INAI</span>
+          <span class="nav-badge" style="background: #ecfdf5; color: #046A38; font-size: 10px; font-weight: 800; padding: 2px 6px;">NEW</span>
+        </button>
       </aside>
 
       <!-- Main Content Stream & Reading Pane -->
@@ -864,6 +874,52 @@
         </form>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ==================== FIND FRIENDS ON INAI MODAL ==================== -->
+  <div id="find-friends-modal" class="modal-wrapper" style="display: none;" onclick="closeFindFriendsModal(event)">
+    <div class="modal-card" style="max-width: 480px; width: 95%; background: var(--bg-surface); border-radius: 16px; border: 1px solid var(--border-light); box-shadow: 0 20px 45px rgba(0,0,0,0.18); overflow: hidden;" onclick="event.stopPropagation()">
+      <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="background: #ecfdf5; color: #046A38; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px;">PEOPLE</span>
+          <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-main);">👥 Find Friends on INAI</h3>
+        </div>
+        <button class="close-modal-btn" onclick="closeFindFriendsModal()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-dim);">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <p style="font-size: 13px; color: var(--text-muted); line-height: 1.45; margin-bottom: 16px;">
+          Check which of your contacts already have an INAI / PhoneMail account. We strictly respect your privacy: no contacts are silently harvested.
+        </p>
+
+        <!-- Method 1: Native Contacts Picker (Mobile/Tablet/Chrome) -->
+        <button type="button" class="btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 12px; margin-bottom: 14px;" onclick="selectDeviceContactsForFriends()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Select Contacts from Device</span>
+        </button>
+
+        <div style="display: flex; align-items: center; gap: 10px; margin: 14px 0;">
+          <div style="flex: 1; height: 1px; background: var(--border-light);"></div>
+          <span style="font-size: 10.5px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px;">OR CHECK BY PHONE NUMBER</span>
+          <div style="flex: 1; height: 1px; background: var(--border-light);"></div>
+        </div>
+
+        <!-- Method 2: Manual Number Input Fallback -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+          <input type="tel" id="find-friends-manual-input" class="desktop-profile-input" placeholder="Enter 10-digit number(s), comma separated" style="flex: 1; padding: 10px 14px; font-size: 13px; border-radius: 8px; border: 1px solid var(--border-light);" onkeydown="if(event.key==='Enter') checkManualFriendsInput()">
+          <button type="button" class="btn-secondary" onclick="checkManualFriendsInput()" style="padding: 10px 16px; font-weight: 700;">Check</button>
+        </div>
+
+        <!-- Results List -->
+        <div id="find-friends-results" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+          <div style="text-align: center; color: var(--text-dim); padding: 30px 10px; font-size: 13px;">
+            Tap "Select Contacts from Device" or enter numbers to check who is on INAI.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-light); display: flex; justify-content: flex-end;">
+        <button class="btn-secondary" onclick="closeFindFriendsModal()">Close</button>
+      </div>
     </div>
   </div>
 

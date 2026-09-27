@@ -219,7 +219,7 @@
         </button>
       </div>
 
-      <!-- Quick Filter Pills: All | Unread | Attachments | Favorites -->
+      <!-- Quick Filter Pills: All | Unread | Attachments | Favorites | Date -->
       <div class="mobile-quick-filter-pills" id="mob-quick-filter-pills">
         <button type="button" class="quick-pill active" id="pill-filter-all" onclick="setMobileQuickFilter('all')">
           <span>All</span>
@@ -236,6 +236,11 @@
         <button type="button" class="quick-pill" id="pill-filter-favorites" onclick="setMobileQuickFilter('favorites')">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           <span>Favorites</span>
+        </button>
+        <button type="button" class="quick-pill" id="pill-filter-date" onclick="openDateFilterModal()" title="Filter by Date">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span id="pill-date-text">Date</span>
+          <span class="pill-badge" id="badge-date-active" style="display: none;">✓</span>
         </button>
       </div>
 
@@ -346,6 +351,9 @@
         <button type="button" class="quote-bar-close" onclick="cancelQuotedReply()" title="Cancel Reply">✕</button>
       </div>
 
+      <!-- Smart Translation Preview in Chat -->
+      <div id="mob-chat-trans-preview-wrap" style="display: none; padding: 0 10px;"></div>
+
       <!-- Input Bar Controls -->
       <div class="whatsapp-input-row">
         <button type="button" class="whatsapp-tool-btn" onclick="insertEmojiQuick('😊')" title="Emoji">
@@ -353,6 +361,11 @@
         </button>
 
         <textarea id="mob-chat-input" class="whatsapp-textarea" rows="1" placeholder="Type an email message..." onkeydown="handleChatInputKey(event)" oninput="autoExpandChatInput(this)"></textarea>
+
+        <!-- Smart Translate Draft Button -->
+        <button type="button" class="whatsapp-tool-btn" id="mob-chat-translate-btn" onclick="triggerSmartTranslateDraft('chat')" title="AI Smart Translate Draft">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </button>
 
         <button type="button" class="whatsapp-tool-btn" onclick="openAttachmentPickerModal()" title="Attach File">
           <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
@@ -470,6 +483,14 @@
         <div class="trad-field">
           <textarea id="trad-body" rows="6" placeholder="Type your message here..."></textarea>
         </div>
+        <!-- Smart Translation Preview in Traditional Compose -->
+        <div id="mob-trad-trans-preview-wrap" style="display: none; margin-top: 8px;"></div>
+        <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+          <button type="button" class="btn-secondary" style="font-size: 11.5px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 5px;" onclick="triggerSmartTranslateDraft('traditional')">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <span>AI Translate & Preview</span>
+          </button>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeTraditionalCompose()">Discard</button>
@@ -527,6 +548,11 @@
         <div class="drawer-item" onclick="openDigitalIdModal(); toggleDrawer();">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           <span>Digital ID Card & QR</span>
+        </div>
+        <div class="drawer-item" onclick="openFindFriendsModal(); toggleDrawer();" style="cursor: pointer;">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span style="font-weight: 700; color: #046A38;">Find Friends on INAI</span>
+          <span style="margin-left: auto; font-size: 10px; background: #ecfdf5; color: #046A38; font-weight: 800; padding: 2px 7px; border-radius: 999px;">NEW</span>
         </div>
         <div class="drawer-item" onclick="openMobileProfileSettings(); toggleDrawer();">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -746,8 +772,21 @@
         </div>
 
         <div class="settings-field">
-          <label>LANGUAGE & TRANSLATION</label>
+          <label>PREFERRED COMMUNICATION LANGUAGE</label>
           <select id="mob-settings-lang" class="profile-input-field" onchange="setInaiLanguage(this.value)">
+            <option value="en">🇬🇧 English</option>
+            <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
+            <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+            <option value="te">🇮🇳 తెలుగు (Telugu)</option>
+            <option value="kn">🇮🇳 ಕನ್ನಡ (Kannada)</option>
+            <option value="bn">🇮🇳 বাংলা (Bengali)</option>
+            <option value="es">🇪🇸 Español</option>
+          </select>
+        </div>
+
+        <div class="settings-field">
+          <label>DEFAULT TRANSLATION TARGET</label>
+          <select id="mob-settings-trans-lang" class="profile-input-field" onchange="setSmartTranslationTarget(this.value)">
             <option value="en">🇬🇧 English</option>
             <option value="hi">🇮🇳 हिन्दी (Hindi)</option>
             <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
@@ -780,10 +819,114 @@
             </label>
           </div>
         </div>
+
+        <div class="settings-field" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <label style="font-weight: 700; font-size: 13.5px; color: var(--text-primary); display: block; margin-bottom: 2px;">Smart Translation Auto-Suggest</label>
+              <span style="font-size: 11.5px; color: var(--text-muted); display: block;">Suggest one-tap translation preview before sending</span>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="mob-auto-translate-toggle" onchange="toggleAutoTranslatePreference(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="btn-secondary" onclick="closeMobileProfileSettings()">Close</button>
         <button class="btn-primary-mobile" onclick="saveMobileSettings()">Save Profile</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== DATE FILTER MODAL ==================== -->
+  <div id="mob-date-filter-modal" class="modal-wrapper" style="display: none;" onclick="closeDateFilterModal(event)">
+    <div class="modal-card" style="max-width: 360px;" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="tiranga-tag-mini">FILTER</span>
+          <h3>Filter by Date</h3>
+        </div>
+        <button class="close-modal-btn" onclick="closeDateFilterModal()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <div class="date-preset-list">
+          <button type="button" class="date-preset-btn active" id="btn-date-all" onclick="selectDatePreset('all')">
+            <span>📅 All Dates (Show All)</span>
+          </button>
+          <button type="button" class="date-preset-btn" id="btn-date-today" onclick="selectDatePreset('today')">
+            <span>🌅 Today</span>
+          </button>
+          <button type="button" class="date-preset-btn" id="btn-date-yesterday" onclick="selectDatePreset('yesterday')">
+            <span>⏳ Yesterday</span>
+          </button>
+          <button type="button" class="date-preset-btn" id="btn-date-week" onclick="selectDatePreset('week')">
+            <span>🗓️ Last 7 Days (This Week)</span>
+          </button>
+          <button type="button" class="date-preset-btn" id="btn-date-month" onclick="selectDatePreset('month')">
+            <span>📆 Last 30 Days (This Month)</span>
+          </button>
+        </div>
+
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-light);">
+          <label style="font-size: 11px; font-weight: 800; color: var(--text-dim); text-transform: uppercase; display: block; margin-bottom: 8px;">Custom Date Range</label>
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <div style="flex: 1;">
+              <span style="font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px;">FROM</span>
+              <input type="date" id="mob-custom-date-start" class="profile-input-field" style="padding: 8px; font-size: 12px;">
+            </div>
+            <div style="flex: 1;">
+              <span style="font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px;">TO</span>
+              <input type="date" id="mob-custom-date-end" class="profile-input-field" style="padding: 8px; font-size: 12px;">
+            </div>
+          </div>
+          <button type="button" class="btn-primary-mobile" style="width: 100%;" onclick="applyCustomDateFilter()">Apply Custom Range ✓</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== FIND FRIENDS ON INAI MODAL ==================== -->
+  <div id="find-friends-modal" class="modal-wrapper" style="display: none;" onclick="closeFindFriendsModal(event)">
+    <div class="modal-card find-friends-card-dialog" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span class="tiranga-tag-mini">PEOPLE</span>
+          <h3>👥 Find Friends on INAI</h3>
+        </div>
+        <button class="close-modal-btn" onclick="closeFindFriendsModal()">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 16px;">
+        <p class="find-friends-intro">
+          Select contacts from your phone or enter a phone number to see who is already registered on INAI.
+        </p>
+
+        <!-- Method 1: Explicit Native Contacts Picker -->
+        <button type="button" class="find-friends-picker-btn" onclick="selectDeviceContactsForFriends()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Select Contacts from Device</span>
+        </button>
+
+        <div class="find-friends-divider">
+          <span>OR CHECK BY PHONE NUMBER</span>
+        </div>
+
+        <!-- Method 2: Manual Search / Entry Fallback -->
+        <div class="find-friends-search-row">
+          <input type="tel" id="find-friends-manual-input" placeholder="Enter 10-digit number(s), comma separated" onkeydown="if(event.key==='Enter') checkManualFriendsInput()">
+          <button type="button" class="find-friends-check-btn" onclick="checkManualFriendsInput()">Check</button>
+        </div>
+
+        <!-- Results List -->
+        <div id="find-friends-results" class="find-friends-results-container">
+          <div style="text-align: center; color: var(--text-dim); padding: 30px 10px; font-size: 13px;">
+            Tap "Select Contacts from Device" or enter numbers to check who is on INAI.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeFindFriendsModal()">Close</button>
       </div>
     </div>
   </div>
