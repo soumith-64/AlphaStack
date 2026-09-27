@@ -1,13 +1,24 @@
 // Strict Device Guard: Phone/Mobile users are restricted to Mobile views (Traditional & Messenger)
-if (window.innerWidth <= 768 || /mobile|iphone|android|ipad|phone/i.test(navigator.userAgent)) {
-  window.location.replace('/mobile/');
+if ((window.innerWidth <= 768 || /mobile|iphone|android|ipad|phone/i.test(navigator.userAgent)) && window.location.pathname !== '/') {
+  window.location.replace('/');
 }
+
+// Clean URL: Keep address bar as clean "alphastack.wwisvnr.com" (strip /desktop)
+try {
+  if (window.location.pathname.startsWith('/desktop')) {
+    window.history.replaceState(null, document.title, '/' + (window.location.search || ''));
+  }
+} catch(e) {}
 
 // ==================== STATE MANAGEMENT ====================
 let currentUser = null;
 
 let currentFolder = 'ALL';
 let currentMailSourceFilter = 'all'; // 'all' | 'phonemail' | 'external'
+let currentQuickFilter = 'all'; // 'all' | 'unread' | 'attachments' | 'starred'
+let currentDateFilter = 'all'; // 'all' | 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+let customDateStart = '';
+let customDateEnd = '';
 let searchTerm = '';
 let allEmails = [];
 let activeEmail = null;
@@ -1817,6 +1828,9 @@ function updateFolderCountsFromList(emails) {
   if (indicator) {
     indicator.innerText = emails.length === 1 ? '1 message' : `${emails.length} messages`;
   }
+
+  updateDesktopFilterBadges(emails);
+  updateDesktopClearBtnVisibility();
 }
 
 function setMailSourceFilter(filter) {
@@ -1830,6 +1844,216 @@ function setMailSourceFilter(filter) {
     }
   });
   renderEmailList(allEmails);
+}
+
+// ==================== ADVANCED FILTER TOOLBAR HANDLERS ====================
+function setDesktopQuickFilter(filter) {
+  currentQuickFilter = filter;
+  currentEmailPage = 1;
+  ['all', 'unread', 'attachments', 'starred'].forEach(f => {
+    const btn = document.getElementById(`desk-filter-${f}`);
+    if (btn) {
+      if (f === filter) btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+  updateDesktopClearBtnVisibility();
+  renderEmailList(allEmails);
+}
+
+function toggleDesktopDateDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('desk-date-menu');
+  if (!menu) return;
+  const isHidden = menu.style.display === 'none' || !menu.style.display;
+  menu.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    setTimeout(() => {
+      window.addEventListener('click', closeDesktopDateDropdown, { once: true });
+    }, 10);
+  }
+}
+
+function closeDesktopDateDropdown() {
+  const menu = document.getElementById('desk-date-menu');
+  if (menu) menu.style.display = 'none';
+}
+
+function setDesktopDateFilter(preset) {
+  currentDateFilter = preset;
+  if (preset !== 'custom') {
+    customDateStart = '';
+    customDateEnd = '';
+    const startInput = document.getElementById('desk-custom-date-start');
+    const endInput = document.getElementById('desk-custom-date-end');
+    if (startInput) startInput.value = '';
+    if (endInput) endInput.value = '';
+  }
+  updateDesktopDateUI();
+  closeDesktopDateDropdown();
+  currentEmailPage = 1;
+  updateDesktopClearBtnVisibility();
+  renderEmailList(allEmails);
+  if (preset !== 'all' && typeof showNotify !== 'undefined') {
+    showNotify.info(`Filtered: ${getDesktopDatePresetLabel(preset)}`, 'Date Filter');
+  }
+}
+
+function applyDesktopCustomDateFilter() {
+  const startInput = document.getElementById('desk-custom-date-start');
+  const endInput = document.getElementById('desk-custom-date-end');
+  const startVal = startInput ? startInput.value : '';
+  const endVal = endInput ? endInput.value : '';
+
+  if (!startVal && !endVal) {
+    if (typeof showNotify !== 'undefined') showNotify.warning('Please select a start or end date', 'Custom Filter');
+    return;
+  }
+
+  currentDateFilter = 'custom';
+  customDateStart = startVal;
+  customDateEnd = endVal;
+  updateDesktopDateUI();
+  closeDesktopDateDropdown();
+  currentEmailPage = 1;
+  updateDesktopClearBtnVisibility();
+  renderEmailList(allEmails);
+  if (typeof showNotify !== 'undefined') {
+    showNotify.success('Custom date range applied ✓', 'Date Filter');
+  }
+}
+
+function getDesktopDatePresetLabel(p) {
+  switch (p) {
+    case 'today': return 'Today';
+    case 'yesterday': return 'Yesterday';
+    case 'week': return 'Last 7 Days';
+    case 'month': return 'Last 30 Days';
+    case 'custom':
+      if (customDateStart && customDateEnd) return `${customDateStart} to ${customDateEnd}`;
+      if (customDateStart) return `From ${customDateStart}`;
+      if (customDateEnd) return `Until ${customDateEnd}`;
+      return 'Custom Range';
+    default: return 'All';
+  }
+}
+
+function updateDesktopDateUI() {
+  ['all', 'today', 'yesterday', 'week', 'month'].forEach(p => {
+    const opt = document.getElementById(`desk-date-opt-${p}`);
+    if (opt) {
+      if (currentDateFilter === p) opt.classList.add('active');
+      else opt.classList.remove('active');
+    }
+  });
+
+  const btn = document.getElementById('desk-date-dropdown-btn');
+  const label = document.getElementById('desk-date-btn-label');
+  if (label) {
+    label.innerText = currentDateFilter === 'all' ? 'Date: All' : `Date: ${getDesktopDatePresetLabel(currentDateFilter)}`;
+  }
+  if (btn) {
+    if (currentDateFilter !== 'all') btn.classList.add('active');
+    else btn.classList.remove('active');
+  }
+}
+
+function updateDesktopClearBtnVisibility() {
+  const clearBtn = document.getElementById('desk-clear-filters');
+  if (!clearBtn) return;
+  const isFiltered = currentQuickFilter !== 'all' || currentDateFilter !== 'all' || (searchTerm && searchTerm.length > 0);
+  clearBtn.style.display = isFiltered ? 'inline-block' : 'none';
+}
+
+function resetAllDesktopFilters() {
+  currentQuickFilter = 'all';
+  currentDateFilter = 'all';
+  customDateStart = '';
+  customDateEnd = '';
+  searchTerm = '';
+  const searchInput = document.getElementById('global-search-input') || document.querySelector('.search-input');
+  if (searchInput) searchInput.value = '';
+
+  const startInput = document.getElementById('desk-custom-date-start');
+  const endInput = document.getElementById('desk-custom-date-end');
+  if (startInput) startInput.value = '';
+  if (endInput) endInput.value = '';
+
+  ['all', 'unread', 'attachments', 'starred'].forEach(f => {
+    const btn = document.getElementById(`desk-filter-${f}`);
+    if (btn) {
+      if (f === 'all') btn.classList.add('active');
+      else btn.classList.remove('active');
+    }
+  });
+
+  updateDesktopDateUI();
+  updateDesktopClearBtnVisibility();
+  currentEmailPage = 1;
+  renderEmailList(allEmails);
+}
+
+function isDateInDesktopFilter(dateVal) {
+  if (currentDateFilter === 'all') return true;
+  if (!dateVal) return false;
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return true;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const endOfToday = startOfToday + 86400000;
+  const t = d.getTime();
+
+  if (currentDateFilter === 'today') {
+    return t >= startOfToday && t < endOfToday;
+  }
+  if (currentDateFilter === 'yesterday') {
+    const startOfYesterday = startOfToday - 86400000;
+    return t >= startOfYesterday && t < startOfToday;
+  }
+  if (currentDateFilter === 'week') {
+    const startOfWeek = startOfToday - 7 * 86400000;
+    return t >= startOfWeek;
+  }
+  if (currentDateFilter === 'month') {
+    const startOfMonth = startOfToday - 30 * 86400000;
+    return t >= startOfMonth;
+  }
+  if (currentDateFilter === 'custom') {
+    if (customDateStart) {
+      const cStart = new Date(customDateStart).getTime();
+      if (t < cStart) return false;
+    }
+    if (customDateEnd) {
+      const cEnd = new Date(customDateEnd).getTime() + 86400000;
+      if (t >= cEnd) return false;
+    }
+    return true;
+  }
+  return true;
+}
+
+function updateDesktopFilterBadges(emails) {
+  const list = emails || allEmails || [];
+  const unreadCount = list.filter(e => e.is_read === 0).length;
+  const attCount = list.filter(e => Boolean(e.has_attachments || (e.attachments && (Array.isArray(e.attachments) ? e.attachments.length > 0 : e.attachments !== '[]' && e.attachments !== '')))).length;
+  const starCount = list.filter(e => e.is_starred === 1 || e.is_important === 1).length;
+
+  const bUnread = document.getElementById('desk-badge-unread');
+  if (bUnread) {
+    bUnread.innerText = unreadCount;
+    bUnread.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+  }
+  const bAtt = document.getElementById('desk-badge-attachments');
+  if (bAtt) {
+    bAtt.innerText = attCount;
+    bAtt.style.display = attCount > 0 ? 'inline-block' : 'none';
+  }
+  const bStar = document.getElementById('desk-badge-starred');
+  if (bStar) {
+    bStar.innerText = starCount;
+    bStar.style.display = starCount > 0 ? 'inline-block' : 'none';
+  }
 }
 
 // ==================== CHECKBOX SELECTION & BULK ACTIONS ====================
@@ -2191,6 +2415,20 @@ function renderEmailList(emails) {
     filtered = filtered.filter(e => !isPhoneMailSender(e.sender_email));
   }
 
+  // Quick Filter (Unread / Attachments / Starred)
+  if (currentQuickFilter === 'unread') {
+    filtered = filtered.filter(e => e.is_read === 0);
+  } else if (currentQuickFilter === 'attachments') {
+    filtered = filtered.filter(e => Boolean(e.has_attachments || (e.attachments && (Array.isArray(e.attachments) ? e.attachments.length > 0 : e.attachments !== '[]' && e.attachments !== ''))));
+  } else if (currentQuickFilter === 'starred') {
+    filtered = filtered.filter(e => e.is_starred === 1 || e.is_important === 1);
+  }
+
+  // Date Filter
+  if (currentDateFilter !== 'all') {
+    filtered = filtered.filter(e => isDateInDesktopFilter(e.created_at || e.timestamp || e.date));
+  }
+
   if (searchTerm) {
     const term = searchTerm.toLowerCase();
     filtered = filtered.filter(e => 
@@ -2203,7 +2441,15 @@ function renderEmailList(emails) {
 
   if (filtered.length === 0) {
     let emptyMsg = `No messages found in ${getFolderFriendlyName(currentFolder)}.`;
-    if (currentMailSourceFilter === 'phonemail') {
+    if (currentQuickFilter === 'unread') {
+      emptyMsg = `No unread messages in ${getFolderFriendlyName(currentFolder)}.`;
+    } else if (currentQuickFilter === 'attachments') {
+      emptyMsg = `No messages with attachments in ${getFolderFriendlyName(currentFolder)}.`;
+    } else if (currentQuickFilter === 'starred') {
+      emptyMsg = `No starred or important messages in ${getFolderFriendlyName(currentFolder)}.`;
+    } else if (currentDateFilter !== 'all') {
+      emptyMsg = `No messages found for date filter (${getDesktopDatePresetLabel(currentDateFilter)}).`;
+    } else if (currentMailSourceFilter === 'phonemail') {
       emptyMsg = `No INAI network emails in ${getFolderFriendlyName(currentFolder)}.`;
     } else if (currentMailSourceFilter === 'external') {
       emptyMsg = `No external (Gmail, Rediff, etc.) emails in ${getFolderFriendlyName(currentFolder)}.`;
@@ -2737,6 +2983,7 @@ async function deleteCurrentEmail() {
 function filterEmails(query) {
   searchTerm = (query || '').toLowerCase().trim();
   currentEmailPage = 1;
+  updateDesktopClearBtnVisibility();
   renderEmailList(allEmails);
 }
 

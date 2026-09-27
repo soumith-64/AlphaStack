@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="/desktop/style.css?v=6">
   <!-- Instant Pre-render Session Persistence: Prevents login flash on reload -->
   <script>
     (function() {
@@ -505,6 +505,68 @@
               </button>
             </div>
 
+            <!-- Comprehensive Filters: Date, Unread, Attachments, Starred -->
+            <div class="desktop-filter-toolbar">
+              <!-- Quick Filter Pills -->
+              <div class="desktop-quick-filters">
+                <button type="button" class="desk-filter-pill active" id="desk-filter-all" onclick="setDesktopQuickFilter('all')">
+                  <span>All</span>
+                </button>
+                <button type="button" class="desk-filter-pill" id="desk-filter-unread" onclick="setDesktopQuickFilter('unread')">
+                  <span class="unread-dot-mini"></span>
+                  <span>Unread</span>
+                  <span class="desk-filter-badge" id="desk-badge-unread">0</span>
+                </button>
+                <button type="button" class="desk-filter-pill" id="desk-filter-attachments" onclick="setDesktopQuickFilter('attachments')">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                  <span>Attachments</span>
+                  <span class="desk-filter-badge" id="desk-badge-attachments">0</span>
+                </button>
+                <button type="button" class="desk-filter-pill" id="desk-filter-starred" onclick="setDesktopQuickFilter('starred')">
+                  <svg viewBox="0 0 24 24" width="13" height="13" fill="#eab308" stroke="#ca8a04" stroke-width="1.2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span>Starred</span>
+                  <span class="desk-filter-badge" id="desk-badge-starred">0</span>
+                </button>
+              </div>
+
+              <!-- Date Filter Dropdown -->
+              <div class="desktop-date-filter-wrapper" style="position: relative;">
+                <button type="button" class="desk-date-btn" id="desk-date-dropdown-btn" onclick="toggleDesktopDateDropdown(event)">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span id="desk-date-btn-label">Date: All</span>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+
+                <div class="desktop-date-menu" id="desk-date-menu" style="display: none;" onclick="event.stopPropagation()">
+                  <button type="button" class="date-menu-opt active" id="desk-date-opt-all" onclick="setDesktopDateFilter('all')">📅 All Dates (Any Time)</button>
+                  <button type="button" class="date-menu-opt" id="desk-date-opt-today" onclick="setDesktopDateFilter('today')">🌅 Today</button>
+                  <button type="button" class="date-menu-opt" id="desk-date-opt-yesterday" onclick="setDesktopDateFilter('yesterday')">⏳ Yesterday</button>
+                  <button type="button" class="date-menu-opt" id="desk-date-opt-week" onclick="setDesktopDateFilter('week')">🗓️ Last 7 Days (This Week)</button>
+                  <button type="button" class="date-menu-opt" id="desk-date-opt-month" onclick="setDesktopDateFilter('month')">📆 Last 30 Days (This Month)</button>
+                  <div class="date-menu-divider"></div>
+                  <div class="date-menu-custom">
+                    <div class="custom-date-title">Custom Date Range:</div>
+                    <div class="custom-date-inputs">
+                      <div class="custom-date-group">
+                        <label>FROM</label>
+                        <input type="date" id="desk-custom-date-start">
+                      </div>
+                      <div class="custom-date-group">
+                        <label>TO</label>
+                        <input type="date" id="desk-custom-date-end">
+                      </div>
+                    </div>
+                    <button type="button" class="btn-apply-custom-date" onclick="applyDesktopCustomDateFilter()">Apply Range ✓</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reset / Clear Active Filter Button -->
+              <button type="button" class="desk-clear-filters-btn" id="desk-clear-filters" onclick="resetAllDesktopFilters()" style="display: none;" title="Reset all filters">
+                ✕ Clear
+              </button>
+            </div>
+
             <div class="toolbar-right">
               <span class="mail-pagination-label" id="mail-page-indicator">1–25 of 25</span>
               <div class="pagination-btn-group">
@@ -932,6 +994,6 @@
   <div id="app-toast-container" class="app-toast-container"></div>
   <div id="app-dialog-overlay" class="app-dialog-overlay" style="display: none;"></div>
 
-  <script src="app.js?v=3"></script>
+  <script src="/desktop/app.js?v=6"></script>
 </body>
 </html>

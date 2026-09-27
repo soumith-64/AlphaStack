@@ -43,23 +43,24 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
-// Root route: Automatically route to real Mobile or Desktop app based on client device
+// Root route: Directly serve Mobile or Desktop app at "/" without URL redirection (keeps URL clean: alphastack.wwisvnr.com)
 app.get('/', (req, res) => {
   const ua = (req.headers['user-agent'] || '').toLowerCase();
   const isMobile = /mobile|iphone|android|ipad|phone/i.test(ua);
-  const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  res.redirect((isMobile ? '/mobile/' : '/desktop/') + query);
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  if (isMobile) {
+    res.sendFile(path.join(__dirname, 'public/mobile/index.html'));
+  } else {
+    res.sendFile(path.join(__dirname, 'public/desktop/index.html'));
+  }
 });
 
-// Guard desktop route: Phone users are strictly confined to Mobile (Traditional & Messenger Views)
-app.use((req, res, next) => {
-  const ua = (req.headers['user-agent'] || '').toLowerCase();
-  const isMobile = /mobile|iphone|android|ipad|phone/i.test(ua);
-  if (isMobile && (req.path.startsWith('/desktop') || req.path === '/desktop')) {
-    const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-    return res.redirect('/mobile/' + query);
-  }
-  next();
+// Clean URL: Redirect any legacy /mobile or /desktop path to clean root "/"
+app.get(['/mobile', '/mobile/', '/desktop', '/desktop/'], (req, res) => {
+  const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  res.redirect('/' + query);
 });
 
 // Serve frontend static files

@@ -2,6 +2,13 @@
 // Real-time Phone-to-Email Platform for Bharat
 // =========================================================================
 
+// Clean URL: Keep address bar as clean "alphastack.wwisvnr.com" (strip /mobile)
+try {
+  if (window.location.pathname.startsWith('/mobile')) {
+    window.history.replaceState(null, document.title, '/' + (window.location.search || ''));
+  }
+} catch(e) {}
+
 // ==================== GLOBAL STATE ====================
 let currentUser = null;
 let pendingPhone = '';

@@ -1642,6 +1642,224 @@ button {
   border-color: rgba(37, 99, 235, 0.25);
 }
 
+/* ==================== DESKTOP ADVANCED FILTER BAR ==================== */
+.desktop-filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 10px;
+}
+
+.desktop-quick-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.desk-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 20px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.desk-filter-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+  border-color: var(--border-focus);
+}
+
+.desk-filter-pill.active {
+  background: rgba(4, 106, 56, 0.1);
+  color: var(--green-main);
+  border-color: rgba(4, 106, 56, 0.35);
+  font-weight: 700;
+}
+
+[data-theme="dark"] .desk-filter-pill.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.desk-filter-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+}
+
+.unread-dot-mini {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2563eb;
+  display: inline-block;
+}
+
+/* Date Filter Dropdown */
+.desktop-date-filter-wrapper {
+  position: relative;
+}
+
+.desk-date-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.desk-date-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.desk-date-btn.active {
+  background: rgba(4, 106, 56, 0.1);
+  color: var(--green-main);
+  border-color: rgba(4, 106, 56, 0.35);
+  font-weight: 700;
+}
+
+.desktop-date-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 250px;
+  padding: 6px 0;
+  animation: fadeIn 0.15s ease;
+}
+
+.date-menu-opt {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.date-menu-opt:hover {
+  background: var(--bg-hover);
+}
+
+.date-menu-opt.active {
+  color: var(--green-main);
+  font-weight: 700;
+  background: rgba(4, 106, 56, 0.08);
+}
+
+.date-menu-divider {
+  height: 1px;
+  background: var(--border-light);
+  margin: 6px 0;
+}
+
+.date-menu-custom {
+  padding: 8px 14px 10px;
+}
+
+.custom-date-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.custom-date-inputs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.custom-date-group {
+  flex: 1;
+}
+
+.custom-date-group label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.custom-date-group input {
+  width: 100%;
+  padding: 5px 6px;
+  font-size: 11px;
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  background: var(--bg-subtle);
+  color: var(--text-main);
+  outline: none;
+}
+
+.btn-apply-custom-date {
+  width: 100%;
+  padding: 6px;
+  background: #046A38;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn-apply-custom-date:hover {
+  background: #03522b;
+}
+
+.desk-clear-filters-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #ef4444;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.desk-clear-filters-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
 /* Badges on email card items and reading pane - Professional Executive Grade */
 .badge-source-tag {
   display: inline-flex;
