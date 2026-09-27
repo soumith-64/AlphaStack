@@ -663,7 +663,20 @@
 
               <textarea id="desktop-thread-reply-input" class="inline-dock-textarea" rows="3" placeholder="Type a reply to this conversation..."></textarea>
 
-              <div class="inline-dock-actions">
+              <div class="inline-dock-actions" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button type="button" class="btn-voice-record" id="desk-voice-dock-btn" onclick="toggleVoiceRecording('desktop-dock')" title="Record Voice Mail">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                    <span id="desk-voice-dock-label">Voice Mail</span>
+                  </button>
+                  <div id="desk-voice-dock-preview" class="voice-dock-preview-tray" style="display: none;">
+                    <span style="font-size: 15px;">🎙️</span>
+                    <span id="desk-dock-voice-duration" style="font-size: 11.5px; font-weight: 700; color: var(--green-main);">Voice Note (0:00)</span>
+                    <audio id="desk-dock-voice-audio" controls style="height: 30px; max-width: 170px;"></audio>
+                    <button type="button" class="close-btn" onclick="removeDesktopDockVoiceMail()" style="font-size: 11px; padding: 2px 5px;">✕</button>
+                  </div>
+                </div>
+
                 <button type="button" class="btn-primary" onclick="submitDesktopThreadReply()">
                   <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                   <span>Send Reply</span>
@@ -708,14 +721,29 @@
         <textarea id="desk-compose-body" rows="8" placeholder="Type your message here..."></textarea>
       </div>
 
-      <div class="compose-footer">
-        <button class="btn-primary" onclick="sendDesktopEmail()">
-          <span>Send Message</span>
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-        <button class="action-btn danger" onclick="closeComposeModal()" title="Discard Draft">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        </button>
+      <div class="compose-footer" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" class="btn-voice-record" id="desk-voice-compose-btn" onclick="toggleVoiceRecording('desktop-compose')" title="Record Voice Mail">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <span id="desk-voice-compose-label">Voice Mail</span>
+          </button>
+          <div id="desk-voice-compose-preview" class="voice-dock-preview-tray" style="display: none;">
+            <span style="font-size: 15px;">🎙️</span>
+            <span id="desk-compose-voice-duration" style="font-size: 11.5px; font-weight: 700; color: var(--green-main);">Voice Note (0:00)</span>
+            <audio id="desk-compose-voice-audio" controls style="height: 30px; max-width: 170px;"></audio>
+            <button type="button" class="close-btn" onclick="removeDesktopComposeVoiceMail()" style="font-size: 11px; padding: 2px 5px;">✕</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn-primary" onclick="sendDesktopEmail()">
+            <span>Send Message</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-left: 4px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+          <button class="action-btn danger" onclick="closeComposeModal()" title="Discard Draft">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>

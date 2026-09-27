@@ -2598,11 +2598,43 @@ function renderChatTimeline(conv) {
       }
     }
 
+    // Extract inline or attached voice mail audio
+    let voiceMailAudioSrc = '';
+    let voiceMailDuration = '0:00';
+    let voiceMailTranscript = '';
+
+    if (msg.body_html) {
+      const audioMatch = msg.body_html.match(/<audio[^>]+src=["']([^"']+)["']/i);
+      if (audioMatch && audioMatch[1]) {
+        voiceMailAudioSrc = audioMatch[1];
+        const durMatch = msg.body_html.match(/data-duration=["']([^"']+)["']/i);
+        if (durMatch && durMatch[1]) voiceMailDuration = durMatch[1];
+        const transMatch = msg.body_html.match(/class=["'][^"']*voicemail-transcript-box[^"']*["'][^>]*>[\s\S]*?<span[^>]*>"?([^"<]+)"?<\/span>/i);
+        if (transMatch && transMatch[1]) voiceMailTranscript = transMatch[1];
+      }
+    }
+    if (!voiceMailAudioSrc && msg.attachments && msg.attachments.length > 0) {
+      const audioAtt = msg.attachments.find(a => 
+        (a.content_type && a.content_type.startsWith('audio/')) || 
+        (a.filename && /\.(webm|mp3|ogg|wav|m4a|aac)$/i.test(a.filename))
+      );
+      if (audioAtt) {
+        voiceMailAudioSrc = audioAtt.url || `/api/attachments/${audioAtt.id}`;
+      }
+    }
+    if (!voiceMailTranscript && msg.body_text) {
+      const txtTransMatch = msg.body_text.match(/Transcription:\s*"?([^"\n]+)"?/i);
+      if (txtTransMatch) voiceMailTranscript = txtTransMatch[1];
+      const durTxtMatch = msg.body_text.match(/Voice Mail\s*\(([^)]+)\)/i);
+      if (durTxtMatch) voiceMailDuration = durTxtMatch[1];
+    }
+
     let cleanText = (msg.body_text || '').replace(/\[image:[^\]]*\]/gi, '').trim();
     if (!cleanText && msg.body_html) {
       cleanText = msg.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     }
-    const hasLongContent = cleanText.length > 180 || Boolean(previewImageSrc) || (msg.body_html && msg.body_html.length > 250);
+    const isPureVoiceMail = voiceMailAudioSrc && (!cleanText || cleanText.startsWith('🎙️ Voice Mail'));
+    const hasLongContent = !isPureVoiceMail && (cleanText.length > 180 || Boolean(previewImageSrc) || (msg.body_html && msg.body_html.length > 250));
     const snippetText = hasLongContent ? (cleanText.substring(0, 160) + (cleanText.length > 160 ? '...' : '')) : cleanText;
 
     // First email in thread shows Subject; replies hide Subject
@@ -2656,12 +2688,69 @@ function renderChatTimeline(conv) {
       </div>
     ` : '';
 
+    // WhatsApp-grade Voice Note Bubble Player
+    const voiceNoteHtml = voiceMailAudioSrc ? `
+      <div class="chat-voice-note-player" id="voice-player-${msg.id}">
+        <button type="button" class="voice-play-toggle" onclick="toggleAudioBubblePlayback('${msg.id}', '${voiceMailAudioSrc}', this)" title="Play / Pause Voice Mail">
+          <svg class="play-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <svg class="pause-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="display:none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        </button>
+        
+        <div class="voice-waveform-area" onclick="seekAudioBubble('${msg.id}', event)">
+          <div class="voice-waveform-bars" id="waveform-bars-${msg.id}">
+            <span class="wave-bar" style="height: 35%;"></span>
+            <span class="wave-bar" style="height: 60%;"></span>
+            <span class="wave-bar" style="height: 90%;"></span>
+            <span class="wave-bar" style="height: 45%;"></span>
+            <span class="wave-bar" style="height: 75%;"></span>
+            <span class="wave-bar" style="height: 100%;"></span>
+            <span class="wave-bar" style="height: 65%;"></span>
+            <span class="wave-bar" style="height: 40%;"></span>
+            <span class="wave-bar" style="height: 85%;"></span>
+            <span class="wave-bar" style="height: 95%;"></span>
+            <span class="wave-bar" style="height: 70%;"></span>
+            <span class="wave-bar" style="height: 50%;"></span>
+            <span class="wave-bar" style="height: 80%;"></span>
+            <span class="wave-bar" style="height: 60%;"></span>
+            <span class="wave-bar" style="height: 30%;"></span>
+            <span class="wave-bar" style="height: 75%;"></span>
+            <span class="wave-bar" style="height: 90%;"></span>
+            <span class="wave-bar" style="height: 40%;"></span>
+          </div>
+          <div class="voice-time-row">
+            <span class="voice-timer" id="voice-timer-${msg.id}">0:00</span>
+            <span class="voice-total-duration">${voiceMailDuration || 'Voice Note'}</span>
+          </div>
+        </div>
+
+        <div class="voice-avatar-badge">
+          <span class="voice-mic-badge">🎙️</span>
+        </div>
+        
+        <button type="button" class="voice-speed-chip" onclick="toggleAudioSpeed('${msg.id}', this)" title="Playback speed">1x</button>
+      </div>
+      ${voiceMailTranscript ? `
+        <div class="voice-transcript-accordion">
+          <button type="button" class="btn-toggle-transcript" onclick="toggleTranscriptView('${msg.id}')">
+            <span>📝 AI Transcript</span>
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="voice-transcript-text" id="voice-transcript-${msg.id}" style="display: none;">
+            "${escapeHtml(voiceMailTranscript)}"
+          </div>
+        </div>
+      ` : ''}
+    ` : '';
+
     // Body display with snippet & actions
     const bodyContentHtml = `
       ${imageHtml}
-      <div class="chat-message-text" id="body-text-${msg.id}">
-        ${escapeHtml(snippetText).replace(/\n/g, '<br>')}
-      </div>
+      ${voiceNoteHtml}
+      ${(!isPureVoiceMail && snippetText) ? `
+        <div class="chat-message-text" id="body-text-${msg.id}">
+          ${escapeHtml(snippetText).replace(/\n/g, '<br>')}
+        </div>
+      ` : ''}
       ${hasLongContent ? `
         <div class="chat-long-email-actions" id="chat-actions-${msg.id}">
           <button type="button" class="btn-chat-link expand-btn" onclick="toggleExpandMessage('${msg.id}')">
@@ -4132,13 +4221,14 @@ async function submitTraditionalCompose() {
     showToastNotification('Please enter a recipient', 'warning');
     return;
   }
-  if (!body && !activeTradAttachedImage) {
-    showToastNotification('Please enter a message or attach an image', 'warning');
+  if (!body && !activeTradAttachedImage && !activeTradVoiceMail) {
+    showToastNotification('Please enter a message, attach an image, or record a voice mail', 'warning');
     return;
   }
 
   const sendSms = Boolean(document.getElementById('mob-send-textbee-sms')?.checked);
   const imageSnapshot = activeTradAttachedImage ? activeTradAttachedImage.dataUrl : null;
+  const voiceSnapshot = activeTradVoiceMail ? { ...activeTradVoiceMail } : null;
 
   showToastNotification('Sending message...', 'info');
 
@@ -4150,19 +4240,21 @@ async function submitTraditionalCompose() {
         sender_phone: currentUser.phone,
         to,
         subject,
-        body: body || '[Photo attached]',
+        body: body || (voiceSnapshot ? `🎙️ Voice Mail (${voiceSnapshot.duration})` : '[Photo attached]'),
         images: imageSnapshot ? [imageSnapshot] : [],
+        voiceMail: voiceSnapshot,
         send_sms: sendSms
       })
     });
     const data = await res.json();
     if (data.success) {
       if (data.sms_dispatched) {
-        showToastNotification('Message & Photo sent! Recipient notified via TextBee SMS 📱', 'success');
+        showToastNotification('Message & Voice sent! Recipient notified via TextBee SMS 📱', 'success');
       } else {
-        showToastNotification(imageSnapshot ? 'Email with image sent! 📸🚀' : 'Message sent successfully! 🚀', 'success');
+        showToastNotification(voiceSnapshot ? 'Voice Mail sent! 🎙️🚀' : (imageSnapshot ? 'Email with image sent! 📸🚀' : 'Message sent successfully! 🚀'), 'success');
       }
       closeTraditionalCompose();
+      removeMobileTradVoiceMail();
       // Invalidate cache and reload
       emailFolderCache = {};
       loadEmails(currentFolder);
@@ -4719,13 +4811,392 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// ==================== INITIALIZATION ====================
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => {
-    restoreSession();
-    loadPhoneEmailScript();
+// ==================== VOICE MAIL RECORDING & PLAYBACK CONTROLLER ====================
+let voiceMediaRecorder = null;
+let voiceMediaStream = null;
+let voiceAudioChunks = [];
+let voiceTimerInterval = null;
+let voiceRecordSeconds = 0;
+let voiceActiveContext = null; // 'mobile-chat' | 'mobile-trad'
+let voiceSpeechRecognition = null;
+let voiceLiveTranscript = '';
+let activeTradVoiceMail = null; // { dataUrl, duration, transcription }
+
+// Global Audio Bubble Playback State
+let currentActiveAudio = null;
+let currentPlayingMsgId = null;
+
+async function toggleVoiceRecording(context) {
+  if (voiceMediaRecorder && voiceMediaRecorder.state === 'recording') {
+    if (context === 'mobile-chat') {
+      await sendVoiceRecording('mobile-chat');
+    } else {
+      await stopVoiceRecording(context);
+    }
+  } else {
+    await startVoiceRecording(context);
+  }
+}
+
+async function startVoiceRecording(context) {
+  voiceActiveContext = context;
+  voiceAudioChunks = [];
+  voiceRecordSeconds = 0;
+  voiceLiveTranscript = '';
+
+  try {
+    voiceMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    console.error('Microphone permission denied or unavailable:', err);
+    showToastNotification('Microphone access denied. Please allow microphone permissions in settings.', 'error');
+    return;
+  }
+
+  // Determine best audio mime type supported
+  let mimeType = 'audio/webm;codecs=opus';
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+    if (MediaRecorder.isTypeSupported(mimeType)) {}
+    else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+    else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+    else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+    else mimeType = '';
+  } else {
+    mimeType = '';
+  }
+
+  try {
+    voiceMediaRecorder = mimeType ? new MediaRecorder(voiceMediaStream, { mimeType }) : new MediaRecorder(voiceMediaStream);
+  } catch(e) {
+    voiceMediaRecorder = new MediaRecorder(voiceMediaStream);
+  }
+
+  voiceMediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) {
+      voiceAudioChunks.push(e.data);
+    }
+  };
+
+  // Start Live Speech-to-Text Recognition in Background
+  try {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+      voiceSpeechRecognition = new SpeechRec();
+      voiceSpeechRecognition.continuous = true;
+      voiceSpeechRecognition.interimResults = true;
+      const langMap = { 'hi': 'hi-IN', 'ta': 'ta-IN', 'en': 'en-IN' };
+      voiceSpeechRecognition.lang = (currentUser && langMap[currentUser.language]) ? langMap[currentUser.language] : 'en-US';
+      voiceSpeechRecognition.onresult = (evt) => {
+        let text = '';
+        for (let i = 0; i < evt.results.length; i++) {
+          text += evt.results[i][0].transcript + ' ';
+        }
+        voiceLiveTranscript = text.trim();
+        const hintEl = document.getElementById('mob-voice-live-text');
+        if (hintEl && voiceLiveTranscript) {
+          hintEl.innerText = voiceLiveTranscript;
+        }
+      };
+      voiceSpeechRecognition.start();
+    }
+  } catch (recErr) {
+    console.warn('Speech recognition notice:', recErr.message);
+  }
+
+  voiceMediaRecorder.start(200);
+
+  // Update UI for recording state
+  if (context === 'mobile-chat') {
+    const overlay = document.getElementById('mob-voice-recording-overlay');
+    if (overlay) overlay.style.display = 'flex';
+    const hintEl = document.getElementById('mob-voice-live-text');
+    if (hintEl) hintEl.innerText = 'Listening...';
+    const timerEl = document.getElementById('mob-voice-timer');
+    if (timerEl) timerEl.innerText = '0:00';
+  } else if (context === 'mobile-trad') {
+    const btn = document.getElementById('mob-trad-voice-btn');
+    if (btn) btn.classList.add('recording');
+    const lbl = document.getElementById('mob-trad-voice-label');
+    if (lbl) lbl.innerText = 'Recording (0:00)...';
+  }
+
+  // Timer interval
+  clearInterval(voiceTimerInterval);
+  voiceTimerInterval = setInterval(() => {
+    voiceRecordSeconds++;
+    const mins = Math.floor(voiceRecordSeconds / 60);
+    const secs = voiceRecordSeconds % 60;
+    const timeStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+    const timerEl = document.getElementById('mob-voice-timer');
+    if (timerEl) timerEl.innerText = timeStr;
+
+    if (context === 'mobile-trad') {
+      const lbl = document.getElementById('mob-trad-voice-label');
+      if (lbl) lbl.innerText = `Recording (${timeStr})...`;
+    }
+  }, 1000);
+}
+
+function cancelVoiceRecording(context) {
+  clearInterval(voiceTimerInterval);
+  if (voiceSpeechRecognition) {
+    try { voiceSpeechRecognition.stop(); } catch(e) {}
+    voiceSpeechRecognition = null;
+  }
+  if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
+    voiceMediaRecorder.stop();
+  }
+  if (voiceMediaStream) {
+    voiceMediaStream.getTracks().forEach(t => t.stop());
+    voiceMediaStream = null;
+  }
+  voiceAudioChunks = [];
+  voiceRecordSeconds = 0;
+
+  if (context === 'mobile-chat') {
+    const overlay = document.getElementById('mob-voice-recording-overlay');
+    if (overlay) overlay.style.display = 'none';
+  } else if (context === 'mobile-trad') {
+    const btn = document.getElementById('mob-trad-voice-btn');
+    if (btn) btn.classList.remove('recording');
+    const lbl = document.getElementById('mob-trad-voice-label');
+    if (lbl) lbl.innerText = activeTradVoiceMail ? 'Re-record Voice' : 'Voice Mail';
+  }
+}
+
+async function sendVoiceRecording(context) {
+  clearInterval(voiceTimerInterval);
+  if (voiceSpeechRecognition) {
+    try { voiceSpeechRecognition.stop(); } catch(e) {}
+    voiceSpeechRecognition = null;
+  }
+
+  if (!voiceMediaRecorder || voiceMediaRecorder.state === 'inactive') {
+    cancelVoiceRecording(context);
+    return;
+  }
+
+  const mins = Math.floor(voiceRecordSeconds / 60);
+  const secs = voiceRecordSeconds % 60;
+  const durationStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+  return new Promise((resolve) => {
+    voiceMediaRecorder.onstop = async () => {
+      if (voiceMediaStream) {
+        voiceMediaStream.getTracks().forEach(t => t.stop());
+        voiceMediaStream = null;
+      }
+
+      const mimeType = voiceMediaRecorder.mimeType || 'audio/webm';
+      const audioBlob = new Blob(voiceAudioChunks, { type: mimeType });
+
+      // Convert to base64 Data URL
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const audioDataUrl = reader.result;
+
+        if (context === 'mobile-chat') {
+          const overlay = document.getElementById('mob-voice-recording-overlay');
+          if (overlay) overlay.style.display = 'none';
+
+          if (!activeConversation) return resolve();
+
+          const to = activeConversation.participant_phone || (activeConversation.messages && activeConversation.messages[0] ? activeConversation.messages[0].sender_email : null);
+          if (!to) return resolve();
+
+          const subject = `🎙️ Voice Mail (${durationStr})`;
+          const body = `🎙️ Voice Mail (${durationStr})${voiceLiveTranscript ? `\n\n"${voiceLiveTranscript}"` : ''}`;
+
+          try {
+            const payload = {
+              sender_phone: currentUser.phone,
+              to: to,
+              subject: subject,
+              body: body,
+              voiceMail: {
+                dataUrl: audioDataUrl,
+                duration: durationStr,
+                transcription: voiceLiveTranscript
+              },
+              reply_to_id: activeReplyingMessage ? activeReplyingMessage.id : null,
+              conversation_id: activeConversation.id
+            };
+
+            const res = await fetch('/api/emails/send', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+              if (activeReplyingMessage) activeReplyingMessage.has_replied = 1;
+              cancelQuotedReply();
+
+              // Append outgoing voicemail note to timeline immediately
+              const now = new Date();
+              const newMsg = {
+                id: data.email ? data.email.id : `tmp_${Date.now()}`,
+                sender_email: `${currentUser.phone}@alphastack.wwisvnr.com`,
+                sender_name: currentUser.display_name || currentUser.phone,
+                subject: subject,
+                body_text: body,
+                body_html: `<div class="inai-voicemail-player" data-duration="${durationStr}" data-audio-src="${audioDataUrl}"><audio src="${audioDataUrl}"></audio>${voiceLiveTranscript ? `<div class="voicemail-transcript-box"><span>${voiceLiveTranscript}</span></div>` : ''}</div>`,
+                created_at: now.toISOString(),
+                is_read: 1,
+                has_replied: 0
+              };
+              activeConversation.messages.push(newMsg);
+              renderChatTimeline(activeConversation);
+
+              showToastNotification('Voice mail sent! 🎙️🚀', 'success');
+              if (navigator.vibrate) navigator.vibrate([40]);
+            }
+          } catch(err) {
+            console.error('Failed to send voice mail:', err);
+            showToastNotification('Failed to send voice mail', 'error');
+          }
+        } else if (context === 'mobile-trad') {
+          activeTradVoiceMail = {
+            dataUrl: audioDataUrl,
+            duration: durationStr,
+            transcription: voiceLiveTranscript
+          };
+
+          const btn = document.getElementById('mob-trad-voice-btn');
+          if (btn) btn.classList.remove('recording');
+          const lbl = document.getElementById('mob-trad-voice-label');
+          if (lbl) lbl.innerText = 'Re-record Voice';
+
+          const tray = document.getElementById('mob-trad-voice-preview-tray');
+          if (tray) tray.style.display = 'block';
+          const durEl = document.getElementById('mob-trad-voice-duration');
+          if (durEl) durEl.innerText = `Voice Mail (${durationStr})`;
+          const audEl = document.getElementById('mob-trad-voice-audio');
+          if (audEl) audEl.src = audioDataUrl;
+
+          showToastNotification(`Voice mail recorded (${durationStr}) 🎙️`, 'info');
+        }
+        resolve();
+      };
+      reader.readAsDataURL(audioBlob);
+    };
+    voiceMediaRecorder.stop();
   });
-} else {
-  restoreSession();
-  loadPhoneEmailScript();
+}
+
+function stopVoiceRecording(context) {
+  sendVoiceRecording(context);
+}
+
+function removeMobileTradVoiceMail() {
+  activeTradVoiceMail = null;
+  const tray = document.getElementById('mob-trad-voice-preview-tray');
+  if (tray) tray.style.display = 'none';
+  const audEl = document.getElementById('mob-trad-voice-audio');
+  if (audEl) audEl.src = '';
+  const lbl = document.getElementById('mob-trad-voice-label');
+  if (lbl) lbl.innerText = 'Voice Mail';
+}
+
+// ==================== WHATSAPP AUDIO BUBBLE PLAYBACK ====================
+function toggleAudioBubblePlayback(msgId, audioSrc, btnEl) {
+  if (currentActiveAudio && currentPlayingMsgId === msgId) {
+    if (currentActiveAudio.paused) {
+      currentActiveAudio.play();
+      updateAudioBubblePlayState(msgId, true);
+    } else {
+      currentActiveAudio.pause();
+      updateAudioBubblePlayState(msgId, false);
+    }
+    return;
+  }
+
+  // Stop any previously playing audio
+  if (currentActiveAudio) {
+    currentActiveAudio.pause();
+    if (currentPlayingMsgId) updateAudioBubblePlayState(currentPlayingMsgId, false);
+    currentActiveAudio = null;
+    currentPlayingMsgId = null;
+  }
+
+  const audio = new Audio(audioSrc);
+  currentActiveAudio = audio;
+  currentPlayingMsgId = msgId;
+
+  audio.ontimeupdate = () => {
+    if (!audio.duration) return;
+    const progress = (audio.currentTime / audio.duration) * 100;
+    const curMins = Math.floor(audio.currentTime / 60);
+    const curSecs = Math.floor(audio.currentTime % 60);
+    const timeStr = `${curMins}:${curSecs < 10 ? '0' : ''}${curSecs}`;
+
+    const timerEl = document.getElementById(`voice-timer-${msgId}`);
+    if (timerEl) timerEl.innerText = timeStr;
+
+    // Highlight wave bars
+    const waveContainer = document.getElementById(`waveform-bars-${msgId}`);
+    if (waveContainer) {
+      const bars = waveContainer.querySelectorAll('.wave-bar');
+      const activeBarCount = Math.floor((progress / 100) * bars.length);
+      bars.forEach((b, idx) => {
+        if (idx <= activeBarCount) b.classList.add('played');
+        else b.classList.remove('played');
+      });
+    }
+  };
+
+  audio.onended = () => {
+    updateAudioBubblePlayState(msgId, false);
+    const timerEl = document.getElementById(`voice-timer-${msgId}`);
+    if (timerEl) timerEl.innerText = '0:00';
+    const waveContainer = document.getElementById(`waveform-bars-${msgId}`);
+    if (waveContainer) {
+      waveContainer.querySelectorAll('.wave-bar').forEach(b => b.classList.remove('played'));
+    }
+    currentActiveAudio = null;
+    currentPlayingMsgId = null;
+  };
+
+  audio.play().then(() => {
+    updateAudioBubblePlayState(msgId, true);
+  }).catch(err => {
+    console.error('Audio playback error:', err);
+  });
+}
+
+function updateAudioBubblePlayState(msgId, isPlaying) {
+  const player = document.getElementById(`voice-player-${msgId}`);
+  if (!player) return;
+  const playIcon = player.querySelector('.play-icon');
+  const pauseIcon = player.querySelector('.pause-icon');
+  if (playIcon && pauseIcon) {
+    playIcon.style.display = isPlaying ? 'none' : 'block';
+    pauseIcon.style.display = isPlaying ? 'block' : 'none';
+  }
+}
+
+function seekAudioBubble(msgId, event) {
+  if (!currentActiveAudio || currentPlayingMsgId !== msgId || !currentActiveAudio.duration) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const clickX = event.clientX - rect.left;
+  const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+  currentActiveAudio.currentTime = ratio * currentActiveAudio.duration;
+}
+
+function toggleAudioSpeed(msgId, speedBtn) {
+  if (!currentActiveAudio || currentPlayingMsgId !== msgId) return;
+  let nextSpeed = 1;
+  if (currentActiveAudio.playbackRate === 1) nextSpeed = 1.5;
+  else if (currentActiveAudio.playbackRate === 1.5) nextSpeed = 2;
+  else nextSpeed = 1;
+
+  currentActiveAudio.playbackRate = nextSpeed;
+  speedBtn.innerText = `${nextSpeed}x`;
+}
+
+function toggleTranscriptView(msgId) {
+  const el = document.getElementById(`voice-transcript-${msgId}`);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }

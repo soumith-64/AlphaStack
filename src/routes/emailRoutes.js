@@ -299,22 +299,69 @@ router.post('/emails/send', async (req, res) => {
     let bodyText = req.body.bodyText || req.body.body || req.body.message || '';
     const bodyHtml = req.body.bodyHtml || req.body.body_html || req.body.html || null;
     const images = Array.isArray(req.body.images) ? req.body.images : (req.body.image ? [req.body.image] : []);
+    const voiceMail = req.body.voiceMail || req.body.voicemail || req.body.audio || null;
     const replyToId = req.body.replyToId || req.body.reply_to_id || null;
     const conversationId = req.body.conversationId || req.body.conversation_id || null;
     const sendSmsRequested = Boolean(req.body.send_sms || req.body.sendSmsNotification || req.body.sendSms);
 
-    if (!bodyText && images.length > 0) {
-      bodyText = '[Photo attached]';
+    let voiceMailDataUrl = null;
+    let voiceMailDuration = '0:00';
+    let voiceMailTranscript = '';
+
+    if (voiceMail) {
+      if (typeof voiceMail === 'object' && voiceMail.dataUrl) {
+        voiceMailDataUrl = voiceMail.dataUrl;
+        voiceMailDuration = voiceMail.duration || '0:00';
+        voiceMailTranscript = voiceMail.transcription || voiceMail.transcript || '';
+      } else if (typeof voiceMail === 'string') {
+        voiceMailDataUrl = voiceMail;
+        voiceMailDuration = req.body.duration || '0:00';
+        voiceMailTranscript = req.body.transcription || req.body.transcript || '';
+      }
     }
 
-    if (!rawSender || !rawRecipients || (!bodyText && images.length === 0)) {
-      return res.status(400).json({ error: 'Sender phone, recipient(s), and message body or image are required' });
+    if (!bodyText && (images.length > 0 || voiceMailDataUrl)) {
+      if (voiceMailDataUrl) {
+        bodyText = `🎙️ Voice Mail (${voiceMailDuration})${voiceMailTranscript ? `\n\n"${voiceMailTranscript}"` : ''}`;
+      } else {
+        bodyText = '[Photo attached]';
+      }
+    }
+
+    if (!rawSender || !rawRecipients || (!bodyText && images.length === 0 && !voiceMailDataUrl)) {
+      return res.status(400).json({ error: 'Sender phone, recipient(s), and message body or voice note are required' });
     }
 
     const cleanSender = String(rawSender).replace(/\D/g, '').slice(-10);
 
-    // Build final HTML with inline images if present
+    // Build final HTML with inline images or voice mail if present
     let finalBodyHtml = bodyHtml;
+
+    if (voiceMailDataUrl) {
+      const voiceMailHtml = `
+        <div class="inai-voicemail-player" data-duration="${voiceMailDuration}" data-audio-src="${voiceMailDataUrl}" style="margin: 12px 0; padding: 14px 18px; border-radius: 14px; background: linear-gradient(135deg, #064e3b 0%, #046a38 100%); color: #ffffff; max-width: 440px; box-shadow: 0 4px 14px rgba(4,106,56,0.22); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 20px;">🎙️</span>
+              <div>
+                <div style="font-weight: 800; font-size: 14px; letter-spacing: 0.2px;">INAI Voice Mail</div>
+                <div style="font-size: 11px; opacity: 0.85;">Duration: ${voiceMailDuration}</div>
+              </div>
+            </div>
+            <span style="background: rgba(255,255,255,0.22); padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase;">Voice Note</span>
+          </div>
+          <audio controls src="${voiceMailDataUrl}" preload="metadata" style="width: 100%; height: 38px; border-radius: 8px; outline: none; margin-top: 4px;"></audio>
+          ${voiceMailTranscript ? `<div class="voicemail-transcript-box" style="margin-top: 10px; padding: 8px 10px; background: rgba(0,0,0,0.22); border-radius: 8px; font-size: 12px; line-height: 1.4;"><strong style="opacity: 0.9;">📝 AI Transcription:</strong><br><span style="font-style: italic;">"${voiceMailTranscript.replace(/"/g, '&quot;')}"</span></div>` : ''}
+        </div>
+      `;
+      if (finalBodyHtml) {
+        finalBodyHtml = `${voiceMailHtml}${finalBodyHtml}`;
+      } else {
+        const textPart = bodyText ? `<div>${String(bodyText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>` : '';
+        finalBodyHtml = `${voiceMailHtml}${textPart}`;
+      }
+    }
+
     if (images.length > 0) {
       const imagesHtml = images.map(img => `
         <div style="margin: 12px 0;">
@@ -333,10 +380,11 @@ router.post('/emails/send', async (req, res) => {
     const email = await emailService.sendOutboundEmail({
       senderPhone: cleanSender,
       toRecipients: rawRecipients,
-      subject,
+      subject: subject || (voiceMailDataUrl ? `🎙️ Voice Mail (${voiceMailDuration})` : ''),
       bodyText,
       bodyHtml: finalBodyHtml,
       images,
+      voiceMail: voiceMailDataUrl ? { dataUrl: voiceMailDataUrl, duration: voiceMailDuration, transcript: voiceMailTranscript } : null,
       replyToId: replyToId || null,
       conversationId: conversationId || null
     });

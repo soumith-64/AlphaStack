@@ -2822,6 +2822,89 @@ function renderDesktopEmailReadingView(email) {
     `;
   }
 
+  // Extract inline or attached voice mail audio
+  let voiceMailAudioSrc = '';
+  let voiceMailDuration = '0:00';
+  let voiceMailTranscript = '';
+
+  if (email.body_html) {
+    const audioMatch = email.body_html.match(/<audio[^>]+src=["']([^"']+)["']/i) || email.body_html.match(/data-audio-src=["']([^"']+)["']/i);
+    if (audioMatch) {
+      voiceMailAudioSrc = audioMatch[1];
+      const durMatch = email.body_html.match(/data-duration=["']([^"']+)["']/i);
+      if (durMatch && durMatch[1]) voiceMailDuration = durMatch[1];
+      const transMatch = email.body_html.match(/class=["'][^"']*voicemail-transcript-box[^"']*["'][^>]*>[\s\S]*?<span[^>]*>"?([^"<]+)"?<\/span>/i);
+      if (transMatch && transMatch[1]) voiceMailTranscript = transMatch[1];
+    }
+  }
+  if (!voiceMailAudioSrc && Array.isArray(attList)) {
+    const audioAtt = attList.find(a => (a.mimeType && a.mimeType.startsWith('audio/')) || (a.filename && a.filename.startsWith('voicemail_')));
+    if (audioAtt) {
+      voiceMailAudioSrc = audioAtt.url || `/api/attachments/${audioAtt.id}`;
+    }
+  }
+  if (!voiceMailTranscript && email.body_text) {
+    const txtTransMatch = email.body_text.match(/"([^"]+)"/);
+    if (txtTransMatch) voiceMailTranscript = txtTransMatch[1];
+    const durTxtMatch = email.body_text.match(/Voice Mail\s*\(([^)]+)\)/i);
+    if (durTxtMatch) voiceMailDuration = durTxtMatch[1];
+  }
+
+  const isPureVoiceMail = voiceMailAudioSrc && (!email.body_text || email.body_text.trim().startsWith('🎙️ Voice Mail'));
+
+  const voiceNoteHtml = voiceMailAudioSrc ? `
+    <div class="chat-voice-note-player" id="voice-player-${email.id}">
+      <button type="button" class="voice-play-toggle" onclick="toggleAudioBubblePlayback('${email.id}', '${voiceMailAudioSrc}', this)" title="Play / Pause Voice Mail">
+        <svg class="play-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+        <svg class="pause-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+
+      <div class="voice-waveform-area" onclick="seekAudioBubble('${email.id}', event)">
+        <div class="voice-waveform-bars" id="waveform-bars-${email.id}">
+          <span class="wave-bar" style="height: 35%;"></span>
+          <span class="wave-bar" style="height: 55%;"></span>
+          <span class="wave-bar" style="height: 80%;"></span>
+          <span class="wave-bar" style="height: 45%;"></span>
+          <span class="wave-bar" style="height: 90%;"></span>
+          <span class="wave-bar" style="height: 60%;"></span>
+          <span class="wave-bar" style="height: 100%;"></span>
+          <span class="wave-bar" style="height: 75%;"></span>
+          <span class="wave-bar" style="height: 40%;"></span>
+          <span class="wave-bar" style="height: 85%;"></span>
+          <span class="wave-bar" style="height: 65%;"></span>
+          <span class="wave-bar" style="height: 95%;"></span>
+          <span class="wave-bar" style="height: 50%;"></span>
+          <span class="wave-bar" style="height: 70%;"></span>
+          <span class="wave-bar" style="height: 35%;"></span>
+          <span class="wave-bar" style="height: 80%;"></span>
+          <span class="wave-bar" style="height: 60%;"></span>
+          <span class="wave-bar" style="height: 40%;"></span>
+        </div>
+        <div class="voice-time-row">
+          <span class="voice-timer" id="voice-timer-${email.id}">0:00</span>
+          <span class="voice-total-duration">${voiceMailDuration || 'Voice Note'}</span>
+        </div>
+      </div>
+
+      <div class="voice-avatar-badge">
+        <span class="voice-mic-badge">🎙️</span>
+      </div>
+
+      <button type="button" class="voice-speed-chip" onclick="toggleAudioSpeed('${email.id}', this)" title="Playback speed">1x</button>
+    </div>
+    ${voiceMailTranscript ? `
+      <div class="voice-transcript-accordion">
+        <button type="button" class="btn-toggle-transcript" onclick="toggleTranscriptView('${email.id}')">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span>AI Audio Transcription</span>
+        </button>
+        <div class="voice-transcript-text" id="voice-transcript-${email.id}" style="display: none; margin-top: 6px; padding: 8px 12px; background: var(--bg-hover); border-radius: 6px; font-size: 13px; font-style: italic; color: var(--text-muted); border-left: 3px solid var(--green-main);">
+          "${escapeHtml(voiceMailTranscript)}"
+        </div>
+      </div>
+    ` : ''}
+  ` : '';
+
   const rawBody = getFormattedEmailBody(email);
 
   const card = document.createElement('div');
@@ -2853,7 +2936,8 @@ function renderDesktopEmailReadingView(email) {
       </div>
     </div>
     <div class="thread-card-body" style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-main);">
-      ${rawBody}
+      ${voiceNoteHtml}
+      ${isPureVoiceMail ? '' : rawBody}
     </div>
     ${attachmentsHtml}
   `;
@@ -2887,8 +2971,8 @@ async function submitDesktopThreadReply() {
   const input = document.getElementById('desktop-thread-reply-input');
   if (!input) return;
   const body = input.value.trim();
-  if (!body) {
-    showToastNotification('Please enter a reply message', 'warning');
+  if (!body && !desktopDockVoiceMail) {
+    showToastNotification('Please enter a reply message or record a voice note', 'warning');
     return;
   }
 
@@ -2897,12 +2981,16 @@ async function submitDesktopThreadReply() {
   const cleanSubject = (targetEmail.subject || '').replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
   const subject = `Re: ${cleanSubject}`;
 
+  const voiceSnapshot = desktopDockVoiceMail ? { ...desktopDockVoiceMail } : null;
+  const finalBody = body || (voiceSnapshot ? `🎙️ Voice Mail (${voiceSnapshot.duration})` : '');
+
   try {
     const payload = {
       sender_phone: currentUser.phone,
       to: to,
       subject: subject,
-      body: body,
+      body: finalBody,
+      voiceMail: voiceSnapshot,
       reply_to_id: targetEmail.id,
       conversation_id: targetEmail.conversation_id || null
     };
@@ -2917,6 +3005,7 @@ async function submitDesktopThreadReply() {
     if (data.success) {
       input.value = '';
       cancelDesktopQuotedReply();
+      removeDesktopDockVoiceMail();
 
       // Append new outgoing message card to container
       const container = document.getElementById('reading-thread-container');
@@ -2924,7 +3013,60 @@ async function submitDesktopThreadReply() {
         const timeDisplay = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
         const senderName = currentUser.name || currentUser.phone;
         const card = document.createElement('div');
+        const replyMsgId = data.email ? data.email.id : `tmp_${Date.now()}`;
         card.className = 'thread-message-card outgoing';
+        card.id = `email-view-card-${replyMsgId}`;
+
+        const replyVoiceHtml = voiceSnapshot ? `
+          <div class="chat-voice-note-player" id="voice-player-${replyMsgId}">
+            <button type="button" class="voice-play-toggle" onclick="toggleAudioBubblePlayback('${replyMsgId}', '${voiceSnapshot.dataUrl}', this)" title="Play / Pause Voice Mail">
+              <svg class="play-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><polygon points="7 4 20 12 7 20 7 4"/></svg>
+              <svg class="pause-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="display: none;"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            </button>
+            <div class="voice-waveform-area" onclick="seekAudioBubble('${replyMsgId}', event)">
+              <div class="voice-waveform-bars" id="waveform-bars-${replyMsgId}">
+                <span class="wave-bar" style="height: 35%;"></span>
+                <span class="wave-bar" style="height: 55%;"></span>
+                <span class="wave-bar" style="height: 80%;"></span>
+                <span class="wave-bar" style="height: 45%;"></span>
+                <span class="wave-bar" style="height: 90%;"></span>
+                <span class="wave-bar" style="height: 60%;"></span>
+                <span class="wave-bar" style="height: 100%;"></span>
+                <span class="wave-bar" style="height: 75%;"></span>
+                <span class="wave-bar" style="height: 40%;"></span>
+                <span class="wave-bar" style="height: 85%;"></span>
+                <span class="wave-bar" style="height: 65%;"></span>
+                <span class="wave-bar" style="height: 95%;"></span>
+                <span class="wave-bar" style="height: 50%;"></span>
+                <span class="wave-bar" style="height: 70%;"></span>
+                <span class="wave-bar" style="height: 35%;"></span>
+                <span class="wave-bar" style="height: 80%;"></span>
+                <span class="wave-bar" style="height: 60%;"></span>
+                <span class="wave-bar" style="height: 40%;"></span>
+              </div>
+              <div class="voice-time-row">
+                <span class="voice-timer" id="voice-timer-${replyMsgId}">0:00</span>
+                <span class="voice-total-duration">${voiceSnapshot.duration}</span>
+              </div>
+            </div>
+            <div class="voice-avatar-badge">
+              <span class="voice-mic-badge">🎙️</span>
+            </div>
+            <button type="button" class="voice-speed-chip" onclick="toggleAudioSpeed('${replyMsgId}', this)" title="Playback speed">1x</button>
+          </div>
+          ${voiceSnapshot.transcription ? `
+            <div class="voice-transcript-accordion">
+              <button type="button" class="btn-toggle-transcript" onclick="toggleTranscriptView('${replyMsgId}')">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>AI Audio Transcription</span>
+              </button>
+              <div class="voice-transcript-text" id="voice-transcript-${replyMsgId}" style="display: none; margin-top: 6px; padding: 8px 12px; background: var(--bg-hover); border-radius: 6px; font-size: 13px; font-style: italic; color: var(--text-muted); border-left: 3px solid var(--green-main);">
+                "${escapeHtml(voiceSnapshot.transcription)}"
+              </div>
+            </div>
+          ` : ''}
+        ` : '';
+
         card.innerHTML = `
           <div class="thread-card-header">
             <div class="thread-sender-info">
@@ -2941,14 +3083,15 @@ async function submitDesktopThreadReply() {
             </div>
           </div>
           <div class="thread-card-body" style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-main);">
-            ${escapeHtml(body).replace(/\n/g, '<br>')}
+            ${replyVoiceHtml}
+            ${body ? escapeHtml(body).replace(/\n/g, '<br>') : ''}
           </div>
         `;
         container.appendChild(card);
         card.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
 
-      showToastNotification('Reply sent successfully! 🚀', 'success');
+      showToastNotification(voiceSnapshot ? 'Voice Mail sent! 🎙️🚀' : 'Reply sent successfully! 🚀', 'success');
       emailFolderCache = {};
     } else {
       showToastNotification(data.error || 'Failed to send reply', 'error');
@@ -2959,6 +3102,16 @@ async function submitDesktopThreadReply() {
 }
 
 function closeReadingPane(shouldReload = true) {
+  if (desktopVoiceActiveContext === 'desktop-dock') {
+    cancelVoiceRecording('desktop-dock');
+  }
+  removeDesktopDockVoiceMail();
+  if (currentActiveAudio) {
+    currentActiveAudio.pause();
+    currentActiveAudio = null;
+    currentPlayingMsgId = null;
+  }
+
   const readingPane = document.getElementById('reading-pane');
   if (readingPane) readingPane.style.display = 'none';
   
@@ -3347,6 +3500,11 @@ function openComposeModal() {
 }
 
 function closeComposeModal() {
+  if (desktopVoiceActiveContext === 'desktop-compose') {
+    cancelVoiceRecording('desktop-compose');
+  }
+  removeDesktopComposeVoiceMail();
+
   const modal = document.getElementById('desktop-compose-modal');
   if (modal) modal.style.display = 'none';
   const dropdown = document.getElementById('desk-contacts-dropdown');
@@ -3391,12 +3549,15 @@ async function sendDesktopEmail() {
   const body = document.getElementById('desk-compose-body').value.trim();
   const sendSms = Boolean(document.getElementById('desk-send-textbee-sms')?.checked);
 
-  if (!to || !body) {
-    showNotify.warning('Please enter recipient and message content.', 'Compose Incomplete');
+  if (!to || (!body && !desktopComposeVoiceMail)) {
+    showNotify.warning('Please enter recipient and message content or record a voice note.', 'Compose Incomplete');
     return;
   }
 
   const recipients = to.split(',').map(r => r.trim()).filter(Boolean);
+  const voiceSnapshot = desktopComposeVoiceMail ? { ...desktopComposeVoiceMail } : null;
+  const finalBody = body || (voiceSnapshot ? `🎙️ Voice Mail (${voiceSnapshot.duration})` : '');
+  const finalSubject = subject || (voiceSnapshot ? `🎙️ Voice Mail (${voiceSnapshot.duration})` : '');
 
   try {
     const res = await fetch('/api/emails/send', {
@@ -3405,8 +3566,9 @@ async function sendDesktopEmail() {
       body: JSON.stringify({
         senderPhone: currentUser.phone,
         toRecipients: recipients,
-        subject,
-        bodyText: body,
+        subject: finalSubject,
+        bodyText: finalBody,
+        voiceMail: voiceSnapshot,
         replyToId: currentReplyToId,
         conversationId: currentReplyConvId,
         send_sms: sendSms
@@ -3414,12 +3576,13 @@ async function sendDesktopEmail() {
     });
     const data = await res.json();
     if (res.ok && data.success) {
+      removeDesktopComposeVoiceMail();
       closeComposeModal();
       loadEmails();
       if (data.sms_dispatched) {
         showNotify.success('Email sent! Recipient notified via TextBee SMS 📱', 'Message & SMS Sent');
       } else {
-        showNotify.success('Email sent successfully!', 'Message Sent');
+        showNotify.success(voiceSnapshot ? 'Voice Mail sent! 🎙️🚀' : 'Email sent successfully!', 'Message Sent');
       }
     } else {
       showNotify.error(data.error || 'Failed to send email', 'Send Failed');
@@ -4539,5 +4702,354 @@ function inviteFriendDesktop(name, phone) {
     window.open(waUrl, '_blank');
   }
   showToastNotification(`Invite prepared for ${name || phone} ✓`, 'info');
+}
+
+// ==================== DESKTOP VOICE MAIL RECORDING & PLAYBACK CONTROLLER ====================
+let desktopVoiceMediaRecorder = null;
+let desktopVoiceMediaStream = null;
+let desktopVoiceAudioChunks = [];
+let desktopVoiceTimerInterval = null;
+let desktopVoiceRecordSeconds = 0;
+let desktopVoiceActiveContext = null; // 'desktop-dock' | 'desktop-compose'
+let desktopVoiceSpeechRecognition = null;
+let desktopVoiceLiveTranscript = '';
+let desktopDockVoiceMail = null; // { dataUrl, duration, transcription }
+let desktopComposeVoiceMail = null; // { dataUrl, duration, transcription }
+
+// Audio Bubble Playback State
+let currentActiveAudio = null;
+let currentPlayingMsgId = null;
+
+async function toggleVoiceRecording(context) {
+  if (desktopVoiceMediaRecorder && desktopVoiceMediaRecorder.state === 'recording') {
+    await stopVoiceRecording(context);
+  } else {
+    await startVoiceRecording(context);
+  }
+}
+
+async function startVoiceRecording(context) {
+  if (desktopVoiceMediaRecorder && desktopVoiceMediaRecorder.state === 'recording') {
+    cancelVoiceRecording(desktopVoiceActiveContext);
+  }
+
+  desktopVoiceActiveContext = context;
+  desktopVoiceAudioChunks = [];
+  desktopVoiceRecordSeconds = 0;
+  desktopVoiceLiveTranscript = '';
+
+  try {
+    desktopVoiceMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    console.error('Microphone permission denied or unavailable:', err);
+    showToastNotification('Microphone access denied. Please allow microphone permissions in settings.', 'error');
+    return;
+  }
+
+  let mimeType = 'audio/webm;codecs=opus';
+  if (typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported) {
+    if (MediaRecorder.isTypeSupported(mimeType)) {}
+    else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
+    else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+    else if (MediaRecorder.isTypeSupported('audio/ogg')) mimeType = 'audio/ogg';
+    else mimeType = '';
+  } else {
+    mimeType = '';
+  }
+
+  try {
+    desktopVoiceMediaRecorder = mimeType ? new MediaRecorder(desktopVoiceMediaStream, { mimeType }) : new MediaRecorder(desktopVoiceMediaStream);
+  } catch(e) {
+    desktopVoiceMediaRecorder = new MediaRecorder(desktopVoiceMediaStream);
+  }
+
+  desktopVoiceMediaRecorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) {
+      desktopVoiceAudioChunks.push(e.data);
+    }
+  };
+
+  // Live Speech Recognition in Background
+  try {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+      desktopVoiceSpeechRecognition = new SpeechRec();
+      desktopVoiceSpeechRecognition.continuous = true;
+      desktopVoiceSpeechRecognition.interimResults = true;
+      const langMap = { 'hi': 'hi-IN', 'ta': 'ta-IN', 'en': 'en-IN' };
+      desktopVoiceSpeechRecognition.lang = (currentUser && langMap[currentUser.language]) ? langMap[currentUser.language] : 'en-US';
+      desktopVoiceSpeechRecognition.onresult = (evt) => {
+        let text = '';
+        for (let i = 0; i < evt.results.length; i++) {
+          text += evt.results[i][0].transcript + ' ';
+        }
+        desktopVoiceLiveTranscript = text.trim();
+      };
+      desktopVoiceSpeechRecognition.start();
+    }
+  } catch (recErr) {
+    console.warn('Speech recognition notice:', recErr.message);
+  }
+
+  desktopVoiceMediaRecorder.start(200);
+
+  // Update UI for recording
+  if (context === 'desktop-dock') {
+    const btn = document.getElementById('desk-voice-dock-btn');
+    if (btn) btn.classList.add('recording');
+    const lbl = document.getElementById('desk-voice-dock-label');
+    if (lbl) lbl.innerText = 'Recording (0:00)...';
+  } else if (context === 'desktop-compose') {
+    const btn = document.getElementById('desk-voice-compose-btn');
+    if (btn) btn.classList.add('recording');
+    const lbl = document.getElementById('desk-voice-compose-label');
+    if (lbl) lbl.innerText = 'Recording (0:00)...';
+  }
+
+  clearInterval(desktopVoiceTimerInterval);
+  desktopVoiceTimerInterval = setInterval(() => {
+    desktopVoiceRecordSeconds++;
+    const mins = Math.floor(desktopVoiceRecordSeconds / 60);
+    const secs = desktopVoiceRecordSeconds % 60;
+    const timeStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+    if (context === 'desktop-dock') {
+      const lbl = document.getElementById('desk-voice-dock-label');
+      if (lbl) lbl.innerText = `Recording (${timeStr})...`;
+    } else if (context === 'desktop-compose') {
+      const lbl = document.getElementById('desk-voice-compose-label');
+      if (lbl) lbl.innerText = `Recording (${timeStr})...`;
+    }
+  }, 1000);
+}
+
+function cancelVoiceRecording(context) {
+  clearInterval(desktopVoiceTimerInterval);
+  if (desktopVoiceSpeechRecognition) {
+    try { desktopVoiceSpeechRecognition.stop(); } catch(e) {}
+    desktopVoiceSpeechRecognition = null;
+  }
+  if (desktopVoiceMediaRecorder && desktopVoiceMediaRecorder.state !== 'inactive') {
+    desktopVoiceMediaRecorder.stop();
+  }
+  if (desktopVoiceMediaStream) {
+    desktopVoiceMediaStream.getTracks().forEach(t => t.stop());
+    desktopVoiceMediaStream = null;
+  }
+  desktopVoiceAudioChunks = [];
+  desktopVoiceRecordSeconds = 0;
+
+  if (context === 'desktop-dock') {
+    const btn = document.getElementById('desk-voice-dock-btn');
+    if (btn) btn.classList.remove('recording');
+    const lbl = document.getElementById('desk-voice-dock-label');
+    if (lbl) lbl.innerText = desktopDockVoiceMail ? 'Re-record Voice' : 'Voice Mail';
+  } else if (context === 'desktop-compose') {
+    const btn = document.getElementById('desk-voice-compose-btn');
+    if (btn) btn.classList.remove('recording');
+    const lbl = document.getElementById('desk-voice-compose-label');
+    if (lbl) lbl.innerText = desktopComposeVoiceMail ? 'Re-record Voice' : 'Voice Mail';
+  }
+}
+
+async function stopVoiceRecording(context) {
+  clearInterval(desktopVoiceTimerInterval);
+  if (desktopVoiceSpeechRecognition) {
+    try { desktopVoiceSpeechRecognition.stop(); } catch(e) {}
+    desktopVoiceSpeechRecognition = null;
+  }
+
+  if (!desktopVoiceMediaRecorder || desktopVoiceMediaRecorder.state === 'inactive') {
+    cancelVoiceRecording(context);
+    return;
+  }
+
+  const mins = Math.floor(desktopVoiceRecordSeconds / 60);
+  const secs = desktopVoiceRecordSeconds % 60;
+  const durationStr = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
+  return new Promise((resolve) => {
+    desktopVoiceMediaRecorder.onstop = async () => {
+      if (desktopVoiceMediaStream) {
+        desktopVoiceMediaStream.getTracks().forEach(t => t.stop());
+        desktopVoiceMediaStream = null;
+      }
+
+      const mimeType = desktopVoiceMediaRecorder.mimeType || 'audio/webm';
+      const audioBlob = new Blob(desktopVoiceAudioChunks, { type: mimeType });
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const audioDataUrl = reader.result;
+
+        if (context === 'desktop-dock') {
+          desktopDockVoiceMail = {
+            dataUrl: audioDataUrl,
+            duration: durationStr,
+            transcription: desktopVoiceLiveTranscript
+          };
+
+          const btn = document.getElementById('desk-voice-dock-btn');
+          if (btn) btn.classList.remove('recording');
+          const lbl = document.getElementById('desk-voice-dock-label');
+          if (lbl) lbl.innerText = 'Re-record Voice';
+
+          const tray = document.getElementById('desk-voice-dock-preview');
+          if (tray) tray.style.display = 'flex';
+          const durEl = document.getElementById('desk-dock-voice-duration');
+          if (durEl) durEl.innerText = `Voice Mail (${durationStr})`;
+          const audEl = document.getElementById('desk-dock-voice-audio');
+          if (audEl) audEl.src = audioDataUrl;
+
+          showToastNotification(`Voice mail recorded (${durationStr}) 🎙️`, 'info');
+        } else if (context === 'desktop-compose') {
+          desktopComposeVoiceMail = {
+            dataUrl: audioDataUrl,
+            duration: durationStr,
+            transcription: desktopVoiceLiveTranscript
+          };
+
+          const btn = document.getElementById('desk-voice-compose-btn');
+          if (btn) btn.classList.remove('recording');
+          const lbl = document.getElementById('desk-voice-compose-label');
+          if (lbl) lbl.innerText = 'Re-record Voice';
+
+          const tray = document.getElementById('desk-voice-compose-preview');
+          if (tray) tray.style.display = 'flex';
+          const durEl = document.getElementById('desk-compose-voice-duration');
+          if (durEl) durEl.innerText = `Voice Mail (${durationStr})`;
+          const audEl = document.getElementById('desk-compose-voice-audio');
+          if (audEl) audEl.src = audioDataUrl;
+
+          showToastNotification(`Voice mail recorded (${durationStr}) 🎙️`, 'info');
+        }
+        resolve();
+      };
+      reader.readAsDataURL(audioBlob);
+    };
+    desktopVoiceMediaRecorder.stop();
+  });
+}
+
+function removeDesktopDockVoiceMail() {
+  desktopDockVoiceMail = null;
+  const tray = document.getElementById('desk-voice-dock-preview');
+  if (tray) tray.style.display = 'none';
+  const audEl = document.getElementById('desk-dock-voice-audio');
+  if (audEl) audEl.src = '';
+  const lbl = document.getElementById('desk-voice-dock-label');
+  if (lbl) lbl.innerText = 'Voice Mail';
+}
+
+function removeDesktopComposeVoiceMail() {
+  desktopComposeVoiceMail = null;
+  const tray = document.getElementById('desk-voice-compose-preview');
+  if (tray) tray.style.display = 'none';
+  const audEl = document.getElementById('desk-compose-voice-audio');
+  if (audEl) audEl.src = '';
+  const lbl = document.getElementById('desk-voice-compose-label');
+  if (lbl) lbl.innerText = 'Voice Mail';
+}
+
+// ==================== DESKTOP AUDIO BUBBLE PLAYBACK ====================
+function toggleAudioBubblePlayback(msgId, audioSrc, btnEl) {
+  if (currentActiveAudio && currentPlayingMsgId === msgId) {
+    if (currentActiveAudio.paused) {
+      currentActiveAudio.play();
+      updateAudioBubblePlayState(msgId, true);
+    } else {
+      currentActiveAudio.pause();
+      updateAudioBubblePlayState(msgId, false);
+    }
+    return;
+  }
+
+  // Stop any previously playing audio
+  if (currentActiveAudio) {
+    currentActiveAudio.pause();
+    if (currentPlayingMsgId) updateAudioBubblePlayState(currentPlayingMsgId, false);
+    currentActiveAudio = null;
+    currentPlayingMsgId = null;
+  }
+
+  const audio = new Audio(audioSrc);
+  currentActiveAudio = audio;
+  currentPlayingMsgId = msgId;
+
+  audio.ontimeupdate = () => {
+    if (!audio.duration) return;
+    const progress = (audio.currentTime / audio.duration) * 100;
+    const curMins = Math.floor(audio.currentTime / 60);
+    const curSecs = Math.floor(audio.currentTime % 60);
+    const timeStr = `${curMins}:${curSecs < 10 ? '0' : ''}${curSecs}`;
+
+    const timerEl = document.getElementById(`voice-timer-${msgId}`);
+    if (timerEl) timerEl.innerText = timeStr;
+
+    // Highlight wave bars
+    const waveContainer = document.getElementById(`waveform-bars-${msgId}`);
+    if (waveContainer) {
+      const bars = waveContainer.querySelectorAll('.wave-bar');
+      const activeBarCount = Math.floor((progress / 100) * bars.length);
+      bars.forEach((b, idx) => {
+        if (idx <= activeBarCount) b.classList.add('played');
+        else b.classList.remove('played');
+      });
+    }
+  };
+
+  audio.onended = () => {
+    updateAudioBubblePlayState(msgId, false);
+    const timerEl = document.getElementById(`voice-timer-${msgId}`);
+    if (timerEl) timerEl.innerText = '0:00';
+    const waveContainer = document.getElementById(`waveform-bars-${msgId}`);
+    if (waveContainer) {
+      waveContainer.querySelectorAll('.wave-bar').forEach(b => b.classList.remove('played'));
+    }
+    currentActiveAudio = null;
+    currentPlayingMsgId = null;
+  };
+
+  audio.play().then(() => {
+    updateAudioBubblePlayState(msgId, true);
+  }).catch(err => {
+    console.error('Audio playback error:', err);
+  });
+}
+
+function updateAudioBubblePlayState(msgId, isPlaying) {
+  const player = document.getElementById(`voice-player-${msgId}`);
+  if (!player) return;
+  const playIcon = player.querySelector('.play-icon');
+  const pauseIcon = player.querySelector('.pause-icon');
+  if (playIcon && pauseIcon) {
+    playIcon.style.display = isPlaying ? 'none' : 'block';
+    pauseIcon.style.display = isPlaying ? 'block' : 'none';
+  }
+}
+
+function seekAudioBubble(msgId, event) {
+  if (!currentActiveAudio || currentPlayingMsgId !== msgId || !currentActiveAudio.duration) return;
+  const rect = event.currentTarget.getBoundingClientRect();
+  const clickX = event.clientX - rect.left;
+  const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+  currentActiveAudio.currentTime = ratio * currentActiveAudio.duration;
+}
+
+function toggleAudioSpeed(msgId, speedBtn) {
+  if (!currentActiveAudio || currentPlayingMsgId !== msgId) return;
+  let nextSpeed = 1;
+  if (currentActiveAudio.playbackRate === 1) nextSpeed = 1.5;
+  else if (currentActiveAudio.playbackRate === 1.5) nextSpeed = 2;
+  else nextSpeed = 1;
+
+  currentActiveAudio.playbackRate = nextSpeed;
+  speedBtn.innerText = `${nextSpeed}x`;
+}
+
+function toggleTranscriptView(msgId) {
+  const el = document.getElementById(`voice-transcript-${msgId}`);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 

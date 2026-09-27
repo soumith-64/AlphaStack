@@ -260,7 +260,7 @@ export const emailService = {
   /**
    * Sends an outbound email or reply (True End-to-End User-to-User)
    */
-  async sendOutboundEmail({ senderPhone, toRecipients, subject, bodyText, bodyHtml = null, images = [], replyToId = null, conversationId = null }) {
+  async sendOutboundEmail({ senderPhone, toRecipients, subject, bodyText, bodyHtml = null, images = [], voiceMail = null, replyToId = null, conversationId = null }) {
     const cleanSenderPhone = String(senderPhone).replace(/\D/g, '').slice(-10);
     let sender = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanSenderPhone]);
     if (!sender) {
@@ -394,6 +394,25 @@ export const emailService = {
         'Return-Receipt-To': `${cleanSenderPhone}@${config.domainName}`
       };
 
+      let smtpAttachments = [];
+      if (voiceMail && voiceMail.dataUrl) {
+        try {
+          const match = voiceMail.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (match) {
+            const mimeType = match[1];
+            const audioBuffer = Buffer.from(match[2], 'base64');
+            const ext = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : (mimeType.includes('wav') ? 'wav' : 'webm'));
+            smtpAttachments.push({
+              filename: `voicemail_${Date.now()}.${ext}`,
+              content: audioBuffer,
+              contentType: mimeType
+            });
+          }
+        } catch(attErr) {
+          console.warn('Could not prepare voice mail attachment for SMTP:', attErr.message);
+        }
+      }
+
       for (const extEmail of externalRecipients) {
         try {
           console.log(`🚀 [Hostinger SMTP] Transmitting live email to ${extEmail}...`);
@@ -407,6 +426,7 @@ export const emailService = {
             to: extEmail,
             subject: emailSubject,
             messageId: `<${msgUniqueId}>`,
+            attachments: smtpAttachments.length > 0 ? smtpAttachments : undefined,
             headers: {
               'X-Mailer': 'PhoneMail WebClient 1.0',
               'Precedence': 'normal',

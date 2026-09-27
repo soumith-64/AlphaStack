@@ -400,9 +400,38 @@
         </button>
         <input type="file" id="mob-chat-img-input" accept="image/*" style="display: none;" onchange="handleMobileChatImageSelected(event)">
 
+        <!-- Voice Mail / Voice Note Record Button -->
+        <button type="button" class="whatsapp-tool-btn voice-record-btn" id="mob-chat-voice-btn" onclick="toggleVoiceRecording('mobile-chat')" title="Record Voice Mail" aria-label="Record Voice Mail">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </button>
+
         <button type="button" class="whatsapp-send-btn" id="mob-chat-send-btn" onclick="submitChatMessage()" title="Send">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         </button>
+      </div>
+
+      <!-- Live Voice Mail Recording Overlay -->
+      <div id="mob-voice-recording-overlay" class="voice-recording-overlay" style="display: none;">
+        <div class="voice-rec-left">
+          <span class="voice-rec-dot"></span>
+          <span class="voice-rec-timer" id="mob-voice-timer">0:00</span>
+          <div class="voice-rec-waves">
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+            <span class="wave-line"></span>
+          </div>
+          <span class="voice-rec-hint" id="mob-voice-live-text">Listening...</span>
+        </div>
+        <div class="voice-rec-actions">
+          <button type="button" class="voice-cancel-btn" onclick="cancelVoiceRecording('mobile-chat')" title="Cancel Recording">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+          <button type="button" class="voice-send-btn" onclick="sendVoiceRecording('mobile-chat')" title="Send Voice Mail">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -539,6 +568,21 @@
               <span>Add Image</span>
             </button>
             <input type="file" id="mob-trad-img-input" accept="image/*" style="display: none;" onchange="handleMobileTradImageSelected(event)">
+
+            <button type="button" class="btn-attach-voice" id="mob-trad-voice-btn" onclick="toggleVoiceRecording('mobile-trad')" title="Record Voice Mail">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+              <span id="mob-trad-voice-label">Voice Mail</span>
+            </button>
+          </div>
+
+          <!-- Attached Voice Mail Preview in Traditional Compose -->
+          <div id="mob-trad-voice-preview-tray" class="trad-voice-preview-tray" style="display: none; width: 100%; margin-top: 8px;">
+            <div class="voice-preview-bubble">
+              <span style="font-size: 16px;">🎙️</span>
+              <span style="font-size: 12px; font-weight: 700; color: var(--green-main);" id="mob-trad-voice-duration">Voice Mail (0:00)</span>
+              <audio id="mob-trad-voice-audio" controls style="height: 32px; max-width: 180px;"></audio>
+              <button type="button" class="remove-img-btn" onclick="removeMobileTradVoiceMail()" title="Remove Voice Mail">✕</button>
+            </div>
           </div>
 
           <button type="button" class="btn-secondary" style="font-size: 11.5px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 5px;" onclick="triggerSmartTranslateDraft('traditional')">
