@@ -366,6 +366,18 @@
       <!-- Smart Translation Preview in Chat -->
       <div id="mob-chat-trans-preview-wrap" style="display: none; padding: 0 10px;"></div>
 
+      <!-- Floating Image Preview Tray in Chat Dock -->
+      <div class="whatsapp-image-preview-tray" id="mob-chat-img-preview-tray" style="display: none;">
+        <div class="chat-attached-img-wrap">
+          <img id="mob-chat-img-thumb" src="" alt="Selected image">
+          <button type="button" class="remove-img-btn" onclick="removeMobileChatAttachedImage()" title="Remove Image">✕</button>
+        </div>
+        <div class="chat-attached-img-info">
+          <span class="chat-img-name" id="mob-chat-img-name">photo.jpg</span>
+          <span class="chat-img-hint">Image will be attached to email</span>
+        </div>
+      </div>
+
       <!-- Input Bar Controls -->
       <div class="whatsapp-input-row">
         <button type="button" class="whatsapp-tool-btn" onclick="insertEmojiQuick('😊')" title="Emoji">
@@ -379,9 +391,11 @@
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z"/></svg>
         </button>
 
-        <button type="button" class="whatsapp-tool-btn" onclick="openAttachmentPickerModal()" title="Attach File">
-          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        <!-- Direct Image / Photo Attachment Button -->
+        <button type="button" class="whatsapp-tool-btn" onclick="triggerMobileChatImageUpload()" title="Add Image / Photo" aria-label="Add Photo">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
         </button>
+        <input type="file" id="mob-chat-img-input" accept="image/*" style="display: none;" onchange="handleMobileChatImageSelected(event)">
 
         <button type="button" class="whatsapp-send-btn" id="mob-chat-send-btn" onclick="submitChatMessage()" title="Send">
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -497,9 +511,29 @@
         <div class="trad-field">
           <textarea id="trad-body" rows="6" placeholder="Type your message here..."></textarea>
         </div>
+        <!-- Attached Image Preview in Traditional Compose -->
+        <div id="mob-trad-img-preview-tray" class="trad-img-preview-tray" style="display: none; margin-top: 8px;">
+          <div class="trad-attached-img-wrap">
+            <img id="mob-trad-img-thumb" src="" alt="Attached image preview">
+            <button type="button" class="remove-img-btn" onclick="removeMobileTradAttachedImage()" title="Remove Image">✕</button>
+          </div>
+          <div class="trad-attached-img-meta">
+            <span id="mob-trad-img-name" style="font-weight: 700; font-size: 12.5px; color: var(--text-main);">image.jpg</span>
+            <span style="font-size: 11px; color: #10b981; font-weight: 600;">✓ Inline photo attached</span>
+          </div>
+        </div>
+
         <!-- Smart Translation Preview in Traditional Compose -->
         <div id="mob-trad-trans-preview-wrap" style="display: none; margin-top: 8px;"></div>
-        <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+        <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn-attach-photo" onclick="triggerMobileTradImageUpload()" title="Attach Photo / Image">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Add Image</span>
+            </button>
+            <input type="file" id="mob-trad-img-input" accept="image/*" style="display: none;" onchange="handleMobileTradImageSelected(event)">
+          </div>
+
           <button type="button" class="btn-secondary" style="font-size: 11.5px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 5px;" onclick="triggerSmartTranslateDraft('traditional')">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
             <span>AI Translate & Preview</span>

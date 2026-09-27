@@ -296,22 +296,47 @@ router.post('/emails/send', async (req, res) => {
     const rawSender = req.body.senderPhone || req.body.sender_phone;
     const rawRecipients = req.body.toRecipients || req.body.to || req.body.recipients;
     const subject = req.body.subject || '';
-    const bodyText = req.body.bodyText || req.body.body || req.body.message || '';
+    let bodyText = req.body.bodyText || req.body.body || req.body.message || '';
+    const bodyHtml = req.body.bodyHtml || req.body.body_html || req.body.html || null;
+    const images = Array.isArray(req.body.images) ? req.body.images : (req.body.image ? [req.body.image] : []);
     const replyToId = req.body.replyToId || req.body.reply_to_id || null;
     const conversationId = req.body.conversationId || req.body.conversation_id || null;
     const sendSmsRequested = Boolean(req.body.send_sms || req.body.sendSmsNotification || req.body.sendSms);
 
-    if (!rawSender || !rawRecipients || !bodyText) {
-      return res.status(400).json({ error: 'Sender phone, recipient(s), and message body are required' });
+    if (!bodyText && images.length > 0) {
+      bodyText = '[Photo attached]';
+    }
+
+    if (!rawSender || !rawRecipients || (!bodyText && images.length === 0)) {
+      return res.status(400).json({ error: 'Sender phone, recipient(s), and message body or image are required' });
     }
 
     const cleanSender = String(rawSender).replace(/\D/g, '').slice(-10);
+
+    // Build final HTML with inline images if present
+    let finalBodyHtml = bodyHtml;
+    if (images.length > 0) {
+      const imagesHtml = images.map(img => `
+        <div style="margin: 12px 0;">
+          <img src="${img}" alt="Attached Photo" style="max-width: 100%; height: auto; border-radius: 10px; display: block; box-shadow: 0 3px 10px rgba(0,0,0,0.12);" />
+        </div>
+      `).join('');
+
+      if (finalBodyHtml) {
+        finalBodyHtml += imagesHtml;
+      } else {
+        const textPart = bodyText ? `<div>${String(bodyText).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</div>` : '';
+        finalBodyHtml = `${textPart}${imagesHtml}`;
+      }
+    }
 
     const email = await emailService.sendOutboundEmail({
       senderPhone: cleanSender,
       toRecipients: rawRecipients,
       subject,
       bodyText,
+      bodyHtml: finalBodyHtml,
+      images,
       replyToId: replyToId || null,
       conversationId: conversationId || null
     });

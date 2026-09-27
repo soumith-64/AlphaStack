@@ -2861,11 +2861,134 @@ function handleChatInputKey(e) {
   }
 }
 
+// ==================== MOBILE IMAGE ATTACHMENTS & UPLOADS ====================
+let activeChatAttachedImage = null;
+let activeTradAttachedImage = null;
+
+function compressImageFile(file, maxWidth = 1200, maxHeight = 1200, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith('image/')) {
+      return reject(new Error('Please select a valid image file.'));
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read image file.'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to load image.'));
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth || height > maxHeight) {
+          if (width > height) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          } else {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve({
+          name: file.name || 'photo.jpg',
+          size: Math.round(dataUrl.length * 0.75),
+          dataUrl: dataUrl
+        });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function triggerMobileChatImageUpload() {
+  const input = document.getElementById('mob-chat-img-input');
+  if (input) input.click();
+}
+
+async function handleMobileChatImageSelected(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  try {
+    showToastNotification('Attaching photo...', 'info');
+    const result = await compressImageFile(file);
+    activeChatAttachedImage = result;
+
+    const tray = document.getElementById('mob-chat-img-preview-tray');
+    const thumb = document.getElementById('mob-chat-img-thumb');
+    const nameEl = document.getElementById('mob-chat-img-name');
+
+    if (thumb) thumb.src = result.dataUrl;
+    if (nameEl) nameEl.innerText = result.name;
+    if (tray) tray.style.display = 'flex';
+
+    const chatInput = document.getElementById('mob-chat-input');
+    if (chatInput) {
+      chatInput.placeholder = 'Add a caption or send photo...';
+      chatInput.focus();
+    }
+    showToastNotification('Photo attached! Tap Send to deliver 📸', 'success');
+  } catch (err) {
+    showToastNotification(err.message || 'Error processing image', 'error');
+  }
+}
+
+function removeMobileChatAttachedImage() {
+  activeChatAttachedImage = null;
+  const input = document.getElementById('mob-chat-img-input');
+  if (input) input.value = '';
+  const tray = document.getElementById('mob-chat-img-preview-tray');
+  if (tray) tray.style.display = 'none';
+  const chatInput = document.getElementById('mob-chat-input');
+  if (chatInput) chatInput.placeholder = 'Type a message or reply...';
+}
+
+function triggerMobileTradImageUpload() {
+  const input = document.getElementById('mob-trad-img-input');
+  if (input) input.click();
+}
+
+async function handleMobileTradImageSelected(e) {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+
+  try {
+    showToastNotification('Processing image...', 'info');
+    const result = await compressImageFile(file);
+    activeTradAttachedImage = result;
+
+    const tray = document.getElementById('mob-trad-img-preview-tray');
+    const thumb = document.getElementById('mob-trad-img-thumb');
+    const nameEl = document.getElementById('mob-trad-img-name');
+
+    if (thumb) thumb.src = result.dataUrl;
+    if (nameEl) nameEl.innerText = result.name;
+    if (tray) tray.style.display = 'flex';
+
+    showToastNotification('Photo attached to email 📸', 'success');
+  } catch (err) {
+    showToastNotification(err.message || 'Error processing image', 'error');
+  }
+}
+
+function removeMobileTradAttachedImage() {
+  activeTradAttachedImage = null;
+  const input = document.getElementById('mob-trad-img-input');
+  if (input) input.value = '';
+  const tray = document.getElementById('mob-trad-img-preview-tray');
+  if (tray) tray.style.display = 'none';
+}
+
 async function submitChatMessage() {
   const input = document.getElementById('mob-chat-input');
   if (!input) return;
   const body = input.value.trim();
-  if (!body) return;
+  if (!body && !activeChatAttachedImage) return;
 
   if (!activeConversation) {
     showToastNotification('No active conversation', 'error');
@@ -2880,12 +3003,15 @@ async function submitChatMessage() {
   const sendBtn = document.getElementById('mob-chat-send-btn');
   if (sendBtn) sendBtn.disabled = true;
 
+  const imageSnapshot = activeChatAttachedImage ? activeChatAttachedImage.dataUrl : null;
+
   try {
     const payload = {
       sender_phone: currentUser.phone,
       to: to,
       subject: subject,
-      body: body,
+      body: body || '[Photo attached]',
+      images: imageSnapshot ? [imageSnapshot] : [],
       reply_to_id: activeReplyingMessage ? activeReplyingMessage.id : null,
       conversation_id: activeConversation.id
     };
@@ -2905,6 +3031,7 @@ async function submitChatMessage() {
         activeReplyingMessage.has_replied = 1;
       }
       cancelQuotedReply();
+      removeMobileChatAttachedImage();
 
       // Append temporary outgoing message to timeline
       const now = new Date();
@@ -2913,7 +3040,10 @@ async function submitChatMessage() {
         sender_email: `${currentUser.phone}@alphastack.wwisvnr.com`,
         sender_name: currentUser.display_name || currentUser.phone,
         subject: subject,
-        body_text: body,
+        body_text: body || '[Photo attached]',
+        body_html: imageSnapshot 
+          ? `<div>${escapeHtml(body || '')}</div><div class="bubble-image-preview"><img src="${imageSnapshot}" alt="Photo"></div>`
+          : (body || ''),
         created_at: now.toISOString(),
         is_read: 1,
         has_replied: 0,
@@ -2923,7 +3053,7 @@ async function submitChatMessage() {
 
       activeConversation.messages.push(newMsg);
       activeConversation.latestMessage = newMsg;
-      activeConversation.latest_snippet = body.substring(0, 90);
+      activeConversation.latest_snippet = (body || '[Photo attached]').substring(0, 90);
       activeConversation.created_at = newMsg.created_at;
 
       renderChatTimeline(activeConversation);
@@ -2933,7 +3063,7 @@ async function submitChatMessage() {
         timeline.scrollTop = timeline.scrollHeight;
       }
 
-      showToastNotification('Reply sent ✓', 'success');
+      showToastNotification(imageSnapshot ? 'Photo sent in email! 📸' : 'Reply sent ✓', 'success');
       // Invalidate memory cache to keep in sync
       emailFolderCache = {};
     } else {
@@ -3516,7 +3646,7 @@ function insertEmojiQuick(emoji) {
 }
 
 function openAttachmentPickerModal() {
-  showToastNotification('Direct document & media attachments ready 📎', 'info');
+  triggerMobileChatImageUpload();
 }
 
 // ==================== REAL-TIME MULTI-LANGUAGE TRANSLATION ====================
@@ -3864,6 +3994,7 @@ function openTraditionalCompose(recipient = '', subject = '', body = '') {
 }
 
 function closeTraditionalCompose() {
+  removeMobileTradAttachedImage();
   document.getElementById('traditional-modal').style.display = 'none';
   const picker = document.getElementById('mobile-contacts-picker');
   if (picker) picker.style.display = 'none';
@@ -3953,12 +4084,13 @@ async function submitTraditionalCompose() {
     showToastNotification('Please enter a recipient', 'warning');
     return;
   }
-  if (!body) {
-    showToastNotification('Please enter a message', 'warning');
+  if (!body && !activeTradAttachedImage) {
+    showToastNotification('Please enter a message or attach an image', 'warning');
     return;
   }
 
   const sendSms = Boolean(document.getElementById('mob-send-textbee-sms')?.checked);
+  const imageSnapshot = activeTradAttachedImage ? activeTradAttachedImage.dataUrl : null;
 
   showToastNotification('Sending message...', 'info');
 
@@ -3970,16 +4102,17 @@ async function submitTraditionalCompose() {
         sender_phone: currentUser.phone,
         to,
         subject,
-        body,
+        body: body || '[Photo attached]',
+        images: imageSnapshot ? [imageSnapshot] : [],
         send_sms: sendSms
       })
     });
     const data = await res.json();
     if (data.success) {
       if (data.sms_dispatched) {
-        showToastNotification('Message sent! Recipient notified via TextBee SMS 📱', 'success');
+        showToastNotification('Message & Photo sent! Recipient notified via TextBee SMS 📱', 'success');
       } else {
-        showToastNotification('Message sent successfully! 🚀', 'success');
+        showToastNotification(imageSnapshot ? 'Email with image sent! 📸🚀' : 'Message sent successfully! 🚀', 'success');
       }
       closeTraditionalCompose();
       // Invalidate cache and reload

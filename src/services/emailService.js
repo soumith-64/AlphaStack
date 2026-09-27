@@ -260,7 +260,7 @@ export const emailService = {
   /**
    * Sends an outbound email or reply (True End-to-End User-to-User)
    */
-  async sendOutboundEmail({ senderPhone, toRecipients, subject, bodyText, replyToId = null, conversationId = null }) {
+  async sendOutboundEmail({ senderPhone, toRecipients, subject, bodyText, bodyHtml = null, images = [], replyToId = null, conversationId = null }) {
     const cleanSenderPhone = String(senderPhone).replace(/\D/g, '').slice(-10);
     let sender = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanSenderPhone]);
     if (!sender) {
@@ -358,11 +358,11 @@ export const emailService = {
       await dbOps.execute('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [targetConvId]);
     }
 
-    // Insert email
+    // Insert email with HTML & inline images
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     await dbOps.execute(`
-      INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, reply_to_id, has_replied, is_read, folder)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 'INBOX')
+      INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, reply_to_id, has_replied, is_read, folder)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'INBOX')
     `, [
       emailId,
       targetConvId,
@@ -370,6 +370,7 @@ export const emailService = {
       JSON.stringify(normalizedRecipients),
       subject || '',
       bodyText,
+      bodyHtml || bodyText || '',
       replyToId
     ]);
 
@@ -420,7 +421,7 @@ export const emailService = {
                 <div style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;">
                   ${String(emailSubject).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
                 </div>
-                <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 24px; white-space: pre-wrap;">${cleanBody ? String(cleanBody).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</div>
+                <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 24px;">${bodyHtml ? bodyHtml : (cleanBody ? String(cleanBody).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : '')}</div>
                 <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; font-size: 12px; color: #64748b; line-height: 1.6;">
                   Sent by <strong>${senderDisplayName}</strong> (+91 ${cleanSenderPhone}) via PhoneMail.<br>
                   Reply directly to this email to reach this user's PhoneMail inbox: 
