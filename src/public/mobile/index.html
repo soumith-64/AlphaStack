@@ -16,8 +16,21 @@
         var s = localStorage.getItem('phonemail-mobile-user') || localStorage.getItem('phonemail-user') || localStorage.getItem('inai_user') || sessionStorage.getItem('phonemail-mobile-user');
         if (s) {
           var u = JSON.parse(s);
-          if (u && (u.phone || u.email)) {
+          var p = String(u.phone || u.phone_number || '').replace(/\D/g, '').slice(-10);
+          if (!p && u.email) {
+            p = String(u.email.split('@')[0] || '').replace(/\D/g, '').slice(-10);
+          }
+          if (!p && u.id) {
+            p = String(u.id).replace(/\D/g, '').slice(-10);
+          }
+          if (!p) {
+            var sp = localStorage.getItem('phonemail_saved_phone');
+            if (sp) p = String(sp).replace(/\D/g, '').slice(-10);
+          }
+          if (p && p.length === 10) {
             document.documentElement.classList.add('has-saved-session');
+          } else {
+            document.documentElement.classList.remove('has-saved-session');
           }
         }
       } catch(e) {}

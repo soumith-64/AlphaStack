@@ -332,7 +332,17 @@ router.post('/emails/send', async (req, res) => {
       return res.status(400).json({ error: 'Sender phone, recipient(s), and message body or voice note are required' });
     }
 
-    const cleanSender = String(rawSender).replace(/\D/g, '').slice(-10);
+    let cleanSender = '';
+    if (String(rawSender).includes('@')) {
+      const localPart = String(rawSender).split('@')[0];
+      cleanSender = localPart.replace(/\D/g, '').slice(-10);
+    } else {
+      cleanSender = String(rawSender).replace(/\D/g, '').slice(-10);
+    }
+
+    if (!cleanSender || cleanSender.length !== 10) {
+      return res.status(400).json({ error: 'Valid 10-digit sender phone number is required' });
+    }
 
     // Build final HTML with inline images or voice mail if present
     let finalBodyHtml = bodyHtml;

@@ -376,14 +376,66 @@ const showNotify = {
 
 // ==================== AUTH & SESSION RESTORATION ====================
 
+function clearCorruptedMobileSession() {
+  try {
+    localStorage.removeItem('phonemail-mobile-user');
+    localStorage.removeItem('inai_user');
+    localStorage.removeItem('phonemail-user');
+    sessionStorage.removeItem('phonemail-mobile-user');
+    sessionStorage.removeItem('phonemail-user');
+  } catch(e) {}
+  document.documentElement.classList.remove('has-saved-session');
+  currentUser = null;
+}
+
 function normalizeMobileUser(user) {
-  if (!user) return null;
-  const rawPhone = user.phone || user.phone_number || '';
-  const cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
-  const rawName = user.name || user.display_name || '';
+  if (!user || typeof user !== 'object') return null;
+
+  // 1. Direct phone fields
+  let rawPhone = user.phone || user.phone_number || user.phoneNumber || '';
+  let cleanPhone = String(rawPhone).replace(/\D/g, '').slice(-10);
+
+  // 2. Email fallback (e.g. 8667611163@alphastack.wwisvnr.com or 8667611163.primary@...)
+  if (cleanPhone.length !== 10) {
+    const rawEmail = user.email || user.email_address || user.emailAddress || '';
+    if (rawEmail) {
+      const prefix = rawEmail.split('@')[0] || '';
+      const emailDigits = prefix.replace(/\D/g, '').slice(-10);
+      if (emailDigits.length === 10) {
+        cleanPhone = emailDigits;
+      }
+    }
+  }
+
+  // 3. User ID fallback (e.g. user_8667611163 or 8667611163)
+  if (cleanPhone.length !== 10 && user.id) {
+    const idDigits = String(user.id).replace(/\D/g, '').slice(-10);
+    if (idDigits.length === 10) {
+      cleanPhone = idDigits;
+    }
+  }
+
+  // 4. Saved phone fallback from localStorage
+  if (cleanPhone.length !== 10 && typeof localStorage !== 'undefined') {
+    try {
+      const savedPhone = (localStorage.getItem('phonemail_saved_phone') || '').replace(/\D/g, '').slice(-10);
+      if (savedPhone.length === 10) {
+        cleanPhone = savedPhone;
+      }
+    } catch (e) {}
+  }
+
+  // Strictly enforce 10-digit phone number. An INAI user without a phone cannot operate.
+  if (cleanPhone.length !== 10) {
+    return null;
+  }
+
+  const rawName = user.name || user.display_name || user.displayName || '';
   const cleanName = (rawName && !rawName.startsWith('User ') ? rawName : (user.display_name || `User ${cleanPhone}`)).trim();
   const rawEmail = user.email || user.email_address || '';
-  const cleanEmail = (rawEmail || (cleanPhone ? `${cleanPhone}@alphastack.wwisvnr.com` : '')).trim();
+  const cleanEmail = (rawEmail.includes('@') && rawEmail.includes(cleanPhone))
+    ? rawEmail.trim()
+    : `${cleanPhone}@alphastack.wwisvnr.com`;
 
   return {
     ...user,
@@ -426,33 +478,38 @@ function restoreSession() {
     try {
       const rawUser = JSON.parse(saved);
       const user = normalizeMobileUser(rawUser);
-      if (user && (user.phone || user.email)) {
+      if (user && user.phone && user.phone.length === 10) {
         currentUser = user;
         saveMobileSession(currentUser);
         document.documentElement.classList.add('has-saved-session');
         initAppView();
 
         // Cross-device profile sync: fetch latest profile & name from database
-        if (currentUser.phone) {
-          fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
-            .then(r => r.json())
-            .then(data => {
-              if (data && data.user) {
-                const refreshed = normalizeMobileUser({ ...currentUser, ...data.user });
+        fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data && data.user) {
+              const refreshed = normalizeMobileUser({ ...currentUser, ...data.user });
+              if (refreshed) {
                 saveMobileSession(refreshed);
                 const drawerName = document.getElementById('drawer-username');
                 if (drawerName) drawerName.innerText = refreshed.name || `User ${refreshed.phone}`;
                 const drawerEmail = document.getElementById('drawer-email');
                 if (drawerEmail) drawerEmail.innerText = formatPhoneDisplay(refreshed.phone);
               }
-            })
-            .catch(() => {});
-        }
+            }
+          })
+          .catch(() => {});
         return;
+      } else {
+        clearCorruptedMobileSession();
       }
-    } catch (e) {}
+    } catch (e) {
+      clearCorruptedMobileSession();
+    }
   }
-  document.documentElement.classList.remove('has-saved-session');
+
+  clearCorruptedMobileSession();
   // Show Onboarding
   const onb = document.getElementById('onboarding-container');
   const app = document.getElementById('app-container');
@@ -463,7 +520,9 @@ function restoreSession() {
 
 function saveMobileSession(user) {
   if (!user) return;
-  currentUser = normalizeMobileUser(user);
+  const normalized = normalizeMobileUser(user);
+  if (!normalized || !normalized.phone || normalized.phone.length !== 10) return;
+  currentUser = normalized;
   const remEl = document.getElementById('mob-remember-me');
   const remember = remEl ? remEl.checked : true;
   const str = JSON.stringify(currentUser);
@@ -471,15 +530,20 @@ function saveMobileSession(user) {
     localStorage.setItem('phonemail-mobile-user', str);
     localStorage.setItem('inai_user', str);
     localStorage.setItem('phonemail-user', str);
-    if (currentUser.phone) localStorage.setItem('phonemail_saved_phone', currentUser.phone);
+    localStorage.setItem('phonemail_saved_phone', currentUser.phone);
   }
   sessionStorage.setItem('phonemail-mobile-user', str);
   document.documentElement.classList.add('has-saved-session');
 }
 
 function initAppView() {
-  if (!currentUser) return;
-  currentUser = normalizeMobileUser(currentUser);
+  if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+    currentUser = normalizeMobileUser(currentUser);
+    if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+      restoreSession();
+      return;
+    }
+  }
 
   document.getElementById('onboarding-container').style.display = 'none';
   document.getElementById('app-container').style.display = 'flex';
@@ -638,7 +702,7 @@ async function handleMobilePhoneSubmit(e) {
     const res = await fetch('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: pendingPhone })
+      body: JSON.stringify({ phone: pendingPhone, phoneNumber: pendingPhone })
     });
     const data = await res.json();
     if (data.success) {
@@ -841,7 +905,7 @@ async function checkAndSubmitOtp() {
       const res = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: pendingPhone, otp })
+        body: JSON.stringify({ phone: pendingPhone, phoneNumber: pendingPhone, otp, clientType: 'MOBILE_APP' })
       });
       const data = await res.json();
       if (data.success) {
@@ -883,7 +947,7 @@ async function completeMobileProfile() {
     const res = await fetch('/api/auth/register-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: pendingPhone, name: fullName })
+      body: JSON.stringify({ phone: pendingPhone, phoneNumber: pendingPhone, name: fullName })
     });
     const data = await res.json();
     if (data.success && data.user) {
@@ -960,7 +1024,13 @@ async function loadEmails(folder = currentFolder) {
 
   // 2. BACKGROUND FETCH TO KEEP SYNCHRONIZED
   try {
-    if (!currentUser || !currentUser.phone) return;
+    if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+      currentUser = normalizeMobileUser(currentUser);
+      if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+        restoreSession();
+        return;
+      }
+    }
     const res = await fetch(`/api/emails?folder=${folder}&phone=${encodeURIComponent(currentUser.phone)}`);
     const data = await res.json();
     allEmails = data.emails || [];
@@ -3149,6 +3219,15 @@ function removeMobileTradAttachedImage() {
 }
 
 async function submitChatMessage() {
+  if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+    currentUser = normalizeMobileUser(currentUser);
+    if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+      showToastNotification('Session invalid. Please verify your phone number.', 'error');
+      restoreSession();
+      return;
+    }
+  }
+
   const input = document.getElementById('mob-chat-input');
   if (!input) return;
   const body = input.value.trim();
@@ -4243,9 +4322,18 @@ function selectContactRecipient(recipient) {
 }
 
 async function submitTraditionalCompose() {
-  const to = (document.getElementById('trad-to').value || '').trim();
-  const subject = (document.getElementById('trad-subject').value || '').trim();
-  const body = (document.getElementById('trad-body').value || '').trim();
+  if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+    currentUser = normalizeMobileUser(currentUser);
+    if (!currentUser || !currentUser.phone || currentUser.phone.length !== 10) {
+      showToastNotification('Session invalid. Please verify your phone number.', 'error');
+      restoreSession();
+      return;
+    }
+  }
+
+  const to = (document.getElementById('trad-to')?.value || '').trim();
+  const subject = (document.getElementById('trad-subject')?.value || '').trim();
+  const body = (document.getElementById('trad-body')?.value || '').trim();
 
   if (!to) {
     showToastNotification('Please enter a recipient', 'warning');
@@ -4292,7 +4380,8 @@ async function submitTraditionalCompose() {
       showToastNotification(data.error || 'Failed to send message', 'error');
     }
   } catch (err) {
-    showToastNotification('Failed to send message', 'error');
+    console.error('Send error:', err);
+    showToastNotification(err.message || 'Failed to send message', 'error');
   }
 }
 

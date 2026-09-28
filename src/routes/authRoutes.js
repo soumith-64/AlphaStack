@@ -13,12 +13,16 @@ const otpStore = new Map();
  */
 router.post('/send-otp', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber) {
+    const rawNumber = req.body.phoneNumber || req.body.phone;
+    if (!rawNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
+    const cleanNumber = String(rawNumber).replace(/\D/g, '').slice(-10);
+    if (!cleanNumber || cleanNumber.length !== 10) {
+      return res.status(400).json({ error: 'Please enter a valid 10-digit mobile number' });
+    }
+
     // Generate real cryptographic 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     otpStore.set(cleanNumber, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
@@ -29,6 +33,7 @@ router.post('/send-otp', async (req, res) => {
 
     let smsDelivered = false;
     let twilioStatusMsg = null;
+    const formattedTo = `+91${cleanNumber}`;
 
     // Dispatch real SMS via Twilio if configured
     if (config.twilio.accountSid && config.twilio.authToken) {
@@ -82,12 +87,17 @@ router.post('/send-otp', async (req, res) => {
  */
 router.post('/verify-otp', async (req, res) => {
   try {
-    const { phoneNumber, otp, clientType = 'WEB_CLIENT', displayName } = req.body;
-    if (!phoneNumber || !otp) {
+    const rawNumber = req.body.phoneNumber || req.body.phone;
+    const { otp, clientType = 'WEB_CLIENT', displayName } = req.body;
+    if (!rawNumber || !otp) {
       return res.status(400).json({ error: 'Phone number and OTP are required' });
     }
 
-    const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
+    const cleanNumber = String(rawNumber).replace(/\D/g, '').slice(-10);
+    if (!cleanNumber || cleanNumber.length !== 10) {
+      return res.status(400).json({ error: 'Invalid phone number format' });
+    }
+
     const record = otpStore.get(cleanNumber);
 
     // Accept real memory OTP or fallback demo code
@@ -118,10 +128,20 @@ router.post('/verify-otp', async (req, res) => {
     otpStore.delete(cleanNumber);
     const aliases = await dbOps.queryAll('SELECT * FROM aliases WHERE user_id = ?', [user.id]);
 
+    const normalizedUser = {
+      ...user,
+      phone: cleanNumber,
+      phone_number: cleanNumber,
+      name: user.display_name || displayName || `User ${cleanNumber}`,
+      display_name: user.display_name || displayName || `User ${cleanNumber}`,
+      email: user.email_address || `${cleanNumber}@${config.domainName}`,
+      email_address: user.email_address || `${cleanNumber}@${config.domainName}`
+    };
+
     res.json({
       success: true,
       isNewUser,
-      user,
+      user: normalizedUser,
       aliases,
       token: `token_${user.id}_${Date.now()}`
     });
@@ -135,12 +155,12 @@ router.post('/verify-otp', async (req, res) => {
  */
 router.post('/call-otp', async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
-    if (!phoneNumber) {
+    const rawNumber = req.body.phoneNumber || req.body.phone;
+    if (!rawNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
+    const cleanNumber = String(rawNumber).replace(/\D/g, '').slice(-10);
     let otpRecord = otpStore.get(cleanNumber);
     let otp;
     if (otpRecord && Date.now() < otpRecord.expiresAt) {
@@ -203,20 +223,21 @@ router.post('/call-otp', async (req, res) => {
 /**
  * Complete Profile for New User Registration (Telegram-style Step 3)
  */
-router.post('/complete-profile', async (req, res) => {
+async function handleCompleteProfile(req, res) {
   try {
-    const { phoneNumber, firstName, lastName, aliasTag } = req.body;
-    if (!phoneNumber) {
+    const rawNumber = req.body.phoneNumber || req.body.phone;
+    const { firstName, lastName, name, aliasTag } = req.body;
+    if (!rawNumber) {
       return res.status(400).json({ error: 'Phone number is required' });
     }
 
-    const cleanNumber = String(phoneNumber).replace(/\D/g, '').slice(-10);
+    const cleanNumber = String(rawNumber).replace(/\D/g, '').slice(-10);
     let user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const fullName = `${firstName || ''} ${lastName || ''}`.trim() || `User ${cleanNumber}`;
+    const fullName = (name || `${firstName || ''} ${lastName || ''}`).trim() || `User ${cleanNumber}`;
     await dbOps.execute('UPDATE users SET display_name = ? WHERE id = ?', [fullName, user.id]);
     user.display_name = fullName;
 
@@ -235,11 +256,24 @@ router.post('/complete-profile', async (req, res) => {
       }
     }
 
-    res.json({ success: true, user });
+    const normalizedUser = {
+      ...user,
+      phone: cleanNumber,
+      phone_number: cleanNumber,
+      name: fullName,
+      display_name: fullName,
+      email: user.email_address || `${cleanNumber}@${config.domainName}`,
+      email_address: user.email_address || `${cleanNumber}@${config.domainName}`
+    };
+
+    res.json({ success: true, user: normalizedUser });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
+}
+
+router.post('/complete-profile', handleCompleteProfile);
+router.post('/register-profile', handleCompleteProfile);
 
 /**
  * Verify authenticated phone number from Phone.Email (phone.email)

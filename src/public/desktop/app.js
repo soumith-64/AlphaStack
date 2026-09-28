@@ -3751,35 +3751,57 @@ function restoreSession() {
     try {
       currentUser = JSON.parse(saved);
       if (currentUser) {
-        currentUser.phone = (currentUser.phone || currentUser.phone_number || '').replace(/\D/g, '').slice(-10);
-        currentUser.name = currentUser.name || currentUser.display_name || (currentUser.phone ? `User ${currentUser.phone}` : 'User');
-        currentUser.email = currentUser.email || currentUser.email_address || `${currentUser.phone}@alphastack.wwisvnr.com`;
-      }
-      document.documentElement.classList.add('has-saved-session');
-      const auth = document.getElementById('desktop-auth-container');
-      const main = document.getElementById('desktop-main-container');
-      if (auth && main) {
-        auth.style.display = 'none';
-        main.style.display = 'flex';
-        initDesktopApp();
+        let cleanPhone = (currentUser.phone || currentUser.phone_number || '').replace(/\D/g, '').slice(-10);
+        if (cleanPhone.length !== 10 && currentUser.email) {
+          cleanPhone = String(currentUser.email.split('@')[0] || '').replace(/\D/g, '').slice(-10);
+        }
+        if (cleanPhone.length !== 10 && currentUser.id) {
+          cleanPhone = String(currentUser.id).replace(/\D/g, '').slice(-10);
+        }
+        if (cleanPhone.length !== 10) {
+          const sp = localStorage.getItem('phonemail_saved_phone');
+          if (sp) cleanPhone = String(sp).replace(/\D/g, '').slice(-10);
+        }
 
-        // Cross-device profile sync: fetch latest profile & aliases from database
-        if (currentUser && currentUser.phone) {
-          fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
-            .then(r => r.json())
-            .then(data => {
-              if (data && data.user) {
-                currentUser.name = data.user.display_name || currentUser.name;
-                currentUser.email = data.user.email_address || currentUser.email;
-                localStorage.setItem('phonemail-user', JSON.stringify(currentUser));
-                localStorage.setItem('inai_user', JSON.stringify(currentUser));
-                sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
-                updateProfileDisplay();
-              }
-            })
-            .catch(() => {});
+        if (cleanPhone.length === 10) {
+          currentUser.phone = cleanPhone;
+          currentUser.phone_number = cleanPhone;
+          currentUser.name = currentUser.name || currentUser.display_name || `User ${cleanPhone}`;
+          currentUser.email = currentUser.email || currentUser.email_address || `${cleanPhone}@alphastack.wwisvnr.com`;
+
+          document.documentElement.classList.add('has-saved-session');
+          const auth = document.getElementById('desktop-auth-container');
+          const main = document.getElementById('desktop-main-container');
+          if (auth && main) {
+            auth.style.display = 'none';
+            main.style.display = 'flex';
+            initDesktopApp();
+
+            // Cross-device profile sync: fetch latest profile & aliases from database
+            fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+              .then(r => r.json())
+              .then(data => {
+                if (data && data.user) {
+                  currentUser.name = data.user.display_name || currentUser.name;
+                  currentUser.email = data.user.email_address || currentUser.email;
+                  localStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                  localStorage.setItem('inai_user', JSON.stringify(currentUser));
+                  sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                  updateProfileDisplay();
+                }
+              })
+              .catch(() => {});
+          }
+          return;
         }
       }
+      // If we reach here, user had no valid 10-digit phone
+      localStorage.removeItem('phonemail-user');
+      localStorage.removeItem('inai_user');
+      localStorage.removeItem('phonemail-mobile-user');
+      sessionStorage.removeItem('phonemail-user');
+      document.documentElement.classList.remove('has-saved-session');
+      currentUser = null;
     } catch (e) {
       localStorage.removeItem('phonemail-user');
       localStorage.removeItem('inai_user');
