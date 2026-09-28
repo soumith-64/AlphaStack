@@ -5323,3 +5323,37 @@ function toggleTranscriptView(msgId) {
   if (!el) return;
   el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
+
+// ==================== APP INITIALIZATION & BROWSER RESUME ====================
+function bootMobileApp() {
+  restoreSession();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootMobileApp);
+} else {
+  bootMobileApp();
+}
+
+// Handle iOS Safari / mobile background-foreground resume & bfcache
+window.addEventListener('pageshow', (event) => {
+  // If restored from bfcache or resumed, re-verify session and refresh inbox
+  if (currentUser && currentUser.phone) {
+    initAppView();
+  } else {
+    restoreSession();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if (currentUser && currentUser.phone) {
+      // Re-sync inbox silently without resetting view
+      if (typeof loadEmails === 'function') {
+        loadEmails(currentFolder);
+      }
+    } else {
+      restoreSession();
+    }
+  }
+});

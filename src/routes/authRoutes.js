@@ -413,8 +413,14 @@ router.post('/portal-register', async (req, res) => {
  */
 router.get('/me', async (req, res) => {
   try {
-    const phone = req.query.phone || '9876543210';
-    const cleanNumber = String(phone).replace(/\D/g, '').slice(-10);
+    const rawPhone = req.query.phone || req.query.phoneNumber;
+    if (!rawPhone) {
+      return res.status(400).json({ error: 'Phone number parameter is required' });
+    }
+    const cleanNumber = String(rawPhone).replace(/\D/g, '').slice(-10);
+    if (!cleanNumber || cleanNumber.length !== 10) {
+      return res.status(400).json({ error: 'Valid 10-digit phone number is required' });
+    }
     const user = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [cleanNumber]);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
