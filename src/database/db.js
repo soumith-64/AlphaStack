@@ -41,7 +41,8 @@ if (useMysql) {
         'ALTER TABLE emails MODIFY COLUMN body_text LONGTEXT',
         'ALTER TABLE emails MODIFY COLUMN body_html LONGTEXT',
         'ALTER TABLE emails MODIFY COLUMN recipient_emails LONGTEXT',
-        'CREATE TABLE IF NOT EXISTS deleted_email_signatures (signature VARCHAR(191) PRIMARY KEY, message_id VARCHAR(191), sender VARCHAR(191), subject VARCHAR(255), deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)'
+        'CREATE TABLE IF NOT EXISTS deleted_email_signatures (signature VARCHAR(191) PRIMARY KEY, message_id VARCHAR(191), sender VARCHAR(191), subject VARCHAR(255), deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
+        'CREATE TABLE IF NOT EXISTS blocked_senders (id INT AUTO_INCREMENT PRIMARY KEY, user_phone VARCHAR(20) NOT NULL, blocked_sender VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_user_block (user_phone, blocked_sender))'
       ];
       for (const m of migrations) {
         try {
@@ -135,6 +136,15 @@ async function getSqliteDb() {
         sender VARCHAR(255),
         subject VARCHAR(255),
         deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );`);
+    } catch (e) {}
+    try {
+      db.run(`CREATE TABLE IF NOT EXISTS blocked_senders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_phone TEXT NOT NULL,
+        blocked_sender TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (user_phone, blocked_sender)
       );`);
     } catch (e) {}
     saveToDisk();

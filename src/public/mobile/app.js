@@ -1077,6 +1077,64 @@ function updateFolderCounts(emails) {
   if (pillUnread) {
     pillUnread.innerText = unreadCount;
   }
+  syncMobileFolderStats();
+}
+
+function parseEmailDate(dateVal) {
+  if (!dateVal) return null;
+  if (dateVal instanceof Date) return isNaN(dateVal.getTime()) ? null : dateVal;
+  if (typeof dateVal === 'number') {
+    const d = new Date(dateVal > 1e11 ? dateVal : dateVal * 1000);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  let s = String(dateVal).trim();
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(s)) {
+    s = s.replace(' ', 'T');
+  }
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  if (/^\d{10,13}$/.test(s)) {
+    const num = parseInt(s, 10);
+    const dNum = new Date(num > 1e11 ? num : num * 1000);
+    if (!isNaN(dNum.getTime())) return dNum;
+  }
+  return null;
+}
+
+async function syncMobileFolderStats() {
+  if (!currentUser || !currentUser.phone) return;
+  try {
+    const res = await fetch(`/api/emails/stats?phone=${encodeURIComponent(currentUser.phone)}`);
+    const stats = await res.json();
+    if (!stats) return;
+
+    const unreadBadge = document.getElementById('badge-unread-count');
+    if (unreadBadge) {
+      const activeUnread = currentFolder === 'INBOX' ? stats.inbox_unread : stats.all_unread;
+      unreadBadge.innerText = activeUnread > 0 ? activeUnread : '';
+      unreadBadge.style.display = activeUnread > 0 ? 'inline-flex' : 'none';
+    }
+
+    const badgeInbox = document.getElementById('mob-badge-inbox');
+    if (badgeInbox) {
+      badgeInbox.innerText = stats.inbox_unread > 0 ? stats.inbox_unread : '';
+      badgeInbox.style.display = stats.inbox_unread > 0 ? 'inline-block' : 'none';
+    }
+
+    const badgeAll = document.getElementById('mob-badge-all');
+    if (badgeAll) {
+      badgeAll.innerText = stats.all_unread > 0 ? stats.all_unread : '';
+      badgeAll.style.display = stats.all_unread > 0 ? 'inline-block' : 'none';
+    }
+
+    const badgeDrafts = document.getElementById('mob-badge-drafts');
+    if (badgeDrafts) {
+      badgeDrafts.innerText = stats.drafts_total > 0 ? stats.drafts_total : '';
+      badgeDrafts.style.display = stats.drafts_total > 0 ? 'inline-block' : 'none';
+    }
+  } catch (err) {
+    console.warn('Could not sync mobile folder stats:', err);
+  }
 }
 
 function setMobileSourceFilter(source) {
@@ -1707,11 +1765,15 @@ function groupEmailsIntoConversations(emails) {
 
 // ==================== QUICK FILTERS (ALL / UNREAD / ATTACHMENTS / FAVORITES) ====================
 function setMobileQuickFilter(filter) {
-  activeQuickFilter = filter;
+  if (activeQuickFilter === filter && filter !== 'all') {
+    activeQuickFilter = 'all';
+  } else {
+    activeQuickFilter = filter;
+  }
   ['all', 'unread', 'attachments', 'favorites'].forEach(f => {
-    const pill = document.getElementById(`quick-pill-${f}`);
+    const pill = document.getElementById(`pill-filter-${f}`) || document.getElementById(`quick-pill-${f}`);
     if (pill) {
-      if (f === filter) pill.classList.add('active');
+      if (f === activeQuickFilter) pill.classList.add('active');
       else pill.classList.remove('active');
     }
   });
@@ -2150,6 +2212,11 @@ function openMobileTraditionalEmail(emailId) {
   }
   if (!email) return;
 
+  if (currentFolder === 'DRAFTS' || email.folder === 'DRAFTS') {
+    openDraftInMobileCompose(email);
+    return;
+  }
+
   activeTradEmail = email;
   activeEmail = email;
 
@@ -2502,6 +2569,14 @@ function createMobileConversationCard(conv) {
 async function openConversation(convId) {
   const conv = allConversations.find(c => c.id === convId || c.key === convId);
   if (!conv) return;
+
+  if (currentFolder === 'DRAFTS') {
+    const draftMsg = conv.latestMessage || (conv.messages && conv.messages[0]);
+    if (draftMsg) {
+      openDraftInMobileCompose(draftMsg);
+      return;
+    }
+  }
 
   activeConversation = conv;
   activeConversationId = conv.id;
@@ -3364,8 +3439,8 @@ function closeImageLightbox() {
 }
 
 // ==================== DIGITAL ID CARD & PERSON INFO MODAL ====================
-function openDigitalIdModal() {
-  openContactInfoModal(currentUser ? currentUser.phone : null);
+function openDigitalIdModal(initialTab = 'card') {
+  openContactInfoModal(currentUser ? currentUser.phone : null, '', initialTab);
 }
 
 function openActiveContactInfoModal() {
@@ -3401,7 +3476,7 @@ function openActiveContactInfoModal() {
   }
 }
 
-async function openContactInfoModal(phoneOrEmail, customName = '') {
+async function openContactInfoModal(phoneOrEmail, customName = '', initialTab = 'card') {
   let raw = phoneOrEmail || (activeConversation && activeConversation.participant_raw) || (currentUser && currentUser.phone);
   if (!raw) return;
 
@@ -3445,8 +3520,8 @@ async function openContactInfoModal(phoneOrEmail, customName = '') {
     btnEdit.style.display = isSelf ? 'inline-flex' : 'none';
   }
 
-  // Set default view to Digital ID Card
-  switchIdCardTab('card');
+  // Set view to requested tab
+  switchIdCardTab(initialTab || 'card');
 
   const isPM = isPhoneMailSender(target) || (cleanPhone && cleanPhone.length === 10);
   const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : (target.includes('@') ? '' : target);
@@ -3562,6 +3637,218 @@ function switchIdCardTab(tab) {
 function flipSmartCard() {
   const card = document.getElementById('smart-mail-card');
   if (card) card.classList.toggle('flipped');
+}
+
+async function downloadDigitalIdCard() {
+  try {
+    const nameEl = document.getElementById('id-card-name');
+    const phoneEl = document.getElementById('id-card-phone');
+    const emailEl = document.getElementById('id-card-email');
+    const qrEl = document.getElementById('id-card-qr-img');
+    const dateEl = document.getElementById('id-card-issue-date');
+
+    const name = (nameEl ? nameEl.innerText : (currentUser ? currentUser.name || currentUser.display_name : 'INAI User')).trim();
+    const phone = (phoneEl ? phoneEl.innerText : (currentUser ? currentUser.phone : '')).trim();
+    const email = (emailEl ? emailEl.innerText : (currentUser ? `${currentUser.phone}@alphastack.wwisvnr.com` : '')).trim();
+    const issueDate = (dateEl ? dateEl.innerText : new Date().toISOString().split('T')[0]).trim();
+
+    // High-resolution canvas for crystal clear image export (1200 x 750)
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 750;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    function roundRect(ctx, x, y, width, height, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    // Gradient background
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 750);
+    bgGrad.addColorStop(0, '#0a1026');
+    bgGrad.addColorStop(0.5, '#101a36');
+    bgGrad.addColorStop(1, '#070b18');
+
+    ctx.save();
+    roundRect(ctx, 20, 20, 1160, 710, 36);
+    ctx.fillStyle = bgGrad;
+    ctx.fill();
+
+    // Glowing border
+    ctx.lineWidth = 4;
+    const borderGrad = ctx.createLinearGradient(20, 20, 1180, 730);
+    borderGrad.addColorStop(0, '#38bdf8');
+    borderGrad.addColorStop(0.5, '#6366f1');
+    borderGrad.addColorStop(1, '#10b981');
+    ctx.strokeStyle = borderGrad;
+    ctx.stroke();
+    ctx.restore();
+
+    // Indian Tiranga accent ribbon
+    const triHeight = 8;
+    const triY = 56;
+    const triWidth = 1100 / 3;
+    ctx.fillStyle = '#FF9933';
+    ctx.fillRect(50, triY, triWidth, triHeight);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(50 + triWidth, triY, triWidth, triHeight);
+    ctx.fillStyle = '#138808';
+    ctx.fillRect(50 + triWidth * 2, triY, triWidth, triHeight);
+
+    // Header
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 34px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText('PHONEMAIL DIGITAL IDENTITY CARD', 50, 115);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '600 18px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('INAI PROTOCOL • E2E VERIFIED IDENTITY', 50, 145);
+
+    // EMV chip simulation
+    const chipX = 50;
+    const chipY = 180;
+    const chipW = 80;
+    const chipH = 62;
+    ctx.save();
+    roundRect(ctx, chipX, chipY, chipW, chipH, 8);
+    const goldGrad = ctx.createLinearGradient(chipX, chipY, chipX + chipW, chipY + chipH);
+    goldGrad.addColorStop(0, '#fcd34d');
+    goldGrad.addColorStop(0.5, '#d97706');
+    goldGrad.addColorStop(1, '#b45309');
+    ctx.fillStyle = goldGrad;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#78350f';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(chipX + 26, chipY);
+    ctx.lineTo(chipX + 26, chipY + chipH);
+    ctx.moveTo(chipX + 54, chipY);
+    ctx.lineTo(chipX + 54, chipY + chipH);
+    ctx.moveTo(chipX, chipY + 31);
+    ctx.lineTo(chipX + chipW, chipY + 31);
+    ctx.stroke();
+    ctx.restore();
+
+    // User Avatar circle
+    const avatarX = 85;
+    const avatarY = 350;
+    const avatarR = 55;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarX, avatarY, avatarR, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e293b';
+    ctx.fill();
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#10b981';
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 44px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const initials = name ? name.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase() : 'U';
+    ctx.fillText(initials, avatarX, avatarY);
+    ctx.restore();
+
+    // User Details
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+
+    // Full Name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 44px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.fillText(name || 'INAI Member', 165, 335);
+
+    // Phone Number
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '600 24px -apple-system, BlinkMacSystemFont, monospace';
+    ctx.fillText(phone || '+91 -', 165, 375);
+
+    // INAI Address
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, monospace';
+    ctx.fillText(email || 'user@alphastack.wwisvnr.com', 165, 415);
+
+    // Sub-ID badge
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+    ctx.fillRect(165, 435, 180, 32);
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('SUB-ID: .primary', 180, 457);
+
+    // Meta details
+    ctx.fillStyle = '#64748b';
+    ctx.font = '600 17px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText(`ISSUED: ${issueDate}`, 50, 560);
+    ctx.fillText('ALGORITHM: SHA-256 E2E • GOV COMPLIANT', 50, 590);
+    ctx.fillText('GATEWAY: PHONE-TO-EMAIL REAL-TIME BRIDGE', 50, 620);
+
+    // Status pill
+    ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+    roundRect(ctx, 50, 645, 290, 40, 10);
+    ctx.fill();
+    ctx.fillStyle = '#10b981';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('⚡ 100% VERIFIED IDENTITY', 70, 671);
+
+    // QR Code on right side
+    const qrSize = 220;
+    const qrX = 900;
+    const qrY = 220;
+
+    let qrDrawn = false;
+    if (qrEl && qrEl.complete && qrEl.naturalWidth > 0) {
+      try {
+        ctx.fillStyle = '#ffffff';
+        roundRect(ctx, qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 16);
+        ctx.fill();
+        ctx.drawImage(qrEl, qrX, qrY, qrSize, qrSize);
+        qrDrawn = true;
+      } catch (e) {}
+    }
+
+    if (!qrDrawn) {
+      ctx.fillStyle = '#ffffff';
+      roundRect(ctx, qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 16);
+      ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.font = 'bold 18px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SCAN TO EMAIL', qrX + qrSize / 2, qrY + qrSize / 2 - 10);
+      ctx.font = '13px monospace';
+      ctx.fillText(email, qrX + qrSize / 2, qrY + qrSize / 2 + 20);
+      ctx.textAlign = 'left';
+    }
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '600 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Scan to Send Direct Email', qrX + qrSize / 2, qrY + qrSize + 40);
+
+    const cleanPhone = String(phone).replace(/\D/g, '').slice(-10) || 'user';
+    const dataUrl = canvas.toDataURL('image/png');
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = dataUrl;
+    downloadAnchor.download = `PhoneMail_Digital_ID_${cleanPhone}.png`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+
+    showToastNotification('Digital ID Card downloaded successfully! 🪪', 'success');
+  } catch (err) {
+    console.error('Error downloading digital id card:', err);
+    showToastNotification('Failed to download Digital ID: ' + err.message, 'error');
+  }
 }
 
 function selectPersonAvatarGradient(palette) {
@@ -3874,6 +4161,55 @@ function deleteCurrentEmail() {
     executeBulkActionOnSingle(m.id, 'delete');
   });
   closeReadingPane();
+}
+
+async function blockCurrentMobileSender() {
+  let senderEmail = null;
+  let senderName = null;
+
+  if (activeTradEmail) {
+    senderEmail = activeTradEmail.sender_email;
+    senderName = activeTradEmail.sender_name || senderEmail;
+  } else if (activeEmail) {
+    senderEmail = activeEmail.sender_email;
+    senderName = activeEmail.sender_name || senderEmail;
+  } else if (activeConversation) {
+    senderEmail = activeConversation.participant_raw || (activeConversation.latestMessage && activeConversation.latestMessage.sender_email);
+    senderName = activeConversation.sender_name || senderEmail;
+  }
+
+  if (!senderEmail || !currentUser || !currentUser.phone) {
+    showToastNotification('Sender information not found', 'warning');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to block ${senderName || senderEmail}? All future emails from this sender will be routed to Spam.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/emails/block', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userPhone: currentUser.phone,
+        sender: senderEmail
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToastNotification(`Blocked ${senderName || senderEmail}. Future emails routed to Spam.`, 'success');
+      closeReadingPane();
+      closeTraditionalReadingPane();
+      emailFolderCache = {};
+      loadEmails(currentFolder);
+      syncMobileFolderStats();
+    } else {
+      showToastNotification(data.error || 'Failed to block sender', 'error');
+    }
+  } catch (err) {
+    showToastNotification('Error blocking sender: ' + err.message, 'error');
+  }
 }
 
 function archiveCurrentEmail() {
@@ -4221,6 +4557,79 @@ async function verifyAndRenderRecipientStatus(val, pillElementId) {
   container.innerHTML = '';
 }
 
+let activeMobileDraftId = null;
+
+function openDraftInMobileCompose(email) {
+  if (!email) return;
+  activeMobileDraftId = email.id;
+
+  let recipientText = '';
+  if (email.recipients) {
+    try {
+      const parsed = typeof email.recipients === 'string' ? JSON.parse(email.recipients) : email.recipients;
+      if (Array.isArray(parsed)) recipientText = parsed.join(', ');
+      else recipientText = String(email.recipients);
+    } catch (e) {
+      recipientText = String(email.recipients);
+    }
+  } else if (email.recipient_emails) {
+    try {
+      const parsed = typeof email.recipient_emails === 'string' ? JSON.parse(email.recipient_emails) : email.recipient_emails;
+      if (Array.isArray(parsed)) recipientText = parsed.join(', ');
+      else recipientText = String(email.recipient_emails);
+    } catch (e) {
+      recipientText = String(email.recipient_emails);
+    }
+  }
+
+  openTraditionalCompose(recipientText, email.subject || '', email.body_text || email.body || '');
+}
+
+async function saveMobileDraft() {
+  if (!currentUser || !currentUser.phone) {
+    showToastNotification('Please log in to save drafts', 'error');
+    return;
+  }
+  const to = (document.getElementById('trad-to')?.value || '').trim();
+  const subject = (document.getElementById('trad-subject')?.value || '').trim();
+  const body = (document.getElementById('trad-body')?.value || '').trim();
+
+  if (!to && !subject && !body) {
+    showToastNotification('Draft is empty. Enter recipient, subject, or content.', 'warning');
+    return;
+  }
+
+  const recipients = to ? to.split(',').map(r => r.trim()).filter(Boolean) : [];
+
+  try {
+    const res = await fetch('/api/emails/draft', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        senderPhone: currentUser.phone,
+        toRecipients: recipients,
+        subject: subject || '(No Subject)',
+        bodyText: body || '',
+        draftId: activeMobileDraftId
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      activeMobileDraftId = data.draftId;
+      showToastNotification('Draft saved successfully! 📝', 'success');
+      syncMobileFolderStats();
+      if (currentFolder === 'DRAFTS') {
+        emailFolderCache = {};
+        loadEmails('DRAFTS');
+      }
+    } else {
+      showToastNotification(data.error || 'Failed to save draft', 'error');
+    }
+  } catch (err) {
+    showToastNotification('Error saving draft: ' + err.message, 'error');
+  }
+}
+
 function openTraditionalCompose(recipient = '', subject = '', body = '') {
   document.getElementById('trad-to').value = recipient;
   document.getElementById('trad-subject').value = subject;
@@ -4249,6 +4658,7 @@ function closeTraditionalCompose() {
     verifyPill.style.display = 'none';
     verifyPill.innerHTML = '';
   }
+  activeMobileDraftId = null;
 }
 
 function openReplyCompose(isForward = false) {
@@ -4366,6 +4776,10 @@ async function submitTraditionalCompose() {
     });
     const data = await res.json();
     if (data.success) {
+      if (activeMobileDraftId) {
+        fetch(`/api/emails/draft/${activeMobileDraftId}`, { method: 'DELETE' }).catch(() => {});
+        activeMobileDraftId = null;
+      }
       if (data.sms_dispatched) {
         showToastNotification('Message & Voice sent! Recipient notified via TextBee SMS 📱', 'success');
       } else {
@@ -4376,6 +4790,7 @@ async function submitTraditionalCompose() {
       // Invalidate cache and reload
       emailFolderCache = {};
       loadEmails(currentFolder);
+      syncMobileFolderStats();
     } else {
       showToastNotification(data.error || 'Failed to send message', 'error');
     }
@@ -4468,8 +4883,8 @@ function updateDateFilterUI() {
 function isDateInFilter(dateVal) {
   if (activeDateFilter === 'all') return true;
   if (!dateVal) return false;
-  const d = new Date(dateVal);
-  if (isNaN(d.getTime())) return true;
+  const d = parseEmailDate(dateVal);
+  if (!d) return false;
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();

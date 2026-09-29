@@ -1,5 +1,6 @@
 import { dbOps } from '../database/db.js';
 import { config } from '../config.js';
+import { textbeeService } from './textbeeService.js';
 
 let ioInstance = null;
 
@@ -9,57 +10,41 @@ export const notificationService = {
   },
 
   /**
-   * Evaluates recipient and sends SMS notification if eligible
-   * Spec: Only for users who do NOT have the mobile app (registered via phone call, web portal, or web client)
+   * Evaluates recipient and sends real-time SMS notification via TextBee
+   * Triggered whenever any user receives a new incoming internal or external email
    */
   async checkAndNotify(email, recipientUser) {
     if (!recipientUser) return;
 
-    // Check if user has mobile app
-    if (recipientUser.has_mobile_app === 1) {
-      console.log(`ℹ️ User ${recipientUser.phone_number} has mobile app. Skipping SMS notification.`);
-      return;
+    const rawPhone = String(recipientUser.phone_number || '').trim();
+    const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) return;
+
+    const senderDisplay = email.sender_name && !/^User\s*\d+/i.test(email.sender_name)
+      ? email.sender_name
+      : (email.sender_email || 'INAI Contact');
+    const subjectDisplay = email.subject ? email.subject.trim() : '(No Subject)';
+    const domain = config.domainName || 'alphastack.wwisvnr.com';
+    const smsBody = `INAI: New email received from ${senderDisplay}. Subject: ${subjectDisplay.slice(0, 50)}. View: https://${domain}`;
+
+    console.log(`📱 [NEW MAIL SMS DISPATCH] To: ${cleanPhone} | Body: "${smsBody}"`);
+
+    // 1. Primary Dispatch via TextBee Indian SMS Gateway
+    let textbeeResult = null;
+    try {
+      textbeeResult = await textbeeService.sendSms(cleanPhone, smsBody);
+    } catch (tbErr) {
+      console.warn('TextBee notification SMS error:', tbErr.message);
     }
 
-    const senderDisplay = email.sender_email;
-    const subjectDisplay = email.subject || '(No Subject)';
-    const smsBody = `You have received an email from ${senderDisplay}. Subject: ${subjectDisplay}.`;
-
-    console.log(`📱 [TARGETED SMS DISPATCH] To: ${recipientUser.phone_number} | Body: "${smsBody}"`);
-
-    // Log to audit table
-    const logId = await dbOps.logTelephony(
-      recipientUser.phone_number,
-      'OUTGOING_NOTIFICATION_SMS',
-      smsBody,
-      config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS',
-      'DELIVERED'
-    );
-
-    const logEntry = {
-      id: logId,
-      phone_number: recipientUser.phone_number,
-      type: 'OUTGOING_NOTIFICATION_SMS',
-      content: smsBody,
-      provider: config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS',
-      status: 'DELIVERED',
-      created_at: new Date().toISOString()
-    };
-
-    // Broadcast in real-time to active clients
-    if (ioInstance) {
-      ioInstance.emit('telephony:log', logEntry);
-    }
-
-    // If real Twilio credentials are provided, dispatch via Twilio API
+    // 2. Secondary dispatch via Twilio if configured
     if (config.twilio.accountSid && config.twilio.authToken) {
       try {
         const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Messages.json`;
         const auth = Buffer.from(`${config.twilio.accountSid}:${config.twilio.authToken}`).toString('base64');
-        const rawPhone = String(recipientUser.phone_number).trim();
         const formattedTo = rawPhone.startsWith('+') 
           ? rawPhone 
-          : (rawPhone.length === 10 ? `+91${rawPhone}` : `+${rawPhone}`);
+          : `+91${cleanPhone}`;
 
         const params = new URLSearchParams({
           To: formattedTo,
@@ -82,6 +67,6 @@ export const notificationService = {
       }
     }
 
-    return logEntry;
+    return textbeeResult;
   }
 };

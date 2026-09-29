@@ -227,11 +227,24 @@ export const emailService = {
       recipientEmailsList.push(to);
     }
 
+    // Check if sender is blocked by recipient
+    const senderDigits = cleanSender.replace(/\D/g, '').slice(-10);
+    let isBlocked = false;
+    try {
+      const blockedRow = await dbOps.queryOne(`
+        SELECT id FROM blocked_senders 
+        WHERE user_phone = ? AND (blocked_sender = ? OR blocked_sender = ?)
+      `, [recipientPhone, cleanSender, senderDigits || 'NONE']);
+      isBlocked = Boolean(blockedRow);
+    } catch (_) {}
+
+    const targetFolder = isBlocked ? 'SPAM' : 'INBOX';
+
     // Insert email
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     await dbOps.execute(`
       INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, is_read, folder, is_important, is_starred)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'INBOX', 0, 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, 0)
     `, [
       emailId,
       conversationId,
@@ -239,7 +252,8 @@ export const emailService = {
       JSON.stringify(recipientEmailsList),
       cleanSubject,
       cleanText,
-      html || cleanText || ''
+      html || cleanText || '',
+      targetFolder
     ]);
 
     const savedEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
@@ -257,8 +271,10 @@ export const emailService = {
       });
     }
 
-    // Check and trigger targeted SMS notification if user has no mobile app
-    await notificationService.checkAndNotify(savedEmail, user);
+    // Check and trigger targeted SMS notification if not blocked
+    if (!isBlocked) {
+      await notificationService.checkAndNotify(savedEmail, user);
+    }
 
     return savedEmail;
   },

@@ -289,6 +289,203 @@ router.get('/emails', async (req, res) => {
 });
 
 /**
+ * Global Mailbox Folder Stats & Counts
+ */
+router.get('/emails/stats', async (req, res) => {
+  try {
+    const userPhone = req.query.phone;
+    if (!userPhone) return res.json({ inbox_unread: 0, inbox_total: 0, all_unread: 0, all_total: 0, drafts_total: 0, sent_total: 0 });
+    const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
+
+    const primaryUser = await dbOps.queryOne('SELECT phone_number FROM users ORDER BY created_at ASC LIMIT 1');
+    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163';
+
+    // 1. INBOX stats
+    const inboxSql = isPrimary
+      ? `SELECT 
+           COUNT(*) as total, 
+           SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
+         FROM emails 
+         WHERE (recipient_emails LIKE ? OR recipient_emails LIKE '%admin@%') 
+           AND (folder = 'INBOX' OR folder IS NULL) AND folder != 'TRASH'`
+      : `SELECT 
+           COUNT(*) as total, 
+           SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
+         FROM emails 
+         WHERE recipient_emails LIKE ? 
+           AND (folder = 'INBOX' OR folder IS NULL) AND folder != 'TRASH'`;
+    const inboxStats = await dbOps.queryOne(inboxSql, [`%${cleanPhone}%`]);
+
+    // 2. ALL Mail stats
+    const allSql = isPrimary
+      ? `SELECT 
+           COUNT(*) as total, 
+           SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
+         FROM emails 
+         WHERE (recipient_emails LIKE ? OR sender_email LIKE ? OR recipient_emails LIKE '%admin@%') 
+           AND folder != 'TRASH' AND folder != 'DRAFTS'`
+      : `SELECT 
+           COUNT(*) as total, 
+           SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
+         FROM emails 
+         WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+           AND folder != 'TRASH' AND folder != 'DRAFTS'`;
+    const allStats = await dbOps.queryOne(allSql, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+
+    // 3. DRAFTS stats
+    const draftsStats = await dbOps.queryOne(`
+      SELECT COUNT(*) as total FROM emails 
+      WHERE (sender_email LIKE ? OR recipient_emails LIKE ?) AND folder = 'DRAFTS'
+    `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+
+    // 4. SENT stats
+    const sentStats = await dbOps.queryOne(`
+      SELECT COUNT(*) as total FROM emails 
+      WHERE sender_email LIKE ? AND folder != 'TRASH'
+    `, [`%${cleanPhone}%`]);
+
+    // 5. STARRED & IMPORTANT
+    const starStats = await dbOps.queryOne(`
+      SELECT COUNT(*) as total FROM emails 
+      WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) AND is_starred = 1 AND folder != 'TRASH'
+    `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+
+    const impStats = await dbOps.queryOne(`
+      SELECT COUNT(*) as total FROM emails 
+      WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) AND is_important = 1 AND folder != 'TRASH'
+    `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+
+    res.json({
+      inbox_unread: Number(inboxStats?.unread || 0),
+      inbox_total: Number(inboxStats?.total || 0),
+      all_unread: Number(allStats?.unread || 0),
+      all_total: Number(allStats?.total || 0),
+      drafts_total: Number(draftsStats?.total || 0),
+      sent_total: Number(sentStats?.total || 0),
+      starred_total: Number(starStats?.total || 0),
+      important_total: Number(impStats?.total || 0)
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Block Sender and Move Their Emails to Spam
+ */
+router.post('/emails/block', async (req, res) => {
+  try {
+    const rawUserPhone = req.body.userPhone || req.body.user_phone;
+    const rawSender = req.body.sender || req.body.senderEmail || req.body.sender_email;
+    if (!rawUserPhone || !rawSender) {
+      return res.status(400).json({ error: 'userPhone and sender are required' });
+    }
+
+    const cleanUserPhone = String(rawUserPhone).replace(/\D/g, '').slice(-10);
+    const cleanSender = String(rawSender).trim();
+    const senderPhoneDigits = cleanSender.replace(/\D/g, '').slice(-10);
+
+    // 1. Insert into blocked_senders table
+    await dbOps.execute(`
+      INSERT INTO blocked_senders (user_phone, blocked_sender) 
+      VALUES (?, ?) 
+      ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP
+    `, [cleanUserPhone, cleanSender]).catch(async () => {
+      // SQLite fallback
+      await dbOps.execute(`
+        INSERT OR REPLACE INTO blocked_senders (user_phone, blocked_sender)
+        VALUES (?, ?)
+      `, [cleanUserPhone, cleanSender]).catch(() => {});
+    });
+
+    if (senderPhoneDigits && senderPhoneDigits.length === 10 && senderPhoneDigits !== cleanSender) {
+      await dbOps.execute(`
+        INSERT INTO blocked_senders (user_phone, blocked_sender) 
+        VALUES (?, ?) 
+        ON DUPLICATE KEY UPDATE created_at = CURRENT_TIMESTAMP
+      `, [cleanUserPhone, senderPhoneDigits]).catch(() => {});
+    }
+
+    // 2. Move existing emails from this sender to SPAM for this user
+    const pattern = senderPhoneDigits ? `%${senderPhoneDigits}%` : `%${cleanSender}%`;
+    await dbOps.execute(`
+      UPDATE emails 
+      SET folder = 'SPAM' 
+      WHERE (sender_email LIKE ? OR sender_email = ?) 
+        AND recipient_emails LIKE ? 
+        AND folder != 'TRASH'
+    `, [pattern, cleanSender, `%${cleanUserPhone}%`]);
+
+    console.log(`🚫 [BLOCKED SENDER] User ${cleanUserPhone} blocked ${cleanSender}`);
+    res.json({ success: true, message: `Sender ${cleanSender} blocked and moved to Spam.` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Save or Update a Draft Email
+ */
+router.post('/emails/draft', async (req, res) => {
+  try {
+    const rawSender = req.body.senderPhone || req.body.sender_phone;
+    const cleanPhone = String(rawSender || '').replace(/\D/g, '').slice(-10);
+    if (!cleanPhone) return res.status(400).json({ error: 'Sender phone required' });
+
+    const rawTo = req.body.toRecipients || req.body.to || req.body.recipients || '';
+    const subject = req.body.subject || '';
+    const bodyText = req.body.bodyText || req.body.body || '';
+    const draftId = req.body.draftId || req.body.draft_id;
+
+    const senderEmail = `${cleanPhone}@${config.domainName || 'alphastack.wwisvnr.com'}`;
+    const user = await dbOps.queryOne('SELECT display_name FROM users WHERE phone_number = ?', [cleanPhone]);
+    const senderName = user ? user.display_name : `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}`;
+    const recipientsJson = typeof rawTo === 'string' ? JSON.stringify([rawTo]) : JSON.stringify(rawTo || []);
+
+    if (draftId) {
+      const existing = await dbOps.queryOne('SELECT id FROM emails WHERE id = ?', [draftId]);
+      if (existing) {
+        await dbOps.execute(`
+          UPDATE emails 
+          SET recipient_emails = ?, subject = ?, body_text = ?, body_html = ? 
+          WHERE id = ?
+        `, [recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>'), draftId]);
+        return res.json({ success: true, draftId, message: 'Draft updated successfully' });
+      }
+    }
+
+    const newId = 'draft_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    await dbOps.execute(`
+      INSERT INTO emails (id, sender_email, sender_name, recipient_emails, subject, body_text, body_html, folder, is_read, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFTS', 1, NOW())
+    `, [newId, senderEmail, senderName, recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>')]).catch(async () => {
+      await dbOps.execute(`
+        INSERT INTO emails (id, sender_email, sender_name, recipient_emails, subject, body_text, body_html, folder, is_read, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFTS', 1, datetime('now'))
+      `, [newId, senderEmail, senderName, recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>')]);
+    });
+
+    res.json({ success: true, draftId: newId, message: 'Draft saved successfully' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Delete a Draft Email
+ */
+router.delete('/emails/draft/:id', async (req, res) => {
+  try {
+    const draftId = req.params.id;
+    if (!draftId) return res.status(400).json({ error: 'Draft ID required' });
+    await dbOps.execute('DELETE FROM emails WHERE id = ?', [draftId]);
+    res.json({ success: true, message: 'Draft deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
  * Send outbound email or reply (with optional TextBee SMS notification for unregistered users)
  */
 router.post('/emails/send', async (req, res) => {

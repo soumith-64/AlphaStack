@@ -1337,21 +1337,20 @@ button {
 }
 
 .list-toolbar {
-  height: 52px;
-  padding: 0 18px;
+  min-height: 52px;
+  height: auto;
+  padding: 6px 18px;
   border-bottom: 1px solid var(--border-light);
   background: var(--bg-surface);
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 14px;
+  flex-wrap: wrap;
+  gap: 12px;
   flex-shrink: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.list-toolbar::-webkit-scrollbar {
-  display: none;
+  overflow: visible;
+  position: relative;
+  z-index: 60;
 }
 
 .toolbar-right {
@@ -1482,9 +1481,9 @@ button {
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
-  z-index: 100;
-  min-width: 120px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
+  min-width: 130px;
   overflow: hidden;
   padding: 4px 0;
 }
@@ -1727,6 +1726,7 @@ button {
 /* Date Filter Dropdown */
 .desktop-date-filter-wrapper {
   position: relative;
+  z-index: 150;
 }
 
 .desk-date-btn {
@@ -1763,11 +1763,82 @@ button {
   background: var(--bg-surface);
   border: 1px solid var(--border-light);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  min-width: 250px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  min-width: 260px;
   padding: 6px 0;
   animation: fadeIn 0.15s ease;
+}
+
+.btn-download-card {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(4, 106, 56, 0.3);
+  background: rgba(4, 106, 56, 0.08);
+  color: var(--green-main);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-download-card:hover {
+  background: var(--green-main);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(4, 106, 56, 0.3);
+  transform: translateY(-1px);
+}
+
+.messenger-view-nav-btn {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(4, 106, 56, 0.08);
+  color: var(--green-main) !important;
+  border: 1px solid rgba(4, 106, 56, 0.25);
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.messenger-view-nav-btn:hover {
+  background: var(--green-main);
+  color: #ffffff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(4, 106, 56, 0.25);
+}
+
+.btn-save-draft {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-save-draft:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+.action-btn.danger-hover:hover {
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
+  border-color: rgba(239, 68, 68, 0.3) !important;
 }
 
 .date-menu-opt {
