@@ -179,13 +179,15 @@ router.get('/emails', async (req, res) => {
 
     let emails;
     if (folder === 'ALL') {
-      // Show ALL emails: inbound, outbound sent, and alias/sub-number mails
+      // Show ALL emails: inbound, outbound sent, and alias/sub-number mails (excluding TRASH, SPAM, DRAFTS)
       const sql = isPrimary
         ? `SELECT * FROM emails 
-           WHERE (recipient_emails LIKE ? OR sender_email LIKE ? OR recipient_emails LIKE '%admin@%') AND folder != 'TRASH'
+           WHERE (recipient_emails LIKE ? OR sender_email LIKE ? OR recipient_emails LIKE '%admin@%') 
+             AND folder != 'TRASH' AND folder != 'SPAM' AND folder != 'DRAFTS'
            ORDER BY is_important DESC, created_at DESC`
         : `SELECT * FROM emails 
-           WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) AND folder != 'TRASH'
+           WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+             AND folder != 'TRASH' AND folder != 'SPAM' AND folder != 'DRAFTS'
            ORDER BY is_important DESC, created_at DESC`;
       emails = await dbOps.queryAll(sql, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
     } else if (folder === 'IMPORTANT') {
@@ -307,29 +309,29 @@ router.get('/emails/stats', async (req, res) => {
            SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
          FROM emails 
          WHERE (recipient_emails LIKE ? OR recipient_emails LIKE '%admin@%') 
-           AND (folder = 'INBOX' OR folder IS NULL) AND folder != 'TRASH'`
+           AND (folder = 'INBOX' OR folder IS NULL) AND folder != 'TRASH' AND folder != 'SPAM'`
       : `SELECT 
            COUNT(*) as total, 
            SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
          FROM emails 
          WHERE recipient_emails LIKE ? 
-           AND (folder = 'INBOX' OR folder IS NULL) AND folder != 'TRASH'`;
+           AND (folder = 'INBOX' OR folder IS NULL) AND folder != 'TRASH' AND folder != 'SPAM'`;
     const inboxStats = await dbOps.queryOne(inboxSql, [`%${cleanPhone}%`]);
 
-    // 2. ALL Mail stats
+    // 2. ALL Mail stats (excludes TRASH, SPAM, DRAFTS; unread counts received unread items)
     const allSql = isPrimary
       ? `SELECT 
            COUNT(*) as total, 
-           SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
+           SUM(CASE WHEN is_read = 0 AND (recipient_emails LIKE ? OR recipient_emails LIKE '%admin@%') THEN 1 ELSE 0 END) as unread 
          FROM emails 
          WHERE (recipient_emails LIKE ? OR sender_email LIKE ? OR recipient_emails LIKE '%admin@%') 
-           AND folder != 'TRASH' AND folder != 'DRAFTS'`
+           AND folder != 'TRASH' AND folder != 'SPAM' AND folder != 'DRAFTS'`
       : `SELECT 
            COUNT(*) as total, 
-           SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread 
+           SUM(CASE WHEN is_read = 0 AND recipient_emails LIKE ? THEN 1 ELSE 0 END) as unread 
          FROM emails 
          WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
-           AND folder != 'TRASH' AND folder != 'DRAFTS'`;
+           AND folder != 'TRASH' AND folder != 'SPAM' AND folder != 'DRAFTS'`;
     const allStats = await dbOps.queryOne(allSql, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
 
     // 3. DRAFTS stats
@@ -455,14 +457,15 @@ router.post('/emails/draft', async (req, res) => {
     }
 
     const newId = 'draft_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const convId = 'conv_draft_' + Date.now();
     await dbOps.execute(`
-      INSERT INTO emails (id, sender_email, sender_name, recipient_emails, subject, body_text, body_html, folder, is_read, created_at)
+      INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, folder, is_read, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFTS', 1, NOW())
-    `, [newId, senderEmail, senderName, recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>')]).catch(async () => {
+    `, [newId, convId, senderEmail, recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>')]).catch(async () => {
       await dbOps.execute(`
-        INSERT INTO emails (id, sender_email, sender_name, recipient_emails, subject, body_text, body_html, folder, is_read, created_at)
+        INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, folder, is_read, created_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, 'DRAFTS', 1, datetime('now'))
-      `, [newId, senderEmail, senderName, recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>')]);
+      `, [newId, convId, senderEmail, recipientsJson, subject, bodyText, bodyText.replace(/\n/g, '<br>')]);
     });
 
     res.json({ success: true, draftId: newId, message: 'Draft saved successfully' });
@@ -599,42 +602,38 @@ router.post('/emails/send', async (req, res) => {
     let smsDispatched = false;
     let smsDetails = null;
 
-    // If SMS requested or if recipient is not registered on INAI, dispatch TextBee SMS
+    // If SMS preview requested for unregistered recipient, dispatch via TextBee asynchronously in background
     if (sendSmsRequested) {
-      try {
-        const rawRecList = Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients];
-        for (const rec of rawRecList) {
-          const parsed = emailService.parseAddress(rec);
-          const recPhone = parsed.phone || (String(rec).replace(/\D/g, '').slice(-10));
-          if (recPhone && recPhone.length === 10 && recPhone !== cleanSender) {
-            const registeredUser = await dbOps.queryOne(`
-              SELECT id FROM users 
-              WHERE phone_number = ? AND (registration_channel != 'INBOUND_EMAIL' OR has_mobile_app = 1)
-            `, [recPhone]);
+      setImmediate(async () => {
+        try {
+          const rawRecList = Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients];
+          for (const rec of rawRecList) {
+            const parsed = emailService.parseAddress(rec);
+            const recPhone = parsed.phone || (String(rec).replace(/\D/g, '').slice(-10));
+            if (recPhone && recPhone.length === 10 && recPhone !== cleanSender) {
+              const registeredUser = await dbOps.queryOne('SELECT id FROM users WHERE phone_number LIKE ?', [`%${recPhone}%`]);
 
-            if (!registeredUser) {
-              const senderUser = await dbOps.queryOne('SELECT display_name FROM users WHERE phone_number = ?', [cleanSender]);
-              const senderName = (senderUser && senderUser.display_name && !/^User\s*\d+/i.test(senderUser.display_name))
-                ? senderUser.display_name
-                : `+91 ${cleanSender.slice(0, 5)} ${cleanSender.slice(5)}`;
-              
-              const cleanSnippet = bodyText.replace(/<[^>]+>/g, '').trim().slice(0, 90);
-              const smsText = `INAI: ${senderName} sent you a message: "${subject ? subject + ' - ' : ''}${cleanSnippet}". Read & reply at https://${config.domainName}`;
+              if (!registeredUser) {
+                const senderUser = await dbOps.queryOne('SELECT display_name FROM users WHERE phone_number LIKE ?', [`%${cleanSender}%`]);
+                const senderName = (senderUser && senderUser.display_name && !/^User\s*\d+/i.test(senderUser.display_name))
+                  ? senderUser.display_name
+                  : `+91 ${cleanSender.slice(0, 5)} ${cleanSender.slice(5)}`;
+                
+                const cleanSnippet = (bodyText || '').replace(/<[^>]+>/g, '').trim().slice(0, 90);
+                const domain = config.domainName || 'alphastack.wwisvnr.com';
+                const smsText = `INAI: ${senderName} sent you a message: "${subject ? subject + ' - ' : ''}${cleanSnippet}". Read & reply at https://${domain}`;
 
-              const smsRes = await textbeeService.sendSms(recPhone, smsText);
-              if (smsRes && smsRes.success) {
-                smsDispatched = true;
-                smsDetails = smsRes;
+                await textbeeService.sendSms(recPhone, smsText).catch(e => console.warn('TextBee invite notice:', e.message));
               }
             }
           }
+        } catch (smsErr) {
+          console.warn('Background SMS trigger error:', smsErr.message);
         }
-      } catch (smsErr) {
-        console.warn('TextBee SMS trigger error during email send:', smsErr.message);
-      }
+      });
     }
 
-    res.json({ success: true, email, sms_dispatched: smsDispatched, sms_details: smsDetails });
+    res.json({ success: true, email, message: 'Message sent immediately' });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -845,6 +844,8 @@ router.post('/emails/bulk', async (req, res) => {
       await dbOps.execute(`UPDATE emails SET is_starred = 1 WHERE id IN (${placeholders})`, ids);
     } else if (action === 'important') {
       await dbOps.execute(`UPDATE emails SET is_important = 1 WHERE id IN (${placeholders})`, ids);
+    } else if (action === 'spam' || action === 'report') {
+      await dbOps.execute(`UPDATE emails SET folder = 'SPAM' WHERE id IN (${placeholders})`, ids);
     } else if (action === 'move' && targetFolder) {
       await dbOps.execute(`UPDATE emails SET folder = ? WHERE id IN (${placeholders})`, [targetFolder.toUpperCase(), ...ids]);
     }
@@ -1082,16 +1083,27 @@ router.post('/contacts/filter-phonemail', async (req, res) => {
 
     // De-duplicate queried numbers
     const uniqueNumbers = Array.from(new Set(cleanNumbers));
-    const placeholders = uniqueNumbers.map(() => '?').join(',');
+    
+    // Find all matching registered users across all channels (handle clean 10-digit, prefix, and email)
+    const conditions = uniqueNumbers.map(() => `(phone_number LIKE ? OR email_address LIKE ?)`).join(' OR ');
+    const params = [];
+    uniqueNumbers.forEach(num => {
+      params.push(`%${num}%`, `%${num}@%`);
+    });
 
     const registered = await dbOps.queryAll(`
       SELECT id, phone_number, email_address, display_name, registration_channel
       FROM users 
-      WHERE phone_number IN (${placeholders})
-        AND (registration_channel != 'INBOUND_EMAIL' OR has_mobile_app = 1 OR phone_number = '8667611163')
-    `, uniqueNumbers);
+      WHERE ${conditions}
+    `, params);
 
-    res.json({ registeredContacts: registered });
+    // Normalize phone numbers in output to 10 digits
+    const normalized = (registered || []).map(u => ({
+      ...u,
+      phone_number: String(u.phone_number || '').replace(/\D/g, '').slice(-10)
+    }));
+
+    res.json({ registeredContacts: normalized });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

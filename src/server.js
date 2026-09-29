@@ -57,10 +57,20 @@ app.get('/', (req, res) => {
   }
 });
 
-// Clean URL: Redirect any legacy /mobile or /desktop path to clean root "/"
-app.get(['/mobile', '/mobile/', '/desktop', '/desktop/'], (req, res) => {
-  const query = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
-  res.redirect('/' + query);
+// Messenger View / Mobile Webapp: Directly accessible from both laptop and phone
+app.get(['/messenger', '/messenger/', '/mobile', '/mobile/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public/mobile/index.html'));
+});
+
+// Desktop webmail direct route
+app.get(['/desktop', '/desktop/'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public/desktop/index.html'));
 });
 
 // Serve frontend static files
@@ -121,11 +131,18 @@ dbOps.consolidateConversations().catch((err) => {
   console.warn('Initial conversation consolidation note:', err.message);
 });
 
-// Start Hostinger IMAP Inbound Auto-Sync Worker (fetches incoming mail every 20s)
+// Start Hostinger IMAP Inbound Auto-Sync Worker (fetches incoming mail every 8s)
 try {
-  imapSyncService.startAutoSync(20);
+  imapSyncService.startAutoSync(8);
 } catch (err) {
   console.warn('IMAP sync worker startup notice:', err.message);
+}
+
+// Start 4-Hour Unviewed Mail Delayed SMS Reminder Worker
+try {
+  notificationService.startDelayedSmsWorker(60000);
+} catch (err) {
+  console.warn('Delayed SMS worker startup notice:', err.message);
 }
 
 // Start HTTP & WebSocket Server (supports TCP port, 0.0.0.0, and Phusion Passenger sockets)

@@ -399,11 +399,11 @@ export const emailService = {
       }
     }
 
-    // Insert email with HTML & inline images
+    // Insert email with HTML & inline images (is_read = 1 because the sender already viewed/wrote their own message)
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
     await dbOps.execute(`
       INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, reply_to_id, has_replied, is_read, folder)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 'INBOX')
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 'INBOX')
     `, [
       emailId,
       targetConvId,
@@ -417,88 +417,7 @@ export const emailService = {
 
     const sentEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
 
-    // SEND LIVE OUTBOUND EMAIL VIA HOSTINGER SMTP TO ANY EXTERNAL RECIPIENTS (e.g. Gmail, Yahoo, Outlook, etc.)
-    const externalRecipients = rawRecipientsList
-      .map(r => this.parseAddress(r))
-      .filter(p => p.isExternal && p.full.includes('@'))
-      .map(p => p.full);
-
-    if (externalRecipients.length > 0) {
-      const senderDisplayName = (sender && sender.display_name && !sender.display_name.startsWith('User ')) 
-        ? sender.display_name 
-        : `+91 ${cleanSenderPhone}`;
-
-      // Check if read receipts are enabled for sender
-      const readReceiptHeaders = (sender && sender.read_receipts_enabled === 0) ? {} : {
-        'Disposition-Notification-To': `${cleanSenderPhone}@${config.domainName}`,
-        'X-Confirm-Reading-To': `${cleanSenderPhone}@${config.domainName}`,
-        'Return-Receipt-To': `${cleanSenderPhone}@${config.domainName}`
-      };
-
-      let smtpAttachments = [];
-      if (voiceMail && voiceMail.dataUrl) {
-        try {
-          const match = voiceMail.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-          if (match) {
-            const mimeType = match[1];
-            const audioBuffer = Buffer.from(match[2], 'base64');
-            const ext = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : (mimeType.includes('wav') ? 'wav' : 'webm'));
-            smtpAttachments.push({
-              filename: `voicemail_${Date.now()}.${ext}`,
-              content: audioBuffer,
-              contentType: mimeType
-            });
-          }
-        } catch(attErr) {
-          console.warn('Could not prepare voice mail attachment for SMTP:', attErr.message);
-        }
-      }
-
-      for (const extEmail of externalRecipients) {
-        try {
-          console.log(`🚀 [Hostinger SMTP] Transmitting live email to ${extEmail}...`);
-          const msgUniqueId = `${Date.now()}.${Math.random().toString(36).substring(2, 9)}@alphastack.wwisvnr.com`;
-          const emailSubject = subject && subject.trim() ? subject.trim() : `Message from ${senderDisplayName}`;
-          const cleanBody = bodyText || '';
-
-          const info = await smtpTransporter.sendMail({
-            from: `"${senderDisplayName}" <${smtpUser}>`,
-            replyTo: `${cleanSenderPhone}@${config.domainName}`,
-            to: extEmail,
-            subject: emailSubject,
-            messageId: `<${msgUniqueId}>`,
-            attachments: smtpAttachments.length > 0 ? smtpAttachments : undefined,
-            headers: {
-              'X-Mailer': 'PhoneMail WebClient 1.0',
-              'Precedence': 'normal',
-              'Importance': 'normal',
-              ...readReceiptHeaders
-            },
-            text: cleanBody 
-              ? `${cleanBody}\n\n---\nSent by ${senderDisplayName} (+91 ${cleanSenderPhone}) via PhoneMail.\nReply directly to this email to reach my phone mailbox: ${cleanSenderPhone}@${config.domainName}`
-              : `Sent by ${senderDisplayName} via PhoneMail.`,
-            html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
-                <div style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;">
-                  ${String(emailSubject).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-                </div>
-                <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 24px;">${bodyHtml ? bodyHtml : (cleanBody ? String(cleanBody).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : '')}</div>
-                <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; font-size: 12px; color: #64748b; line-height: 1.6;">
-                  Sent by <strong>${senderDisplayName}</strong> (+91 ${cleanSenderPhone}) via PhoneMail.<br>
-                  Reply directly to this email to reach this user's PhoneMail inbox: 
-                  <a href="mailto:${cleanSenderPhone}@${config.domainName}" style="color: #046A38; font-weight: 600; text-decoration: none;">${cleanSenderPhone}@${config.domainName}</a>
-                </div>
-              </div>
-            `
-          });
-          console.log(`✅ [Hostinger SMTP SUCCESS] Delivered to ${extEmail} | ID: ${info.messageId}`);
-        } catch (smtpErr) {
-          console.error(`❌ [Hostinger SMTP ERROR] Failed sending to ${extEmail}:`, smtpErr.message);
-        }
-      }
-    }
-
-    // Real-time broadcast to all participants and specific user rooms
+    // Real-time broadcast to all participants and specific user rooms immediately
     if (ioInstance) {
       ioInstance.emit('email:new', {
         email: sentEmail,
@@ -525,16 +444,102 @@ export const emailService = {
       }
     }
 
-    // Process delivery notifications to any PhoneMail recipients who do NOT have the app open
-    for (const rec of rawRecipientsList) {
-      const parsed = this.parseAddress(rec);
-      if (parsed.phone && parsed.phone !== cleanSenderPhone) {
-        const internalUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [parsed.phone]);
-        if (internalUser) {
-          await notificationService.checkAndNotify(sentEmail, internalUser);
+    // Process external Hostinger SMTP and notifications asynchronously so message returns immediately (< 20ms)
+    setImmediate(async () => {
+      try {
+        const externalRecipients = rawRecipientsList
+          .map(r => this.parseAddress(r))
+          .filter(p => p.isExternal && p.full.includes('@'))
+          .map(p => p.full);
+
+        if (externalRecipients.length > 0) {
+          const senderDisplayName = (sender && sender.display_name && !sender.display_name.startsWith('User ')) 
+            ? sender.display_name 
+            : `+91 ${cleanSenderPhone}`;
+
+          const readReceiptHeaders = (sender && sender.read_receipts_enabled === 0) ? {} : {
+            'Disposition-Notification-To': `${cleanSenderPhone}@${config.domainName}`,
+            'X-Confirm-Reading-To': `${cleanSenderPhone}@${config.domainName}`,
+            'Return-Receipt-To': `${cleanSenderPhone}@${config.domainName}`
+          };
+
+          let smtpAttachments = [];
+          if (voiceMail && voiceMail.dataUrl) {
+            try {
+              const match = voiceMail.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+              if (match) {
+                const mimeType = match[1];
+                const audioBuffer = Buffer.from(match[2], 'base64');
+                const ext = mimeType.includes('mp4') ? 'm4a' : (mimeType.includes('ogg') ? 'ogg' : (mimeType.includes('wav') ? 'wav' : 'webm'));
+                smtpAttachments.push({
+                  filename: `voicemail_${Date.now()}.${ext}`,
+                  content: audioBuffer,
+                  contentType: mimeType
+                });
+              }
+            } catch(attErr) {
+              console.warn('Could not prepare voice mail attachment for SMTP:', attErr.message);
+            }
+          }
+
+          for (const extEmail of externalRecipients) {
+            try {
+              console.log(`🚀 [Hostinger SMTP] Transmitting live email to ${extEmail}...`);
+              const msgUniqueId = `${Date.now()}.${Math.random().toString(36).substring(2, 9)}@alphastack.wwisvnr.com`;
+              const emailSubject = subject && subject.trim() ? subject.trim() : `Message from ${senderDisplayName}`;
+              const cleanBody = bodyText || '';
+
+              const info = await smtpTransporter.sendMail({
+                from: `"${senderDisplayName}" <${smtpUser}>`,
+                replyTo: `${cleanSenderPhone}@${config.domainName}`,
+                to: extEmail,
+                subject: emailSubject,
+                messageId: `<${msgUniqueId}>`,
+                attachments: smtpAttachments.length > 0 ? smtpAttachments : undefined,
+                headers: {
+                  'X-Mailer': 'PhoneMail WebClient 1.0',
+                  'Precedence': 'normal',
+                  'Importance': 'normal',
+                  ...readReceiptHeaders
+                },
+                text: cleanBody 
+                  ? `${cleanBody}\n\n---\nSent by ${senderDisplayName} (+91 ${cleanSenderPhone}) via PhoneMail.\nReply directly to this email to reach my phone mailbox: ${cleanSenderPhone}@${config.domainName}`
+                  : `Sent by ${senderDisplayName} via PhoneMail.`,
+                html: `
+                  <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+                    <div style="font-size: 17px; font-weight: 700; color: #0f172a; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;">
+                      ${String(emailSubject).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                    </div>
+                    <div style="font-size: 15px; line-height: 1.7; color: #1e293b; margin-bottom: 24px;">${bodyHtml ? bodyHtml : (cleanBody ? String(cleanBody).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : '')}</div>
+                    <div style="border-top: 1px solid #f1f5f9; padding-top: 14px; font-size: 12px; color: #64748b; line-height: 1.6;">
+                      Sent by <strong>${senderDisplayName}</strong> (+91 ${cleanSenderPhone}) via PhoneMail.<br>
+                      Reply directly to this email to reach this user's PhoneMail inbox: 
+                      <a href="mailto:${cleanSenderPhone}@${config.domainName}" style="color: #046A38; font-weight: 600; text-decoration: none;">${cleanSenderPhone}@${config.domainName}</a>
+                    </div>
+                  </div>
+                `
+              });
+              console.log(`✅ [Hostinger SMTP SUCCESS] Delivered to ${extEmail} | ID: ${info.messageId}`);
+            } catch (smtpErr) {
+              console.error(`❌ [Hostinger SMTP ERROR] Failed sending to ${extEmail}:`, smtpErr.message);
+            }
+          }
         }
+
+        // Check notifications for PhoneMail recipients
+        for (const rec of rawRecipientsList) {
+          const parsed = this.parseAddress(rec);
+          if (parsed.phone && parsed.phone !== cleanSenderPhone) {
+            const internalUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number LIKE ?', [`%${parsed.phone}%`]);
+            if (internalUser) {
+              await notificationService.checkAndNotify(sentEmail, internalUser);
+            }
+          }
+        }
+      } catch (bgErr) {
+        console.warn('Background outbound email processing notice:', bgErr.message);
       }
-    }
+    });
 
     return sentEmail;
   }

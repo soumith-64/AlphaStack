@@ -1633,6 +1633,9 @@ function initDesktopApp() {
   loadEmails();
   loadDesktopAliases();
 
+  // Continuously reload and display new incoming mails in real-time
+  startContinuousEmailSync();
+
   // Load cached device contacts and fetch account network contacts
   try {
     const raw = localStorage.getItem('phonemail_cached_device_contacts');
@@ -1752,6 +1755,45 @@ async function syncAndLoadEmails() {
     await fetch('/api/emails/sync', { method: 'POST' });
   } catch (e) {}
   await loadEmails(currentFolder);
+}
+
+let desktopContinuousPollInterval = null;
+
+function startContinuousEmailSync() {
+  if (desktopContinuousPollInterval) clearInterval(desktopContinuousPollInterval);
+  desktopContinuousPollInterval = setInterval(async () => {
+    if (!currentUser || !currentUser.phone) return;
+    if (selectedEmailIds && selectedEmailIds.size > 0) return;
+    const composeModal = document.getElementById('desktop-compose-modal');
+    if (composeModal && composeModal.style.display !== 'none') {
+      syncFolderStats();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/emails?folder=${currentFolder}&phone=${encodeURIComponent(currentUser.phone)}`);
+      const data = await res.json();
+      const freshEmails = data.emails || [];
+
+      const currentIds = allEmails.map(e => `${e.id}_${e.is_read}_${e.is_starred}_${e.is_important}`).join(',');
+      const freshIds = freshEmails.map(e => `${e.id}_${e.is_read}_${e.is_starred}_${e.is_important}`).join(',');
+
+      if (currentIds !== freshIds) {
+        allEmails = freshEmails;
+        emailFolderCache[currentFolder] = allEmails;
+        updateFolderCountsFromList(allEmails);
+        if (!activeEmail) {
+          renderEmailList(allEmails);
+        } else {
+          const updatedActive = allEmails.find(e => e.id === activeEmail.id);
+          if (updatedActive) activeEmail = updatedActive;
+        }
+      }
+      syncFolderStats();
+    } catch (e) {
+      // Silent error
+    }
+  }, 5000);
 }
 
 async function loadEmails(folder = currentFolder) {
@@ -2371,7 +2413,7 @@ async function executeBulkAction(action) {
     allEmails.forEach(e => {
       if (emailIds.includes(e.id)) e.is_important = 1;
     });
-  } else if (action === 'archive' || action === 'delete') {
+  } else if (action === 'archive' || action === 'delete' || action === 'spam' || action === 'report') {
     allEmails = allEmails.filter(e => !emailIds.includes(e.id));
   }
 
@@ -2389,7 +2431,11 @@ async function executeBulkAction(action) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ids: emailIds, emailIds: emailIds, folder: currentFolder })
     });
-    showToastNotification(`Updated ${count} message${count > 1 ? 's' : ''} ✓`);
+    const successMsg = (action === 'spam' || action === 'report') 
+      ? `Reported ${count} message${count > 1 ? 's' : ''} as spam ✓` 
+      : `Updated ${count} message${count > 1 ? 's' : ''} ✓`;
+    showToastNotification(successMsg);
+    syncFolderStats();
   } catch (err) {
     console.error('Bulk action error:', err);
   }
@@ -2407,7 +2453,11 @@ async function executeBulkActionOnSingle(id, action) {
       emailFolderCache[currentFolder] = [...allEmails];
     }
     renderEmailList(allEmails);
-    showToastNotification(`Message ${action === 'archive' ? 'archived' : 'moved to trash'} ✓`);
+    const actionLabel = action === 'archive' 
+      ? 'archived' 
+      : ((action === 'spam' || action === 'report') ? 'reported and moved to Spam' : 'moved to trash');
+    showToastNotification(`Message ${actionLabel} ✓`);
+    syncFolderStats();
   } catch (err) {}
 }
 
@@ -3223,6 +3273,19 @@ async function deleteCurrentEmail() {
   const id = activeEmail.id;
   closeReadingPane();
   executeBulkActionOnSingle(id, 'delete');
+}
+
+async function reportCurrentEmailSpam() {
+  if (!activeEmail) return;
+  const id = activeEmail.id;
+  const rawSender = activeEmail.sender_email;
+  const senderName = activeEmail.sender_name || rawSender;
+  if (!confirm(`Are you sure you want to report this email as spam? It will be moved to the Spam folder.`)) {
+    return;
+  }
+  closeReadingPane(false);
+  await executeBulkActionOnSingle(id, 'spam');
+  syncFolderStats();
 }
 
 async function blockCurrentSender() {

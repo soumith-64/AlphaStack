@@ -33,7 +33,7 @@ let activeReplyingMessage = null;
 let activeContactForModal = null;
 let activeContactModalIsSelf = true;
 let activeTradEmail = null;
-let mobileInboxMode = localStorage.getItem('mobile_inbox_mode') || 'messenger'; // 'messenger' | 'traditional'
+let mobileInboxMode = 'messenger'; // Default strictly to messenger view for professional mobile experience
 let activeCustomAvatarDataUrl = '';
 
 // Date Filter State
@@ -607,6 +607,65 @@ function initAppView() {
 
   // Pre-fetch contacts silently in background for instant autocomplete
   fetchContactsSilently();
+
+  // Continuously reload and display new incoming mails in real-time
+  startMobileContinuousEmailSync();
+}
+
+let mobileContinuousPollInterval = null;
+
+function startMobileContinuousEmailSync() {
+  if (mobileContinuousPollInterval) clearInterval(mobileContinuousPollInterval);
+  mobileContinuousPollInterval = setInterval(async () => {
+    if (!currentUser || !currentUser.phone) return;
+    if (selectedEmailIds && selectedEmailIds.size > 0) return;
+    const composeModal = document.getElementById('mobile-compose-modal');
+    if (composeModal && composeModal.style.display !== 'none') {
+      syncMobileFolderStats();
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/emails?folder=${currentFolder}&phone=${encodeURIComponent(currentUser.phone)}`);
+      const data = await res.json();
+      const freshEmails = data.emails || [];
+
+      const currentSign = allEmails.map(e => `${e.id}_${e.is_read}_${e.is_starred}_${e.is_important}`).join(',');
+      const freshSign = freshEmails.map(e => `${e.id}_${e.is_read}_${e.is_starred}_${e.is_important}`).join(',');
+
+      if (currentSign !== freshSign) {
+        allEmails = freshEmails;
+        emailFolderCache[currentFolder] = allEmails;
+        updateFolderCounts(allEmails);
+
+        if (activeConversation) {
+          const counterpartClean = activeConversation.participant_raw ? activeConversation.participant_raw.replace(/\D/g, '').slice(-10) : '';
+          const relevantNew = allEmails.filter(e => {
+            const sClean = (e.sender_email || '').replace(/\D/g, '').slice(-10);
+            return (e.conversation_id && e.conversation_id === activeConversation.id) ||
+                   (counterpartClean && sClean && sClean === counterpartClean);
+          });
+
+          let addedNew = false;
+          relevantNew.forEach(msg => {
+            if (!activeConversation.messages.some(m => m.id === msg.id)) {
+              activeConversation.messages.push(msg);
+              addedNew = true;
+            }
+          });
+          if (addedNew) {
+            renderChatTimeline(activeConversation);
+            if (navigator.vibrate) navigator.vibrate(50);
+          }
+        } else {
+          renderEmailList(allEmails);
+        }
+      }
+      syncMobileFolderStats();
+    } catch (e) {
+      // Silent error
+    }
+  }, 5000);
 }
 
 function setupSocket() {
@@ -4209,6 +4268,39 @@ async function blockCurrentMobileSender() {
     }
   } catch (err) {
     showToastNotification('Error blocking sender: ' + err.message, 'error');
+  }
+}
+
+async function reportCurrentMobileSpam() {
+  let targetIds = [];
+  if (activeTradEmail) {
+    targetIds = [activeTradEmail.id];
+  } else if (activeConversation && activeConversation.messages) {
+    targetIds = activeConversation.messages.map(m => m.id);
+  } else if (activeEmail) {
+    targetIds = [activeEmail.id];
+  }
+
+  if (targetIds.length === 0) return;
+
+  if (!confirm(`Are you sure you want to report this email as spam? It will be moved to the Spam folder.`)) {
+    return;
+  }
+
+  try {
+    await fetch('/api/emails/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'spam', ids: targetIds, emailIds: targetIds, folder: currentFolder })
+    });
+    showToastNotification('Reported as spam and moved to Spam folder ✓', 'success');
+    closeReadingPane();
+    closeTraditionalReadingPane();
+    emailFolderCache = {};
+    loadEmails(currentFolder);
+    syncMobileFolderStats();
+  } catch (err) {
+    showToastNotification('Error reporting spam: ' + err.message, 'error');
   }
 }
 
