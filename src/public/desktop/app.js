@@ -3595,6 +3595,14 @@ async function verifyAndRenderRecipientStatus(val, pillElementId) {
         contactName = regUser.display_name;
       }
 
+      if (contactName) {
+        try {
+          const namesMap = JSON.parse(localStorage.getItem('phonemail_cached_device_names') || '{}');
+          namesMap[cleanPhone] = contactName;
+          localStorage.setItem('phonemail_cached_device_names', JSON.stringify(namesMap));
+        } catch(e) {}
+      }
+
       if (isRegistered) {
         container.innerHTML = `
           <div class="verify-chip verified-inai">

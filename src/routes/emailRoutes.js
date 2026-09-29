@@ -1018,7 +1018,7 @@ router.post('/emails/heal-truncated', async (req, res) => {
 });
 
 /**
- * User Network Contacts (Only returns user's actual conversation contacts or searched registered PhoneMail users)
+ * User Network Contacts (Returns registered INAI users and past email contacts for instant autocomplete)
  */
 router.get('/contacts', async (req, res) => {
   try {
@@ -1026,36 +1026,27 @@ router.get('/contacts', async (req, res) => {
     const cleanPhone = String(currentPhone).replace(/\D/g, '').slice(-10);
     const q = (req.query.q || '').trim();
 
-    if (q.length >= 2) {
-      // User is actively searching by phone or name
+    if (q.length >= 1) {
+      // User is typing phone or name in compose
       const searchPattern = `%${q}%`;
       const contacts = await dbOps.queryAll(`
         SELECT id, phone_number, email_address, display_name, registration_channel
         FROM users 
         WHERE phone_number != ? 
-          AND (phone_number LIKE ? OR display_name LIKE ?)
-          AND registration_channel IN ('PHONE_EMAIL', 'WEB_CLIENT', 'MOBILE_APP', 'TELEGRAM', 'WEB_PORTAL')
-        ORDER BY created_at DESC LIMIT 8
-      `, [cleanPhone, searchPattern, searchPattern]);
+          AND (phone_number LIKE ? OR display_name LIKE ? OR email_address LIKE ?)
+        ORDER BY created_at DESC LIMIT 15
+      `, [cleanPhone, searchPattern, searchPattern, searchPattern]);
 
       return res.json({ contacts, isSearch: true });
     }
 
-    // Default when opening compose: ONLY return people this user has communicated with
-    if (!cleanPhone) {
-      return res.json({ contacts: [], isRecent: true });
-    }
-
+    // Default: Return all registered users for instant autocomplete dropdown
     const contacts = await dbOps.queryAll(`
-      SELECT DISTINCT u.id, u.phone_number, u.email_address, u.display_name, u.registration_channel
-      FROM users u
-      JOIN conversation_participants cp ON u.phone_number = cp.phone_number
-      JOIN conversation_participants my_cp ON cp.conversation_id = my_cp.conversation_id
-      WHERE my_cp.phone_number = ? 
-        AND u.phone_number != ?
-        AND u.registration_channel IN ('PHONE_EMAIL', 'WEB_CLIENT', 'MOBILE_APP', 'TELEGRAM', 'WEB_PORTAL')
-      ORDER BY u.created_at DESC LIMIT 15
-    `, [cleanPhone, cleanPhone]);
+      SELECT id, phone_number, email_address, display_name, registration_channel
+      FROM users 
+      WHERE phone_number != ?
+      ORDER BY created_at DESC LIMIT 30
+    `, [cleanPhone]);
 
     res.json({ contacts, isRecent: true });
   } catch (err) {
@@ -1096,6 +1087,52 @@ router.post('/contacts/filter-phonemail', async (req, res) => {
       FROM users 
       WHERE ${conditions}
     `, params);
+
+    // Auto-discover any numbers from past emails and auto-register them in users
+    for (const num of uniqueNumbers) {
+      const alreadyFound = registered.some(r => String(r.phone_number || '').replace(/\D/g, '').slice(-10) === num);
+      if (!alreadyFound) {
+        try {
+          const em = await dbOps.queryOne(`
+            SELECT recipient_emails, sender_email FROM emails 
+            WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+            ORDER BY created_at DESC LIMIT 1
+          `, [`%${num}%`, `%${num}%`]);
+
+          if (em) {
+            let discoveredName = `User ${num}`;
+            const fullStr = `${em.recipient_emails || ''} ${em.sender_email || ''}`;
+            const match = fullStr.match(/"([^"]+)"\s*<[^>]*[0-9]{10}/) || 
+                          fullStr.match(/([A-Za-z\s]{3,30})\s*\(\+?91\s*[0-9]{5}\s*[0-9]{5}\)/) ||
+                          fullStr.match(/([A-Za-z\s]{3,30})\s*<[^>]*[0-9]{10}/);
+            if (match && match[1] && !/^User\s*\d+/i.test(match[1])) {
+              discoveredName = match[1].trim();
+            }
+
+            const newUserId = 'user_' + num;
+            const newEmail = `${num}@${config.domainName || 'alphastack.wwisvnr.com'}`;
+            await dbOps.execute(`
+              INSERT INTO users (id, phone_number, email_address, display_name, language, registration_channel, has_mobile_app)
+              VALUES (?, ?, ?, ?, 'en', 'WEB_CLIENT', 1)
+              ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)
+            `, [newUserId, num, newEmail, discoveredName]).catch(async () => {
+              await dbOps.execute(`
+                INSERT OR REPLACE INTO users (id, phone_number, email_address, display_name, language, registration_channel, has_mobile_app)
+                VALUES (?, ?, ?, ?, 'en', 'WEB_CLIENT', 1)
+              `, [newUserId, num, newEmail, discoveredName]).catch(() => {});
+            });
+
+            registered.push({
+              id: newUserId,
+              phone_number: num,
+              email_address: newEmail,
+              display_name: discoveredName,
+              registration_channel: 'WEB_CLIENT'
+            });
+          }
+        } catch (autoErr) {}
+      }
+    }
 
     // Normalize phone numbers in output to 10 digits
     const normalized = (registered || []).map(u => ({
