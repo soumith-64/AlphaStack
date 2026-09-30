@@ -45,8 +45,6 @@
     Official smart identity card with a holographic EMV chip, 3D flip animation, verified `AES-256-GCM / SHA-256` security badge, dynamic `mailto:` QR code, and 1-click image download.
 12. **🌐 Real-Time Multilingual Translation:**  
     Translate the entire UI and incoming email bodies on the fly across **English, हिन्दी (Hindi), தமிழ் (Tamil), and తెలుగు (Telugu)**.
-13. **📞 Toll-Free Voice IVR Telephony (Twilio Voice):**  
-    Interactive voice response allowing feature phone users to dial a toll-free number and hear their unread emails read out aloud via Amazon Polly text-to-speech.
 
 ---
 
@@ -94,7 +92,6 @@
 | **SMTP Delivery** | **Nodemailer**, **Hostinger SMTP (Port 465 SSL)** | Outbound delivery to Gmail, Outlook, Yahoo, and corporate domains |
 | **IMAP Sync** | **Raw TLS Sockets**, **mailparser** | Inbound polling directly from Hostinger IMAP mailboxes |
 | **SMS Gateway** | **TextBee Android SMS Gateway** | 4-Hour delayed unread email alerts via live SMS |
-| **Telephony** | **Twilio Voice IVR (Amazon Polly)** | Toll-free dial-in audio readout of unread emails |
 | **Authentication** | **Phone.Email SDK**, **Direct OTP** | SMS & WhatsApp one-tap authentication + 6-cell Telegram OTP auto-submit |
 | **Translation Engine** | **Google Neural API + Fallback Dictionaries** | Real-time multilingual translation for Indian regional languages |
 | **Styling & UI** | **Vanilla CSS (Tiranga Tokens)** | Zero bloated frameworks, 60fps animations, Daylight & Midnight themes |
@@ -203,11 +200,6 @@ INAI offers comprehensive folder management across desktop and mobile:
    HOSTINGER_IMAP_USER=admin@alphastack.wwisvnr.com
    HOSTINGER_IMAP_PASS=YourEmailPasswordHere
 
-   # Telephony (Optional / Not used)
-   TWILIO_ACCOUNT_SID=
-   TWILIO_AUTH_TOKEN=
-   TWILIO_PHONE_NUMBER=
-
    # TextBee Live SMS Gateway
    TEXTBEE_DEVICE_ID=YourTextbeeDeviceId
    TEXTBEE_API_KEY=YourTextbeeApiKey
@@ -274,14 +266,12 @@ AlphaStack/
 │   │   └── schema.sql         # Database schema (emails, users, conversations, blocked)
 │   ├── routes/
 │   │   ├── authRoutes.js      # Phone verification, OTP validation & profile registration
-│   │   ├── emailRoutes.js     # Email CRUD, conversations, drafts, bulk, spam & security status
-│   │   └── twilioRoutes.js    # Voice IVR & SMS webhook handlers
+│   │   └── emailRoutes.js     # Email CRUD, conversations, drafts, bulk, spam & security status
 │   ├── services/
 │   │   ├── cryptoService.js   # AES-256-GCM payload encryption, decryption & SHA-256 stamps
 │   │   ├── emailService.js    # Inbound/outbound email pipelines with encryption hooks
 │   │   ├── imapSyncService.js # Live IMAP sync from Hostinger mail servers
 │   │   ├── notificationService.js # 4-hour unread delayed SMS scheduler
-│   │   ├── telephonyService.js# Twilio Voice IVR text-to-speech audio readout
 │   │   └── textbeeService.js  # Live Android SMS gateway integration
 │   ├── smtp/
 │   │   └── smtpServer.js      # Local SMTP server & MIME parser

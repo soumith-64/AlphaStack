@@ -7,7 +7,6 @@ import { fileURLToPath } from 'url';
 
 import { config } from './config.js';
 import { notificationService } from './services/notificationService.js';
-import { telephonyService } from './services/telephonyService.js';
 import { emailService } from './services/emailService.js';
 import { textbeeService } from './services/textbeeService.js';
 import { startSmtpServer } from './smtp/smtpServer.js';
@@ -15,7 +14,6 @@ import { imapSyncService } from './services/imapSyncService.js';
 
 import authRoutes from './routes/authRoutes.js';
 import emailRoutes from './routes/emailRoutes.js';
-import twilioRoutes from './routes/twilioRoutes.js';
 import { dbOps } from './database/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,7 +27,6 @@ const io = new SocketIOServer(server, {
 
 // Pass Socket.IO instance to services for real-time notifications & streaming
 notificationService.setSocketIO(io);
-telephonyService.setSocketIO(io);
 emailService.setSocketIO(io);
 textbeeService.setSocketIO(io);
 
@@ -89,7 +86,6 @@ app.use(express.static(path.join(__dirname, 'public'), {
 // Mount API routes
 app.use('/api/auth', authRoutes);
 app.use('/api', emailRoutes);
-app.use('/api/twilio', twilioRoutes);
 
 // Socket.IO event handler
 io.on('connection', (socket) => {

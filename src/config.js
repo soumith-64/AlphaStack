@@ -8,11 +8,6 @@ export const config = {
   enableSmtp: process.env.ENABLE_SMTP === 'true',
   domainName: process.env.DOMAIN_NAME || 'phonemail.com',
   jwtSecret: process.env.JWT_SECRET || 'phonemail-secret-key-alpha-buildathon-2026',
-  twilio: {
-    accountSid: process.env.TWILIO_ACCOUNT_SID || '',
-    authToken: process.env.TWILIO_AUTH_TOKEN || '',
-    phoneNumber: process.env.TWILIO_PHONE_NUMBER || '',
-  },
   textbee: {
     apiKey: process.env.TEXTBEE_API_KEY || '',
     deviceId: process.env.TEXTBEE_DEVICE_ID || '',

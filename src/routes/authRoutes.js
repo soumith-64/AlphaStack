@@ -170,49 +170,12 @@ router.post('/call-otp', async (req, res) => {
       otpStore.set(cleanNumber, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
     }
 
-    const spacedDigits = otp.split('').join(' , ');
-    await dbOps.logTelephony(cleanNumber, 'INCOMING_CALL_IVR', `Voice OTP verification call: ${otp}`, config.twilio.accountSid ? 'TWILIO' : 'SYSTEM_SMS');
-
-    let callPlaced = false;
-    if (config.twilio.accountSid && config.twilio.authToken) {
-      try {
-        const url = `https://api.twilio.com/2010-04-01/Accounts/${config.twilio.accountSid}/Calls.json`;
-        const auth = Buffer.from(`${config.twilio.accountSid}:${config.twilio.authToken}`).toString('base64');
-        const formattedTo = cleanNumber.length === 10 ? `+91${cleanNumber}` : (cleanNumber.startsWith('+') ? cleanNumber : `+${cleanNumber}`);
-        const twiml = `<Response><Pause length="1"/><Say voice="Polly.Joanna">Hello! Your PhoneMail verification code is ${spacedDigits}. Once again, your code is ${spacedDigits}. Goodbye.</Say></Response>`;
-
-        const params = new URLSearchParams({
-          To: formattedTo,
-          From: config.twilio.phoneNumber,
-          Twiml: twiml
-        });
-
-        const twilioRes = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${auth}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: params.toString()
-        });
-        const twilioData = await twilioRes.json();
-        if (twilioRes.ok && twilioData.sid) {
-          callPlaced = true;
-          console.log(`📞 [TWILIO VOICE OTP CALL PLACED] SID: ${twilioData.sid} to ${formattedTo}`);
-        } else {
-          console.warn(`Twilio voice call note:`, twilioData.message || twilioData);
-        }
-      } catch (err) {
-        console.warn('Twilio voice call exception:', err.message);
-      }
-    }
+    await dbOps.logTelephony(cleanNumber, 'INCOMING_CALL_IVR', `Voice OTP verification call: ${otp}`, 'SYSTEM_OTP');
 
     res.json({
       success: true,
-      message: callPlaced 
-        ? `PhoneMail is calling your phone now to speak the verification code!` 
-        : `Voice code generated.`,
-      callPlaced,
+      message: 'Voice code generated.',
+      callPlaced: false,
       liveOtp: otp
     });
   } catch (err) {
