@@ -171,21 +171,21 @@ Configuration variables in `.env`:
 PORT=3000
 HOST=0.0.0.0
 DOMAIN_NAME=alphastack.wwisvnr.com
-JWT_SECRET=super_secret_jwt_key_phonemail_alphastack_2026
+JWT_SECRET=your_jwt_secret_key_here
 
 # Database (Leave empty for zero-setup built-in SQLite)
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=u663364821_alphastack
-DB_USER=u663364821_alphastack_hk
-DB_PASSWORD=Alphastack@2026
+DB_NAME=your_database_name
+DB_USER=your_database_user
+DB_PASSWORD=your_database_password
 
 # Phone.Email Verification
-PHONE_EMAIL_CLIENT_ID=13311688567845248231
+PHONE_EMAIL_CLIENT_ID=your_phone_email_client_id
 
 # TextBee Live SMS Gateway
-TEXTBEE_DEVICE_ID=6ab8a9c9c9101e0cf7d228a2
-TEXTBEE_API_KEY=txb_ZJ2wrOi8MHUsN4SLiF76sADF4k8WYGcz
+TEXTBEE_DEVICE_ID=your_textbee_device_id
+TEXTBEE_API_KEY=your_textbee_api_key
 
 NODE_ENV=production
 ```
