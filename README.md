@@ -248,6 +248,34 @@ INAI is pre-packaged and optimized for deployment on **Hostinger Cloud Hosting /
 
 ---
 
+## 🐳 Docker Container Deployment
+
+The platform includes a production-ready, lightweight `node:20-alpine` Docker configuration with automatic health checking.
+
+### 1-Command Startup:
+```bash
+docker compose up -d --build
+```
+
+### Useful Docker Commands:
+```bash
+# View live container logs
+docker compose logs -f
+
+# Check container health status
+docker compose ps
+
+# Stop the container
+docker compose down
+
+# Rebuild the image
+docker compose build
+```
+
+The container automatically maps port `3000:3000`, loads your environment variables from `.env`, runs an integrated healthcheck against `/health`, and restarts automatically (`unless-stopped`).
+
+---
+
 ## 📂 Project Directory Structure
 
 ```
