@@ -166,10 +166,22 @@ async function getSqliteDb() {
   return db;
 }
 
+function normalizeQueryParams(sql, params = []) {
+  const cleanParams = (Array.isArray(params) ? [...params] : [params]).map(p => (p === undefined ? null : p));
+  if (typeof sql === 'string') {
+    const sqlWithoutStrings = sql.replace(/'[^']*'/g, '').replace(/"[^"]*"/g, '');
+    const qCount = (sqlWithoutStrings.match(/\?/g) || []).length;
+    while (cleanParams.length < qCount) {
+      cleanParams.push(cleanParams.length > 0 ? cleanParams[cleanParams.length - 1] : null);
+    }
+  }
+  return cleanParams;
+}
+
 // Database abstraction layer (supports both MySQL and SQLite seamlessly with graceful fallback)
 export const dbOps = {
   async queryAll(sql, params = []) {
-    const cleanParams = (Array.isArray(params) ? params : [params]).map(p => (p === undefined ? null : p));
+    const cleanParams = normalizeQueryParams(sql, params);
     if (mysqlPool) {
       try {
         const [rows] = await mysqlPool.query(sql, cleanParams);
@@ -232,7 +244,7 @@ export const dbOps = {
   },
 
   async execute(sql, params = []) {
-    const cleanParams = (Array.isArray(params) ? params : [params]).map(p => (p === undefined ? null : p));
+    const cleanParams = normalizeQueryParams(sql, params);
     if (mysqlPool) {
       try {
         const [result] = await mysqlPool.query(sql, cleanParams);

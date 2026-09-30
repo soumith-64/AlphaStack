@@ -353,7 +353,7 @@ router.get('/emails/stats', async (req, res) => {
          FROM emails 
          WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
            AND folder != 'TRASH' AND folder != 'SPAM' AND folder != 'DRAFTS'`;
-    const allStats = await dbOps.queryOne(allSql, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+    const allStats = await dbOps.queryOne(allSql, [`%${cleanPhone}%`, `%${cleanPhone}%`, `%${cleanPhone}%`]);
 
     // 3. DRAFTS stats
     const draftsStats = await dbOps.queryOne(`
