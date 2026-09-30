@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { dbOps } from '../database/db.js';
 import { notificationService } from './notificationService.js';
+import { cryptoService } from './cryptoService.js';
 import { config } from '../config.js';
 
 let ioInstance = null;
@@ -204,8 +205,8 @@ export const emailService = {
       if (curLen <= 65535 && newLen > curLen) {
         console.log(`🔄 [INBOUND DEDUPLICATION] Healing truncated email ${duplicate.id} (${curLen} -> ${newLen} bytes)...`);
         await dbOps.execute(`UPDATE emails SET body_html = ?, body_text = ? WHERE id = ?`, [
-          html,
-          cleanText,
+          cryptoService.encrypt(html),
+          cryptoService.encrypt(cleanText),
           duplicate.id
         ]);
       } else {
@@ -240,8 +241,11 @@ export const emailService = {
 
     const targetFolder = isBlocked ? 'SPAM' : 'INBOX';
 
-    // Insert email
+    // Insert email with AES-256-GCM payload encryption
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const encryptedBodyText = cryptoService.encrypt(cleanText);
+    const encryptedBodyHtml = cryptoService.encrypt(html || cleanText || '');
+
     await dbOps.execute(`
       INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, is_read, folder, is_important, is_starred)
       VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, 0)
@@ -251,12 +255,19 @@ export const emailService = {
       cleanSender,
       JSON.stringify(recipientEmailsList),
       cleanSubject,
-      cleanText,
-      html || cleanText || '',
+      encryptedBodyText,
+      encryptedBodyHtml,
       targetFolder
     ]);
 
     const savedEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
+    if (savedEmail) {
+      savedEmail.body_text = cryptoService.decrypt(savedEmail.body_text);
+      savedEmail.body_html = cryptoService.decrypt(savedEmail.body_html);
+      savedEmail.is_encrypted = 1;
+      savedEmail.encryption_type = 'AES-256-GCM';
+      savedEmail.security_fingerprint = cryptoService.generateFingerprint(savedEmail.sender_email, recipientEmailsList[0], savedEmail.subject, savedEmail.created_at);
+    }
 
     // Broadcast via WebSockets for real-time inbox/chat updates
     if (ioInstance) {
@@ -399,8 +410,11 @@ export const emailService = {
       }
     }
 
-    // Insert email with HTML & inline images (is_read = 1 because the sender already viewed/wrote their own message)
+    // Insert email with AES-256-GCM payload encryption
     const emailId = 'email_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+    const encryptedBodyText = cryptoService.encrypt(bodyText);
+    const encryptedBodyHtml = cryptoService.encrypt(bodyHtml || bodyText || '');
+
     await dbOps.execute(`
       INSERT INTO emails (id, conversation_id, sender_email, recipient_emails, subject, body_text, body_html, reply_to_id, has_replied, is_read, folder)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, 'INBOX')
@@ -410,12 +424,19 @@ export const emailService = {
       senderEmail,
       JSON.stringify(normalizedRecipients),
       subject || '',
-      bodyText,
-      bodyHtml || bodyText || '',
+      encryptedBodyText,
+      encryptedBodyHtml,
       replyToId
     ]);
 
     const sentEmail = await dbOps.queryOne('SELECT * FROM emails WHERE id = ?', [emailId]);
+    if (sentEmail) {
+      sentEmail.body_text = cryptoService.decrypt(sentEmail.body_text);
+      sentEmail.body_html = cryptoService.decrypt(sentEmail.body_html);
+      sentEmail.is_encrypted = 1;
+      sentEmail.encryption_type = 'AES-256-GCM';
+      sentEmail.security_fingerprint = cryptoService.generateFingerprint(sentEmail.sender_email, normalizedRecipients[0], sentEmail.subject, sentEmail.created_at);
+    }
 
     // Real-time broadcast to all participants and specific user rooms immediately
     if (ioInstance) {

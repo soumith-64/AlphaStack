@@ -2447,6 +2447,25 @@ button {
   color: #34d399;
 }
 
+.chat-encryption-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #059669;
+  margin-right: 3px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.chat-bubble.outgoing .chat-encryption-lock {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="dark"] .chat-encryption-lock {
+  color: #34d399;
+}
+
+
 /* Chat Date Dividers (Frosted Glass Pill) */
 .chat-date-divider,
 .whatsapp-date-chip {

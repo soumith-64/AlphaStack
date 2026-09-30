@@ -1,4 +1,5 @@
 import { dbOps } from '../database/db.js';
+import { cryptoService } from './cryptoService.js';
 import { config } from '../config.js';
 
 let ioInstance = null;
@@ -109,7 +110,8 @@ export const telephonyService = {
       }
 
       const latest = unreadEmails[0];
-      const speech = `You have ${unreadEmails.length} unread email. Latest message from ${latest.sender_email}. Subject: ${latest.subject || 'No Subject'}. Message body: ${latest.body_text || 'No content'}.`;
+      const plainBody = cryptoService.decrypt(latest.body_text || '');
+      const speech = `You have ${unreadEmails.length} unread email. Latest message from ${latest.sender_email}. Subject: ${latest.subject || 'No Subject'}. Message body: ${plainBody || 'No content'}.`;
 
       return `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
