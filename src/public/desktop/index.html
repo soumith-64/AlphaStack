@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/desktop/style.css?v=11">
+  <link rel="stylesheet" href="/desktop/style.css?v=12">
   <!-- Instant Pre-render Session Persistence: Prevents login flash on reload -->
   <script>
     (function() {
@@ -609,32 +609,55 @@
               <span data-i18n="back_to_messages">Back to messages</span>
             </button>
             <div class="reading-actions">
+              <!-- Primary Email Actions: Reply, Reply All, Forward -->
+              <button class="action-btn primary-action-btn" id="pane-reply-btn" onclick="openInlineReplyComposer('reply')" title="Reply (R)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                <span>Reply</span>
+              </button>
+              <button class="action-btn" id="pane-reply-all-btn" onclick="openInlineReplyComposer('reply-all')" title="Reply All (A)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>
+                <span>Reply All</span>
+              </button>
+              <button class="action-btn" id="pane-forward-btn" onclick="openInlineReplyComposer('forward')" title="Forward (F)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+                <span>Forward</span>
+              </button>
+              <button class="action-btn" id="pane-unread-btn" onclick="markCurrentEmailUnread()" title="Mark as Unread (U)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                <span>Unread</span>
+              </button>
+
+              <div class="action-divider"></div>
+
               <!-- Real-Time AI Translation in Reading Pane -->
               <button class="action-btn" id="pane-translate-btn" onclick="toggleMessageTranslation()" title="AI Real-Time Translation">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                <span style="font-size: 11px; margin-left: 4px;" id="pane-trans-label">AI Translate</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                <span id="pane-trans-label">AI Translate</span>
               </button>
               <!-- Mark as Priority / Important Toggle -->
-              <button class="action-btn" id="pane-important-btn" onclick="toggleCurrentImportant()" title="Mark as Priority">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+              <button class="action-btn icon-only" id="pane-important-btn" onclick="toggleCurrentImportant()" title="Mark as Priority">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
               </button>
-              <button class="action-btn" id="pane-star-btn" onclick="toggleCurrentStar()" title="Star Message">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <button class="action-btn icon-only" id="pane-star-btn" onclick="toggleCurrentStar()" title="Star Message (S)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
               </button>
-              <button class="action-btn" onclick="archiveCurrentEmail()" title="Archive Email">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              <button class="action-btn icon-only" onclick="archiveCurrentEmail()" title="Archive Email (E)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
               </button>
+
+              <div class="action-divider"></div>
+
               <button class="action-btn" id="pane-report-spam-btn" onclick="reportCurrentEmailSpam()" title="Report Spam / Move to Spam">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                <span style="font-size: 11px; margin-left: 3px; font-weight: 600;">Report Spam</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Report Spam</span>
               </button>
               <button class="action-btn danger-hover" id="pane-block-btn" onclick="blockCurrentSender()" title="Block Sender">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
-                <span style="font-size: 11px; margin-left: 3px; font-weight: 600;">Block Sender</span>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                <span>Block Sender</span>
               </button>
-              <button class="action-btn danger" id="pane-delete-btn" onclick="deleteCurrentEmail()" title="Delete Email">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                <span style="font-size: 11px; margin-left: 3px; font-weight: 600;">Delete</span>
+              <button class="action-btn danger" id="pane-delete-btn" onclick="deleteCurrentEmail()" title="Delete Email (#)">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Delete</span>
               </button>
             </div>
           </div>
@@ -657,11 +680,15 @@
               <!-- Chronological messages render here -->
             </div>
 
-            <!-- Gmail-Style Bottom Action Chips (Reply & Forward) -->
+            <!-- Gmail-Style Bottom Action Chips (Reply, Reply All & Forward) -->
             <div class="gmail-reading-bottom-actions">
               <button type="button" class="gmail-action-chip" onclick="openInlineReplyComposer('reply')" title="Reply to this message">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
                 <span>Reply</span>
+              </button>
+              <button type="button" class="gmail-action-chip" onclick="openInlineReplyComposer('reply-all')" title="Reply all to this message">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="7 17 2 12 7 7"/><polyline points="12 17 7 12 12 7"/><path d="M22 18v-2a4 4 0 0 0-4-4H7"/></svg>
+                <span>Reply All</span>
               </button>
               <button type="button" class="gmail-action-chip" onclick="openInlineReplyComposer('forward')" title="Forward this message">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
@@ -676,7 +703,13 @@
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
                   <span>Reply in this Conversation</span>
                 </div>
-                <div style="font-size: 12px; color: var(--text-dim);" id="inline-dock-recipient-label">To: locked recipient</div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div style="font-size: 12px; color: var(--text-dim);" id="inline-dock-recipient-label">To: locked recipient</div>
+                  <button type="button" class="btn-dock-popout" onclick="openReplyInModal()" title="Pop out into full composer" style="background: none; border: 1px solid var(--border-light); border-radius: 6px; cursor: pointer; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 3px 8px;">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    <span>Pop out</span>
+                  </button>
+                </div>
               </div>
 
               <!-- Quoted Reply Banner -->
@@ -1053,6 +1086,6 @@
   <div id="app-toast-container" class="app-toast-container"></div>
   <div id="app-dialog-overlay" class="app-dialog-overlay" style="display: none;"></div>
 
-  <script src="/desktop/app.js?v=11"></script>
+  <script src="/desktop/app.js?v=12"></script>
 </body>
 </html>

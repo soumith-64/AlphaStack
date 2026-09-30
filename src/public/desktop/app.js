@@ -1718,6 +1718,36 @@ function setupKeyboardShortcuts() {
         return;
       }
 
+      if (e.key.toLowerCase() === 'r' && activeEmail) {
+        e.preventDefault();
+        openInlineReplyComposer('reply');
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'a' && activeEmail) {
+        e.preventDefault();
+        openInlineReplyComposer('reply-all');
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'f' && activeEmail) {
+        e.preventDefault();
+        openInlineReplyComposer('forward');
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'u' && activeEmail) {
+        e.preventDefault();
+        markCurrentEmailUnread();
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'e' && activeEmail) {
+        e.preventDefault();
+        archiveCurrentEmail();
+        return;
+      }
+
       if (e.key.toLowerCase() === 's' && activeEmail) {
         toggleCurrentStar();
         return;
@@ -2363,14 +2393,59 @@ function goToNextPage() {
 function openInlineReplyComposer(mode) {
   if (mode === 'forward') {
     startForward();
-  } else {
-    const dock = document.getElementById('conversation-inline-dock');
-    if (dock) {
-      dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      const input = document.getElementById('desktop-thread-reply-input');
-      if (input) input.focus();
+    return;
+  }
+  if (mode === 'reply-all') {
+    openReplyInModal(true);
+    return;
+  }
+  const dock = document.getElementById('conversation-inline-dock');
+  if (dock) {
+    dock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const input = document.getElementById('desktop-thread-reply-input');
+    if (input) {
+      input.focus();
+      input.placeholder = 'Type a reply to this email...';
     }
   }
+}
+
+function openReplyInModal(isReplyAll = false) {
+  if (!activeEmail) return;
+  openComposeModal();
+  let to = activeEmail.sender_email;
+  if (isReplyAll) {
+    const extra = getRecipientsDisplay(activeEmail);
+    if (extra && extra !== 'Me') {
+      to = `${to}, ${extra}`;
+    }
+  }
+  const toInput = document.getElementById('desk-compose-to');
+  if (toInput) toInput.value = to;
+
+  const cleanSubject = (activeEmail.subject || '').replace(/^(\s*(re|fw|fwd)\s*:\s*)+/i, '');
+  const subjInput = document.getElementById('desk-compose-subject');
+  if (subjInput) subjInput.value = `Re: ${cleanSubject}`;
+
+  const senderDisplay = formatSenderDisplay(activeEmail.sender_email, false, activeEmail.sender_name);
+  const timeDisplay = new Date(activeEmail.created_at).toLocaleString();
+  const quoteHeader = `\n\nOn ${timeDisplay}, ${senderDisplay} wrote:\n> ${(activeEmail.body_text || '').split('\n').join('\n> ')}\n`;
+  const bodyInput = document.getElementById('desk-compose-body');
+  if (bodyInput) {
+    bodyInput.value = quoteHeader;
+    setTimeout(() => {
+      bodyInput.focus();
+      bodyInput.setSelectionRange(0, 0);
+    }, 100);
+  }
+}
+
+function markCurrentEmailUnread() {
+  if (!activeEmail) return;
+  const id = activeEmail.id;
+  closeReadingPane(false);
+  executeBulkActionOnSingle(id, 'unread');
+  showToastNotification('Marked message as unread', 'info');
 }
 
 function startForward() {
@@ -3015,7 +3090,7 @@ function renderDesktopEmailReadingView(email) {
   card.id = `email-view-card-${email.id}`;
 
   card.innerHTML = `
-    <div class="thread-card-header">
+    <div class="thread-card-header" style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
       <div class="thread-sender-info">
         <div class="thread-avatar" onclick="openContactInfoModal('${escapeHtml(email.sender_email)}');" title="View ${escapeHtml(formattedSender)} Digital ID Card" style="cursor: pointer;">
           <img src="${avatarUrl}" alt="${escapeHtml(formattedSender)}" class="avatar-inner-img" onerror="this.onerror=null; this.src='${fallbackSvg}';">
@@ -3040,6 +3115,16 @@ function renderDesktopEmailReadingView(email) {
             <span style="color: var(--text-dim); font-size: 11px;">To: ${escapeHtml(getRecipientsDisplay(email) || 'Me')}</span>
           </div>
         </div>
+      </div>
+      <div class="thread-card-quick-actions" style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+        <button type="button" class="btn-card-action" onclick="openInlineReplyComposer('reply')" title="Reply to this message">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+          <span>Reply</span>
+        </button>
+        <button type="button" class="btn-card-action" onclick="openInlineReplyComposer('forward')" title="Forward this message">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
+          <span>Forward</span>
+        </button>
       </div>
     </div>
     <div class="thread-card-body" style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-main);">
