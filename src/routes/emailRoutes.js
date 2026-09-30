@@ -1061,10 +1061,82 @@ router.get('/contacts', async (req, res) => {
         ORDER BY created_at DESC LIMIT 15
       `, [cleanPhone, searchPattern, searchPattern, searchPattern]);
 
+      // Also search past sent and received emails to discover any contacts
+      try {
+        const pastEmails = await dbOps.queryAll(`
+          SELECT recipient_emails, sender_email FROM emails 
+          WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+          ORDER BY created_at DESC LIMIT 20
+        `, [searchPattern, searchPattern]);
+
+        for (const pe of pastEmails) {
+          let list = [];
+          try {
+            list = typeof pe.recipient_emails === 'string' ? JSON.parse(pe.recipient_emails) : pe.recipient_emails;
+          } catch (_) {
+            list = [pe.recipient_emails];
+          }
+          if (!Array.isArray(list)) list = [list];
+          if (pe.sender_email) list.push(pe.sender_email);
+
+          for (const item of list) {
+            const str = String(item || '').trim();
+            const digits = str.replace(/\D/g, '').slice(-10);
+            if (digits && digits.length === 10 && digits !== cleanPhone) {
+              const alreadyHas = contacts.some(c => String(c.phone_number || '').replace(/\D/g, '').slice(-10) === digits);
+              if (!alreadyHas) {
+                let userRow = await dbOps.queryOne('SELECT id, phone_number, email_address, display_name, registration_channel FROM users WHERE phone_number LIKE ?', [`%${digits}%`]);
+                if (!userRow) {
+                  let dName = `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
+                  const angle = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>/);
+                  if (angle && angle[1] && !/^User\s*\d+/i.test(angle[1])) dName = angle[1].trim();
+
+                  const newId = 'user_' + digits;
+                  const newEmail = `${digits}@${config.domainName || 'alphastack.wwisvnr.com'}`;
+                  await dbOps.execute(`
+                    INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
+                    VALUES (?, ?, ?, ?, 'SAVED_CONTACT', 1)
+                  `, [newId, digits, newEmail, dName]).catch(() => {});
+
+                  userRow = {
+                    id: newId,
+                    phone_number: digits,
+                    email_address: newEmail,
+                    display_name: dName,
+                    registration_channel: 'SAVED_CONTACT'
+                  };
+                }
+                contacts.push(userRow);
+              }
+            } else if (str.includes('@') && !str.includes('alphastack.wwisvnr.com')) {
+              const cleanExt = str.replace(/^[<"']+|[>"']+$/g, '').trim();
+              if (cleanExt && !contacts.some(c => c.email_address === cleanExt || c.phone_number === cleanExt)) {
+                contacts.push({
+                  id: 'ext_' + Buffer.from(cleanExt).toString('hex').slice(0, 10),
+                  phone_number: cleanExt,
+                  email_address: cleanExt,
+                  display_name: cleanExt.split('@')[0],
+                  registration_channel: 'EXTERNAL_EMAIL',
+                  is_external: true
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {}
+
+      // Enrich contacts so display_name is never raw 'User XXXXXXXXXX'
+      for (const c of contacts) {
+        if (c.phone_number && (!c.display_name || /^User\s*\d+/i.test(c.display_name))) {
+          const cleanP = c.phone_number.replace(/\D/g, '').slice(-10);
+          c.display_name = `+91 ${cleanP.slice(0, 5)} ${cleanP.slice(5)}`;
+        }
+      }
+
       return res.json({ contacts, isSearch: true });
     }
 
-    // Default: Return all registered users for instant autocomplete dropdown
+    // Default: Return all registered and saved users
     const contacts = await dbOps.queryAll(`
       SELECT id, phone_number, email_address, display_name, registration_channel
       FROM users 
@@ -1072,7 +1144,15 @@ router.get('/contacts', async (req, res) => {
       ORDER BY created_at DESC LIMIT 30
     `, [cleanPhone]);
 
+    for (const c of contacts) {
+      if (c.phone_number && (!c.display_name || /^User\s*\d+/i.test(c.display_name))) {
+        const cleanP = c.phone_number.replace(/\D/g, '').slice(-10);
+        c.display_name = `+91 ${cleanP.slice(0, 5)} ${cleanP.slice(5)}`;
+      }
+    }
+
     res.json({ contacts, isRecent: true });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

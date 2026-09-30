@@ -4789,10 +4789,39 @@ function openReplyCompose(isForward = false) {
 }
 
 let mobVerifyDebounce = null;
+let mobSearchDebounce = null;
+
 function setupContactsAutocomplete() {
   const input = document.getElementById('trad-to');
   const picker = document.getElementById('mobile-contacts-picker');
   if (!input || !picker) return;
+
+  function renderPickerMatches(matches) {
+    if (!matches || matches.length === 0) {
+      picker.style.display = 'none';
+      return;
+    }
+    picker.innerHTML = matches.slice(0, 6).map(c => {
+      const p = c.phone_number || c.phone || '';
+      const em = c.email_address || c.email || '';
+      const targetVal = p || em;
+      const dName = (c.display_name && !/^User\s*\d+/i.test(c.display_name)) ? c.display_name : (c.name || (p ? `+91 ${p.slice(0,5)} ${p.slice(5)}` : em));
+      const initials = getInitials(dName);
+      return `
+      <div class="contact-picker-item" onclick="selectContactRecipient('${escapeHtml(targetVal)}')">
+        <div style="width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #046A38, #10B981); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-right: 8px;">${initials}</div>
+        <div style="flex: 1; min-width: 0;">
+          <strong style="color: var(--text-main); font-size: 13px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(dName)}</strong>
+          <div style="font-size: 11px; color: var(--text-dim);">${formatPhoneDisplay(p || '')} ${em ? `&bull; ${escapeHtml(em)}` : ''}</div>
+        </div>
+        <span class="badge-source-tag badge-phonemail-pill" style="margin-left: 6px;">
+          <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>INAI</span>
+        </span>
+      </div>
+    `}).join('');
+    picker.style.display = 'block';
+  }
 
   input.oninput = () => {
     const val = input.value.trim();
@@ -4800,42 +4829,45 @@ function setupContactsAutocomplete() {
     mobVerifyDebounce = setTimeout(() => verifyAndRenderRecipientStatus(val, 'mob-recipient-verify-pill'), 180);
 
     const q = val.toLowerCase();
-    if (!q || cachedContacts.length === 0) {
+    if (!q) {
       picker.style.display = 'none';
       return;
     }
 
-    const matches = cachedContacts.filter(c => 
+    // 1. Instant local matches from cachedContacts
+    const localMatches = (cachedContacts || []).filter(c => 
       ((c.name || c.display_name) && (c.name || c.display_name).toLowerCase().includes(q)) || 
       (c.phone && c.phone.includes(q)) ||
       (c.phone_number && c.phone_number.includes(q)) ||
       ((c.email || c.email_address) && (c.email || c.email_address).toLowerCase().includes(q))
     ).slice(0, 5);
 
-    if (matches.length === 0) {
-      picker.style.display = 'none';
-      return;
+    if (localMatches.length > 0) {
+      renderPickerMatches(localMatches);
     }
 
-    picker.innerHTML = matches.map(c => {
-      const p = c.phone || c.phone_number || '';
-      const em = c.email || c.email_address || '';
-      const targetVal = p || em;
-      const dName = c.name || c.display_name || p || em;
-      return `
-      <div class="contact-picker-item" onclick="selectContactRecipient('${escapeHtml(targetVal)}')">
-        <div>
-          <strong style="color: var(--text-main);">${escapeHtml(dName)}</strong>
-          <div style="font-size: 11px; color: var(--text-dim);">${formatPhoneDisplay(p || '')} ${em ? `&bull; ${escapeHtml(em)}` : ''}</div>
-        </div>
-        <span class="badge-source-tag badge-phonemail-pill">
-          <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          <span>INAI</span>
-        </span>
-      </div>
-    `}).join('');
-
-    picker.style.display = 'block';
+    // 2. Dynamic live query from server /api/contacts to find any newly saved number
+    if (mobSearchDebounce) clearTimeout(mobSearchDebounce);
+    mobSearchDebounce = setTimeout(async () => {
+      try {
+        const myPhone = currentUser ? currentUser.phone : '';
+        const res = await fetch(`/api/contacts?phone=${encodeURIComponent(myPhone)}&q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        const serverMatches = data.contacts || [];
+        if (serverMatches.length > 0) {
+          // Merge with cachedContacts
+          serverMatches.forEach(sm => {
+            const smDigits = String(sm.phone_number || sm.phone || '').replace(/\D/g, '').slice(-10);
+            if (smDigits && !cachedContacts.some(c => String(c.phone_number || c.phone || '').replace(/\D/g, '').slice(-10) === smDigits)) {
+              cachedContacts.push(sm);
+            }
+          });
+          renderPickerMatches(serverMatches);
+        } else if (localMatches.length === 0) {
+          picker.style.display = 'none';
+        }
+      } catch (err) {}
+    }, 200);
   };
 }
 
@@ -4909,6 +4941,7 @@ async function submitTraditionalCompose() {
       emailFolderCache = {};
       loadEmails(currentFolder);
       syncMobileFolderStats();
+      fetchContacts();
     } else {
       showToastNotification(data.error || 'Failed to send message', 'error');
     }

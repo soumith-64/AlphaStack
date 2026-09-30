@@ -29,10 +29,10 @@
    - One-tap switch between **Messenger View** and **Traditional Email View** on mobile and desktop.
 4. **🔄 Continuous Live Email Sync (5s Polling & WebSockets):**  
    Continuous background polling (5-second intervals) combined with instant Socket.IO push broadcasts (`email:new`, `email:sent`, `email:incoming`) ensures new emails and badges update instantly without manual page reloads.
-5. **👥 Automatic Contact Discovery & Auto-Registration:**  
-   Zero-configuration address book: incoming and outgoing emails automatically discover and register 10-digit numbers into verified INAI network contacts with display names.
-6. **⏰ 4-Hour Unread Delayed SMS Notifications (TextBee Gateway):**  
-   Background daemon monitors unviewed emails. If an email remains unread after **4 hours**, an automated SMS alert with the email subject line is dispatched to the recipient's phone via TextBee SMS Gateway.
+5. **👥 Automatic Contact Saving & Instant Autocomplete:**  
+   Sending an email to any new number automatically registers and saves it as a contact in the database. Next time you start typing the number or name in the compose "To" field (on desktop or mobile), a rich contact card appears with their formatted phone number (`+91 XXXXX XXXXX`), avatar, and verified member status.
+6. **⏰ 4-5+ Hour Unread Delayed SMS Notifications (TextBee Gateway):**  
+   An automated background worker continuously scans for unviewed emails. If an email remains unread for **4 to 5 or more hours**, a subject-only SMS reminder is automatically dispatched to the recipient's phone via the TextBee SMS Gateway, ensuring critical messages are never missed.
 7. **🚫 One-Click Sender Blocking & Spam Reporting:**  
    Users can block spam senders directly from the desktop reading pane, bulk selection bar, or mobile chat menu. Blocked senders are tracked in `blocked_senders` and automatically routed to the Spam folder.
 8. **📝 Drafts Management Engine:**  

@@ -34,10 +34,16 @@ export const emailService = {
    * while preserving standard external email addresses (e.g. name@gmail.com) completely intact.
    */
   parseAddress(input) {
-    if (!input) return { phone: '', alias: '', full: '', isExternal: false };
-    let raw = String(input).trim().toLowerCase();
+    if (!input) return { phone: '', alias: '', full: '', name: '', isExternal: false };
+    const rawInput = String(input).trim();
+    let raw = rawInput.toLowerCase();
     
     // Check if it has angle brackets: "Name" <user@domain.com>
+    let extractedName = '';
+    const nameAngleMatch = rawInput.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>/);
+    if (nameAngleMatch && nameAngleMatch[1]) {
+      extractedName = nameAngleMatch[1].trim();
+    }
     const angleMatch = raw.match(/<([^>]+)>/);
     if (angleMatch && angleMatch[1]) {
       raw = angleMatch[1].trim();
@@ -86,6 +92,7 @@ export const emailService = {
     return {
       phone: isValidPhone ? digitsOnly : '',
       alias: aliasPart,
+      name: extractedName,
       full: isValidPhone ? `${digitsOnly}${aliasPart ? '.' + aliasPart : ''}@${config.domainName}` : raw,
       isExternal: !isValidPhone
     };
@@ -311,18 +318,22 @@ export const emailService = {
     const rawRecipientsList = Array.isArray(toRecipients) ? toRecipients : [toRecipients];
     const normalizedRecipients = rawRecipientsList.map(r => this.parseAddress(r).full);
 
-    // Auto-provision any internal recipients who haven't registered yet
+    // Auto-provision any internal recipients who haven't registered yet so they are permanently saved contacts
     for (const rec of rawRecipientsList) {
       const parsed = this.parseAddress(rec);
       if (parsed.phone && parsed.phone !== cleanSenderPhone) {
         let recipientUser = await dbOps.queryOne('SELECT * FROM users WHERE phone_number = ?', [parsed.phone]);
+        const formatted = `+91 ${parsed.phone.slice(0, 5)} ${parsed.phone.slice(5)}`;
+        const recName = parsed.name || formatted;
         if (!recipientUser) {
-          const recUserId = 'user_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+          const recUserId = 'user_' + parsed.phone;
           const recEmail = `${parsed.phone}@${config.domainName}`;
           await dbOps.execute(`
             INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
-            VALUES (?, ?, ?, ?, 'INBOUND_EMAIL', 0)
-          `, [recUserId, parsed.phone, recEmail, `User ${parsed.phone}`]);
+            VALUES (?, ?, ?, ?, 'SAVED_CONTACT', 1)
+          `, [recUserId, parsed.phone, recEmail, recName]);
+        } else if (parsed.name && (!recipientUser.display_name || /^User\s*\d+/i.test(recipientUser.display_name))) {
+          await dbOps.execute('UPDATE users SET display_name = ? WHERE id = ?', [parsed.name, recipientUser.id]);
         }
       }
     }

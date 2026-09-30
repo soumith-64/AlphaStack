@@ -72,11 +72,13 @@ export const notificationService = {
   },
 
   /**
-   * Periodic scanner for emails unviewed/unread for >= 4 hours
+   * Periodic scanner for emails unviewed/unread for >= 4-5 hours
    */
   async checkDelayedUnreadEmails() {
     try {
-      // Find unread emails created at least 4 hours ago where sms_delayed_notified = 0
+      const delayHours = parseInt(process.env.UNREAD_SMS_DELAY_HOURS || '4', 10);
+
+      // Find unread emails created at least delayHours ago (4 or 5+ hours) where sms_delayed_notified = 0
       let unreadEmails = [];
       try {
         unreadEmails = await dbOps.queryAll(`
@@ -85,7 +87,7 @@ export const notificationService = {
           WHERE is_read = 0 
             AND (sms_delayed_notified = 0 OR sms_delayed_notified IS NULL)
             AND folder NOT IN ('TRASH', 'SPAM', 'DRAFTS')
-            AND created_at <= (NOW() - INTERVAL 4 HOUR)
+            AND created_at <= (NOW() - INTERVAL ${delayHours} HOUR)
         `);
       } catch (mysqlErr) {
         // Fallback for SQLite
@@ -96,14 +98,14 @@ export const notificationService = {
             WHERE is_read = 0 
               AND (sms_delayed_notified = 0 OR sms_delayed_notified IS NULL)
               AND folder NOT IN ('TRASH', 'SPAM', 'DRAFTS')
-              AND created_at <= datetime('now', '-4 hours')
+              AND created_at <= datetime('now', '-${delayHours} hours')
           `);
         } catch (sqliteErr) {}
       }
 
       if (!unreadEmails || unreadEmails.length === 0) return;
 
-      console.log(`⏱️ [4-HR UNREAD CHECK] Found ${unreadEmails.length} unread email(s) >= 4 hours old. Dispatching SMS reminders...`);
+      console.log(`⏱️ [DELAYED UNREAD CHECK] Found ${unreadEmails.length} unread email(s) >= ${delayHours} hours old. Dispatching SMS reminders...`);
 
       for (const email of unreadEmails) {
         // Mark notified first to prevent duplicate sends
@@ -121,11 +123,7 @@ export const notificationService = {
         for (const rec of recipients) {
           const digits = String(rec).replace(/\D/g, '').slice(-10);
           if (digits && digits.length === 10) {
-            // Verify this is a registered user
-            const user = await dbOps.queryOne('SELECT phone_number FROM users WHERE phone_number LIKE ?', [`%${digits}%`]);
-            if (user) {
-              await this.dispatchSubjectOnlySms(digits, email.subject);
-            }
+            await this.dispatchSubjectOnlySms(digits, email.subject);
           }
         }
       }
