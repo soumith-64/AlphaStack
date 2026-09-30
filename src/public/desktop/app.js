@@ -850,7 +850,7 @@ function triggerPhoneEmailLogin() {
   }
 
   // Fallback: open official secure login popup directly
-  const clientId = '13311688567845248231';
+  const clientId = '13185767641328082743';
   const redirectUrl = window.location.href.split('?')[0].split('#')[0];
   const authUrl = `https://auth.phone.email/log-in?client_id=${clientId}&auth_type=8&origin=${encodeURIComponent(redirectUrl)}`;
   const w = 500, h = 600;
@@ -4494,11 +4494,26 @@ function restoreSession() {
     return;
   }
 
+  // Handle explicit session reset or phone switch via URL parameter
+  const targetPhone = (urlParams.get('phone') || '').replace(/\D/g, '').slice(-10);
+  const wantsReset = urlParams.get('logout') || urlParams.get('switch') || urlParams.get('login');
+  if (wantsReset) {
+    localStorage.removeItem('phonemail-user');
+    localStorage.removeItem('inai_user');
+    localStorage.removeItem('phonemail-mobile-user');
+    localStorage.removeItem('phonemail_saved_phone');
+    sessionStorage.removeItem('phonemail-user');
+    sessionStorage.removeItem('phonemail-mobile-user');
+    document.documentElement.classList.remove('has-saved-session');
+    currentUser = null;
+    try { window.history.replaceState({}, document.title, window.location.pathname); } catch (e) {}
+  }
+
   const saved = localStorage.getItem('phonemail-user') || 
                 localStorage.getItem('inai_user') || 
                 localStorage.getItem('phonemail-mobile-user') || 
                 sessionStorage.getItem('phonemail-user');
-  if (saved) {
+  if (saved && !wantsReset) {
     try {
       currentUser = JSON.parse(saved);
       if (currentUser) {
@@ -4515,41 +4530,54 @@ function restoreSession() {
         }
 
         if (cleanPhone.length === 10) {
-          currentUser.phone = cleanPhone;
-          currentUser.phone_number = cleanPhone;
-          currentUser.name = currentUser.name || currentUser.display_name || `User ${cleanPhone}`;
-          currentUser.email = currentUser.email || currentUser.email_address || `${cleanPhone}@alphastack.wwisvnr.com`;
+          // If an explicit phone is specified and doesn't match saved session, clear session
+          if (targetPhone && targetPhone.length === 10 && cleanPhone !== targetPhone) {
+            localStorage.removeItem('phonemail-user');
+            localStorage.removeItem('inai_user');
+            localStorage.removeItem('phonemail-mobile-user');
+            localStorage.removeItem('phonemail_saved_phone');
+            sessionStorage.removeItem('phonemail-user');
+            sessionStorage.removeItem('phonemail-mobile-user');
+            document.documentElement.classList.remove('has-saved-session');
+            currentUser = null;
+          } else {
+            currentUser.phone = cleanPhone;
+            currentUser.phone_number = cleanPhone;
+            currentUser.name = currentUser.name || currentUser.display_name || `User ${cleanPhone}`;
+            currentUser.email = currentUser.email || currentUser.email_address || `${cleanPhone}@alphastack.wwisvnr.com`;
 
-          document.documentElement.classList.add('has-saved-session');
-          const auth = document.getElementById('desktop-auth-container');
-          const main = document.getElementById('desktop-main-container');
-          if (auth && main) {
-            auth.style.display = 'none';
-            main.style.display = 'flex';
-            initDesktopApp();
+            document.documentElement.classList.add('has-saved-session');
+            const auth = document.getElementById('desktop-auth-container');
+            const main = document.getElementById('desktop-main-container');
+            if (auth && main) {
+              auth.style.display = 'none';
+              main.style.display = 'flex';
+              initDesktopApp();
 
-            // Cross-device profile sync: fetch latest profile & aliases from database
-            fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
-              .then(r => r.json())
-              .then(data => {
-                if (data && data.user) {
-                  currentUser.name = data.user.display_name || currentUser.name;
-                  currentUser.email = data.user.email_address || currentUser.email;
-                  localStorage.setItem('phonemail-user', JSON.stringify(currentUser));
-                  localStorage.setItem('inai_user', JSON.stringify(currentUser));
-                  sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
-                  updateProfileDisplay();
-                }
-              })
-              .catch(() => {});
+              // Cross-device profile sync: fetch latest profile & aliases from database
+              fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+                .then(r => r.json())
+                .then(data => {
+                  if (data && data.user) {
+                    currentUser.name = data.user.display_name || currentUser.name;
+                    currentUser.email = data.user.email_address || currentUser.email;
+                    localStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                    localStorage.setItem('inai_user', JSON.stringify(currentUser));
+                    sessionStorage.setItem('phonemail-user', JSON.stringify(currentUser));
+                    updateProfileDisplay();
+                  }
+                })
+                .catch(() => {});
+            }
+            return;
           }
-          return;
         }
       }
       // If we reach here, user had no valid 10-digit phone
       localStorage.removeItem('phonemail-user');
       localStorage.removeItem('inai_user');
       localStorage.removeItem('phonemail-mobile-user');
+      localStorage.removeItem('phonemail_saved_phone');
       sessionStorage.removeItem('phonemail-user');
       document.documentElement.classList.remove('has-saved-session');
       currentUser = null;
@@ -4557,9 +4585,17 @@ function restoreSession() {
       localStorage.removeItem('phonemail-user');
       localStorage.removeItem('inai_user');
       localStorage.removeItem('phonemail-mobile-user');
+      localStorage.removeItem('phonemail_saved_phone');
       sessionStorage.removeItem('phonemail-user');
       document.documentElement.classList.remove('has-saved-session');
       currentUser = null;
+    }
+  }
+
+  if (targetPhone && targetPhone.length === 10) {
+    const phoneInput = document.getElementById('desktop-phone-input');
+    if (phoneInput) {
+      phoneInput.value = targetPhone;
     }
   }
 }
@@ -4568,6 +4604,7 @@ function logoutDesktop() {
   localStorage.removeItem('phonemail-user');
   localStorage.removeItem('inai_user');
   localStorage.removeItem('phonemail-mobile-user');
+  localStorage.removeItem('phonemail_saved_phone');
   sessionStorage.removeItem('phonemail-user');
   sessionStorage.removeItem('phonemail-mobile-user');
   document.documentElement.classList.remove('has-saved-session');

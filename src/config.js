@@ -12,6 +12,7 @@ export const config = {
     apiKey: process.env.TEXTBEE_API_KEY || '',
     deviceId: process.env.TEXTBEE_DEVICE_ID || '',
   },
+  phoneEmailClientId: process.env.PHONE_EMAIL_CLIENT_ID || '13185767641328082743',
   dbPath: process.env.DB_PATH || './data/phonemail.db',
   db: {
     host: process.env.DB_HOST || 'localhost',

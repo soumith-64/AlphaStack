@@ -381,6 +381,7 @@ function clearCorruptedMobileSession() {
     localStorage.removeItem('phonemail-mobile-user');
     localStorage.removeItem('inai_user');
     localStorage.removeItem('phonemail-user');
+    localStorage.removeItem('phonemail_saved_phone');
     sessionStorage.removeItem('phonemail-mobile-user');
     sessionStorage.removeItem('phonemail-user');
   } catch(e) {}
@@ -470,37 +471,50 @@ function restoreSession() {
     return;
   }
 
+  // Handle explicit session reset or phone switch via URL parameter
+  const targetPhone = (urlParams.get('phone') || '').replace(/\D/g, '').slice(-10);
+  const wantsReset = urlParams.get('logout') || urlParams.get('switch') || urlParams.get('login');
+  if (wantsReset) {
+    clearCorruptedMobileSession();
+    try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
+  }
+
   const saved = localStorage.getItem('phonemail-mobile-user') || 
                 localStorage.getItem('inai_user') || 
                 localStorage.getItem('phonemail-user') ||
                 sessionStorage.getItem('phonemail-mobile-user');
-  if (saved) {
+  if (saved && !wantsReset) {
     try {
       const rawUser = JSON.parse(saved);
       const user = normalizeMobileUser(rawUser);
       if (user && user.phone && user.phone.length === 10) {
-        currentUser = user;
-        saveMobileSession(currentUser);
-        document.documentElement.classList.add('has-saved-session');
-        initAppView();
+        // If an explicit phone is specified and doesn't match saved session, clear session
+        if (targetPhone && targetPhone.length === 10 && user.phone !== targetPhone) {
+          clearCorruptedMobileSession();
+        } else {
+          currentUser = user;
+          saveMobileSession(currentUser);
+          document.documentElement.classList.add('has-saved-session');
+          initAppView();
 
-        // Cross-device profile sync: fetch latest profile & name from database
-        fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
-          .then(r => r.json())
-          .then(data => {
-            if (data && data.user) {
-              const refreshed = normalizeMobileUser({ ...currentUser, ...data.user });
-              if (refreshed) {
-                saveMobileSession(refreshed);
-                const drawerName = document.getElementById('drawer-username');
-                if (drawerName) drawerName.innerText = refreshed.name || `User ${refreshed.phone}`;
-                const drawerEmail = document.getElementById('drawer-email');
-                if (drawerEmail) drawerEmail.innerText = formatPhoneDisplay(refreshed.phone);
+          // Cross-device profile sync: fetch latest profile & name from database
+          fetch(`/api/auth/me?phone=${encodeURIComponent(currentUser.phone)}`)
+            .then(r => r.json())
+            .then(data => {
+              if (data && data.user) {
+                const refreshed = normalizeMobileUser({ ...currentUser, ...data.user });
+                if (refreshed) {
+                  saveMobileSession(refreshed);
+                  const drawerName = document.getElementById('drawer-username');
+                  if (drawerName) drawerName.innerText = refreshed.name || `User ${refreshed.phone}`;
+                  const drawerEmail = document.getElementById('drawer-email');
+                  if (drawerEmail) drawerEmail.innerText = formatPhoneDisplay(refreshed.phone);
+                }
               }
-            }
-          })
-          .catch(() => {});
-        return;
+            })
+            .catch(() => {});
+          return;
+        }
       } else {
         clearCorruptedMobileSession();
       }
@@ -516,6 +530,13 @@ function restoreSession() {
   if (onb) onb.style.display = 'flex';
   if (app) app.style.display = 'none';
   goToScreen('screen-phone');
+
+  if (targetPhone && targetPhone.length === 10) {
+    const phoneInput = document.getElementById('mob-phone-input');
+    if (phoneInput) {
+      phoneInput.value = targetPhone;
+    }
+  }
 }
 
 function saveMobileSession(user) {
@@ -793,7 +814,7 @@ function triggerPhoneEmailLogin() {
     if (subCaption) subCaption.innerText = 'Connecting to Phone.Email gateway...';
   }
 
-  const clientId = '13311688567845248231';
+  const clientId = '13185767641328082743';
   const redirectUrl = window.location.href.split('?')[0].split('#')[0];
   const authUrl = `https://auth.phone.email/log-in?client_id=${clientId}&auth_type=8&origin=${encodeURIComponent(redirectUrl)}`;
 
@@ -1023,6 +1044,7 @@ function logoutMobile() {
   localStorage.removeItem('phonemail-mobile-user');
   localStorage.removeItem('inai_user');
   localStorage.removeItem('phonemail-user');
+  localStorage.removeItem('phonemail_saved_phone');
   sessionStorage.removeItem('phonemail-mobile-user');
   sessionStorage.removeItem('phonemail-user');
   document.documentElement.classList.remove('has-saved-session');

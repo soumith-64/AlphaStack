@@ -18,7 +18,7 @@ router.get('/conversations', async (req, res) => {
     const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
 
     const primaryUser = await dbOps.queryOne('SELECT phone_number FROM users ORDER BY created_at ASC LIMIT 1');
-    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163';
+    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163' || cleanPhone === '8777611163';
 
     const whereClause = isPrimary 
       ? `(cp.phone_number = ? OR cp.phone_number LIKE ? OR cp.phone_number LIKE '%admin%')`
@@ -191,7 +191,7 @@ router.get('/emails', async (req, res) => {
     const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
 
     const primaryUser = await dbOps.queryOne('SELECT phone_number FROM users ORDER BY created_at ASC LIMIT 1');
-    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163';
+    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163' || cleanPhone === '8777611163';
 
     let emails;
     if (folder === 'ALL') {
@@ -324,7 +324,7 @@ router.get('/emails/stats', async (req, res) => {
     const cleanPhone = String(userPhone).replace(/\D/g, '').slice(-10);
 
     const primaryUser = await dbOps.queryOne('SELECT phone_number FROM users ORDER BY created_at ASC LIMIT 1');
-    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163';
+    const isPrimary = (primaryUser && primaryUser.phone_number === cleanPhone) || cleanPhone === '8667611163' || cleanPhone === '8777611163';
 
     // 1. INBOX stats
     const inboxSql = isPrimary
