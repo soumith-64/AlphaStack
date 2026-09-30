@@ -77,31 +77,18 @@ export const notificationService = {
   async checkDelayedUnreadEmails() {
     try {
       const delayHours = parseInt(process.env.UNREAD_SMS_DELAY_HOURS || '4', 10);
+      const cutoffDate = new Date(Date.now() - delayHours * 60 * 60 * 1000);
+      const cutoffStr = cutoffDate.toISOString().slice(0, 19).replace('T', ' ');
 
-      // Find unread emails created at least delayHours ago (4 or 5+ hours) where sms_delayed_notified = 0
-      let unreadEmails = [];
-      try {
-        unreadEmails = await dbOps.queryAll(`
-          SELECT id, recipient_emails, subject, created_at 
-          FROM emails 
-          WHERE is_read = 0 
-            AND (sms_delayed_notified = 0 OR sms_delayed_notified IS NULL)
-            AND folder NOT IN ('TRASH', 'SPAM', 'DRAFTS')
-            AND created_at <= (NOW() - INTERVAL ${delayHours} HOUR)
-        `);
-      } catch (mysqlErr) {
-        // Fallback for SQLite
-        try {
-          unreadEmails = await dbOps.queryAll(`
-            SELECT id, recipient_emails, subject, created_at 
-            FROM emails 
-            WHERE is_read = 0 
-              AND (sms_delayed_notified = 0 OR sms_delayed_notified IS NULL)
-              AND folder NOT IN ('TRASH', 'SPAM', 'DRAFTS')
-              AND created_at <= datetime('now', '-${delayHours} hours')
-          `);
-        } catch (sqliteErr) {}
-      }
+      // Find unread emails created at least delayHours ago where sms_delayed_notified = 0
+      const unreadEmails = await dbOps.queryAll(`
+        SELECT id, recipient_emails, subject, created_at 
+        FROM emails 
+        WHERE is_read = 0 
+          AND (sms_delayed_notified = 0 OR sms_delayed_notified IS NULL)
+          AND folder NOT IN ('TRASH', 'SPAM', 'DRAFTS')
+          AND created_at <= ?
+      `, [cutoffStr]);
 
       if (!unreadEmails || unreadEmails.length === 0) return;
 
