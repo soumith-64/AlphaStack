@@ -118,7 +118,7 @@
 ```bash
 docker run -d -p 3000:3000 --name inai-app soumithjv/inai-alphastack:latest
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser!
+Access the application at your domain or server URL (Live demo: **[https://alphastack.wwisvnr.com](https://alphastack.wwisvnr.com)**).
 
 ### Option 2: Run with Docker Compose
 ```bash
@@ -194,7 +194,7 @@ NODE_ENV=production
 ```bash
 npm start
 ```
-The server will start on `http://localhost:3000`.
+The server will bind to port 3000 (Production domain: **https://alphastack.wwisvnr.com**).
 
 ---
 
