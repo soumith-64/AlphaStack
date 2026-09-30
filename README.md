@@ -272,6 +272,15 @@ docker compose down
 docker compose build
 ```
 
+### Pull from Docker Hub:
+```bash
+# Pull official image directly from Docker Hub
+docker pull soumithjv/inai-alphastack:latest
+
+# Run container with environment file
+docker run -d -p 3000:3000 --env-file .env --name inai-app soumithjv/inai-alphastack:latest
+```
+
 The container automatically maps port `3000:3000`, loads your environment variables from `.env`, runs an integrated healthcheck against `/health`, and restarts automatically (`unless-stopped`).
 
 ---
