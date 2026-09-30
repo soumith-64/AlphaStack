@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: inai-alphastack:latest
+    image: soumithjv/inai-alphastack:latest
     container_name: inai-alphastack
     restart: unless-stopped
     ports:
