@@ -365,7 +365,7 @@ function generateDefaultAvatar(seed, displayName = '') {
   }
   
   const gradients = [
-    ['#059669', '#10B981'], // Bharat Green
+    ['#059669', '#10B981'], // India Green
     ['#EA580C', '#F59E0B'], // Kesari Saffron Amber
     ['#2563EB', '#38BDF8'], // Ocean Sapphire Blue
     ['#7C3AED', '#C084FC'], // Royal Purple

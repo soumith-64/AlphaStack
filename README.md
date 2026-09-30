@@ -1,4 +1,4 @@
-# 🇮🇳 INAI — Bharat's Unified Phone-to-Email WebApp
+# 🇮🇳 INAI — Unified Phone-to-Email WebApp
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-alphastack.wwisvnr.com-046A38?style=for-the-badge&logo=googlechrome&logoColor=white)](https://alphastack.wwisvnr.com/)
 [![Docker Hub](https://img.shields.io/badge/Docker%20Hub-soumithjv%2Finai--alphastack-0db7ed?style=for-the-badge&logo=docker&logoColor=white)](https://hub.docker.com/r/soumithjv/inai-alphastack)
@@ -8,7 +8,7 @@
 > 🚀 **Built for the AlphaStack Hackathon 2026**  
 > Imagine an email ecosystem where nobody needs to remember, spell, or register cryptic email handles like `john.doe1992@gmail.com`.  
 > What if your email was simply your **10-digit mobile number**: **`9876543210@alphastack.wwisvnr.com`**?  
-> **INAI (Instant Network AI)** makes this a reality for Bharat — an ultra-modern, zero-delay phone-powered email platform featuring **AES-256-GCM payload encryption at rest**, **Spike/WhatsApp-style Messenger view**, **real-time WebSocket synchronization**, **automatic contact discovery**, **TextBee live SMS alerts for unread emails**, and **national Tiranga aesthetics**.
+> **INAI (Instant Network AI)** makes this a reality — an ultra-modern, zero-delay phone-powered email platform featuring **AES-256-GCM payload encryption at rest**, **Spike/WhatsApp-style Messenger view**, **real-time WebSocket synchronization**, **automatic contact discovery**, **TextBee live SMS alerts for unread emails**, and **national Tiranga aesthetics**.
 
 ---
 
@@ -258,4 +258,4 @@ AlphaStack/
 ---
 
 ## 📄 License
-This project is open-source under the **MIT License**. Built with ❤️ for Bharat at the **AlphaStack Hackathon 2026**.
+This project is open-source under the **MIT License**. Built with ❤️ for the **AlphaStack Hackathon 2026**.
