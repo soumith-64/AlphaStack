@@ -203,10 +203,10 @@ INAI offers comprehensive folder management across desktop and mobile:
    HOSTINGER_IMAP_USER=admin@alphastack.wwisvnr.com
    HOSTINGER_IMAP_PASS=YourEmailPasswordHere
 
-   # Twilio Telephony (Voice IVR)
-   TWILIO_ACCOUNT_SID=YourTwilioSid
-   TWILIO_AUTH_TOKEN=YourTwilioToken
-   TWILIO_PHONE_NUMBER=+17372508034
+   # Telephony (Optional / Not used)
+   TWILIO_ACCOUNT_SID=
+   TWILIO_AUTH_TOKEN=
+   TWILIO_PHONE_NUMBER=
 
    # TextBee Live SMS Gateway
    TEXTBEE_DEVICE_ID=YourTextbeeDeviceId

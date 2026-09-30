@@ -11,7 +11,7 @@ export const config = {
   twilio: {
     accountSid: process.env.TWILIO_ACCOUNT_SID || '',
     authToken: process.env.TWILIO_AUTH_TOKEN || '',
-    phoneNumber: process.env.TWILIO_PHONE_NUMBER || '+12055550199',
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER || '',
   },
   textbee: {
     apiKey: process.env.TEXTBEE_API_KEY || '',
