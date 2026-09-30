@@ -47,7 +47,7 @@ if (useMysql) {
       ];
       for (const m of migrations) {
         try {
-          await mysqlPool.execute(m);
+          await mysqlPool.query(m);
           console.log(`✅ [MySQL Migration] Executed: ${m}`);
         } catch (e) {
           // ignore ER_DUP_FIELDNAME (1060) or existing columns
@@ -56,18 +56,18 @@ if (useMysql) {
 
       // Ensure all outgoing emails sent by local users are marked as read (is_read = 1) so they don't count as unread inbox items
       try {
-        await mysqlPool.execute("UPDATE emails SET is_read = 1 WHERE sender_email LIKE '%@alphastack.wwisvnr.com%' AND is_read = 0");
+        await mysqlPool.query("UPDATE emails SET is_read = 1 WHERE sender_email LIKE '%@alphastack.wwisvnr.com%' AND is_read = 0");
       } catch (e) {}
 
       // Auto-heal emails truncated at old 65KB MySQL TEXT limit so IMAP re-fetches full content
       try {
-        const [truncated] = await mysqlPool.execute(
+        const [truncated] = await mysqlPool.query(
           "SELECT id, subject FROM emails WHERE LENGTH(body_html) = 65535"
         );
         if (truncated && truncated.length > 0) {
           console.log(`⚠️ [MySQL Migration] Found ${truncated.length} email(s) truncated at 65KB limit. Resetting for clean re-sync.`);
           for (const row of truncated) {
-            await mysqlPool.execute('DELETE FROM emails WHERE id = ?', [row.id]);
+            await mysqlPool.query('DELETE FROM emails WHERE id = ?', [row.id]);
           }
         }
       } catch (truncErr) {}
@@ -169,12 +169,12 @@ async function getSqliteDb() {
 // Database abstraction layer (supports both MySQL and SQLite seamlessly with graceful fallback)
 export const dbOps = {
   async queryAll(sql, params = []) {
+    const cleanParams = (Array.isArray(params) ? params : [params]).map(p => (p === undefined ? null : p));
     if (mysqlPool) {
       try {
-        const [rows] = await mysqlPool.execute(sql, params);
+        const [rows] = await mysqlPool.query(sql, cleanParams);
         return rows;
       } catch (err) {
-        console.warn('Notice: MySQL query warning:', err.message);
         const colMatch = (err.message || '').match(/Unknown column '([^']+)'/i);
         if (colMatch && colMatch[1]) {
           const col = colMatch[1];
@@ -186,15 +186,15 @@ export const dbOps = {
             if (col === 'language') typeDef = "VARCHAR(10) DEFAULT 'en'";
             if (col === 'read_at') typeDef = 'DATETIME DEFAULT NULL';
             if (col === 'read_receipts_enabled') typeDef = 'INT DEFAULT 1';
-            await mysqlPool.execute(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
+            await mysqlPool.query(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
             console.log(`✅ [MySQL Auto-Heal] Added missing column \`${col}\` to emails table`);
-            const [retryRows] = await mysqlPool.execute(sql, params);
+            const [retryRows] = await mysqlPool.query(sql, cleanParams);
             return retryRows;
           } catch (mErr) {
             if (col === 'is_important') {
               try {
                 const fallbackSql = sql.replace(/is_important DESC,\s*/gi, '').replace(/\s*AND\s+is_important\s*=\s*\d+/gi, '');
-                const [fallbackRows] = await mysqlPool.execute(fallbackSql, params);
+                const [fallbackRows] = await mysqlPool.query(fallbackSql, cleanParams);
                 return fallbackRows;
               } catch (fErr) {}
             }
@@ -204,21 +204,26 @@ export const dbOps = {
           console.warn('⚠️ [MySQL] Connection lost, switching to local SQLite');
           mysqlPool = null;
         } else {
-          // Keep using MySQL pool - do NOT fall back to empty SQLite on SQL errors
+          console.warn('Notice: MySQL query warning:', err.message);
           return [];
         }
       }
     }
     const sqliteDb = await getSqliteDb();
     if (!sqliteDb) return [];
-    const stmt = sqliteDb.prepare(sql);
-    stmt.bind(params);
-    const results = [];
-    while (stmt.step()) {
-      results.push(stmt.getAsObject());
+    try {
+      const stmt = sqliteDb.prepare(sql);
+      stmt.bind(cleanParams);
+      const results = [];
+      while (stmt.step()) {
+        results.push(stmt.getAsObject());
+      }
+      stmt.free();
+      return results;
+    } catch (sErr) {
+      console.warn('Notice: SQLite query error:', sErr.message);
+      return [];
     }
-    stmt.free();
-    return results;
   },
 
   async queryOne(sql, params = []) {
@@ -227,12 +232,12 @@ export const dbOps = {
   },
 
   async execute(sql, params = []) {
+    const cleanParams = (Array.isArray(params) ? params : [params]).map(p => (p === undefined ? null : p));
     if (mysqlPool) {
       try {
-        const [result] = await mysqlPool.execute(sql, params);
-        return { changes: result.affectedRows };
+        const [result] = await mysqlPool.query(sql, cleanParams);
+        return { changes: result.affectedRows || result.changedRows || 0, insertId: result.insertId };
       } catch (err) {
-        console.warn('Notice: MySQL execute warning:', err.message);
         const colMatch = (err.message || '').match(/Unknown column '([^']+)'/i);
         if (colMatch && colMatch[1]) {
           const col = colMatch[1];
@@ -242,24 +247,29 @@ export const dbOps = {
             if (col === 'reply_to_id') typeDef = 'VARCHAR(64) DEFAULT NULL';
             if (col === 'read_at') typeDef = 'DATETIME DEFAULT NULL';
             if (col === 'read_receipts_enabled') typeDef = 'INT DEFAULT 1';
-            await mysqlPool.execute(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
+            await mysqlPool.query(`ALTER TABLE emails ADD COLUMN \`${col}\` ${typeDef}`);
             console.log(`✅ [MySQL Auto-Heal] Added missing column \`${col}\` to emails table`);
-            const [retryResult] = await mysqlPool.execute(sql, params);
-            return { changes: retryResult.affectedRows };
+            const [retryResult] = await mysqlPool.query(sql, cleanParams);
+            return { changes: retryResult.affectedRows || 0, insertId: retryResult.insertId };
           } catch (mErr) {}
         }
         if (err.code === 'ECONNREFUSED' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ETIMEDOUT') {
           console.warn('⚠️ [MySQL] Connection lost, switching to local SQLite');
           mysqlPool = null;
         } else {
+          console.warn('Notice: MySQL execute warning:', err.message);
           return { changes: 0, error: err.message };
         }
       }
     }
     const sqliteDb = await getSqliteDb();
     if (sqliteDb) {
-      sqliteDb.run(sql, params);
-      saveToDisk();
+      try {
+        sqliteDb.run(sql, cleanParams);
+        saveToDisk();
+      } catch (sErr) {
+        console.warn('Notice: SQLite execute error:', sErr.message);
+      }
     }
     return { changes: 1 };
   },
@@ -272,7 +282,7 @@ export const dbOps = {
       const sig = `${sender}___${subject}`;
       if (mysqlPool) {
         try {
-          await mysqlPool.execute(`
+          await mysqlPool.query(`
             INSERT INTO deleted_email_signatures (signature, message_id, sender, subject)
             VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE deleted_at = CURRENT_TIMESTAMP
