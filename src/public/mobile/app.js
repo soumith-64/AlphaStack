@@ -4562,7 +4562,24 @@ async function fetchContactsSilently() {
   try {
     const res = await fetch(`/api/contacts?phone=${encodeURIComponent(currentUser.phone)}`);
     const data = await res.json();
-    cachedContacts = data.contacts || [];
+    const serverContacts = data.contacts || [];
+
+    let deviceContacts = [];
+    try {
+      const raw = localStorage.getItem('phonemail_cached_device_contacts');
+      if (raw) deviceContacts = JSON.parse(raw);
+    } catch(e) {}
+
+    const combined = [...serverContacts];
+    if (Array.isArray(deviceContacts)) {
+      deviceContacts.forEach(dc => {
+        const dcDigits = String(dc.phone_number || dc.phone || '').replace(/\D/g, '').slice(-10);
+        if (dcDigits && !combined.some(c => String(c.phone_number || c.phone || '').replace(/\D/g, '').slice(-10) === dcDigits)) {
+          combined.push({ ...dc, is_device: true });
+        }
+      });
+    }
+    cachedContacts = combined;
   } catch (err) {}
 }
 
@@ -4869,6 +4886,16 @@ function setupContactsAutocomplete() {
       } catch (err) {}
     }, 200);
   };
+
+  input.onfocus = () => {
+    if (!input.value.trim() && cachedContacts && cachedContacts.length > 0) {
+      renderPickerMatches(cachedContacts.slice(0, 5));
+    }
+  };
+
+  input.addEventListener('blur', () => {
+    setTimeout(() => { if (picker) picker.style.display = 'none'; }, 250);
+  });
 }
 
 function selectContactRecipient(recipient) {

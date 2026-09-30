@@ -623,6 +623,26 @@ router.post('/emails/send', async (req, res) => {
       conversationId: conversationId || null
     });
 
+    // Automatically record recipient(s) in sender's personal contacts
+    try {
+      const rawRecList = Array.isArray(rawRecipients) ? rawRecipients : [rawRecipients];
+      for (const rec of rawRecList) {
+        const parsed = emailService.parseAddress(rec);
+        const recPhone = parsed.phone || (String(rec).replace(/\D/g, '').slice(-10));
+        const contactId = 'uc_' + cleanSender + '_' + (recPhone || parsed.email || Date.now());
+        await dbOps.execute(`
+          INSERT INTO user_contacts (id, user_phone, contact_phone, contact_email, contact_name)
+          VALUES (?, ?, ?, ?, ?)
+          ON DUPLICATE KEY UPDATE contact_name = COALESCE(VALUES(contact_name), contact_name)
+        `, [contactId, cleanSender, (recPhone && recPhone.length === 10) ? recPhone : null, parsed.email || null, parsed.name || null]).catch(async () => {
+          await dbOps.execute(`
+            INSERT OR REPLACE INTO user_contacts (id, user_phone, contact_phone, contact_email, contact_name)
+            VALUES (?, ?, ?, ?, ?)
+          `, [contactId, cleanSender, (recPhone && recPhone.length === 10) ? recPhone : null, parsed.email || null, parsed.name || null]).catch(() => {});
+        });
+      }
+    } catch (_) {}
+
     let smsDispatched = false;
     let smsDetails = null;
 
@@ -1040,7 +1060,8 @@ router.post('/emails/heal-truncated', async (req, res) => {
 });
 
 /**
- * User Network Contacts (Returns registered INAI users and past email contacts for instant autocomplete)
+ * User Personal Contacts (Returns ONLY contacts belonging to the requesting user: past conversations, emails, and address book)
+ * IMPORTANT: Strictly scopes to the requesting user's contacts. NEVER leaks the global users table.
  */
 router.get('/contacts', async (req, res) => {
   try {
@@ -1048,108 +1069,225 @@ router.get('/contacts', async (req, res) => {
     const cleanPhone = String(currentPhone).replace(/\D/g, '').slice(-10);
     const q = (req.query.q || '').trim();
 
-    if (q.length >= 1) {
-      // User is typing phone or name in compose
-      const searchPattern = `%${q}%`;
-      const contacts = await dbOps.queryAll(`
-        SELECT id, phone_number, email_address, display_name, registration_channel
-        FROM users 
-        WHERE phone_number != ? 
-          AND (phone_number LIKE ? OR display_name LIKE ? OR email_address LIKE ?)
-        ORDER BY created_at DESC LIMIT 15
-      `, [cleanPhone, searchPattern, searchPattern, searchPattern]);
+    // Privacy rule: Only authenticated users can see their own contacts.
+    // If phone is missing or invalid, return empty list.
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      return res.json({ contacts: [], message: 'Valid phone required' });
+    }
 
-      // Also search past sent and received emails to discover any contacts
+    // Map of unique contact key -> contact object
+    const contactMap = new Map();
+
+    // Helper: Ingest contact from phone/email string safely
+    const ingestContact = (rawStr, source) => {
+      const str = String(rawStr || '').trim();
+      if (!str) return;
+
+      const angleMatch = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>/);
+      let displayName = angleMatch && angleMatch[1] ? angleMatch[1].trim() : null;
+      const address = angleMatch ? angleMatch[2].trim() : str.replace(/^[<"']+|[>"']+$/g, '').trim();
+
+      if (address.includes('@')) {
+        const [local, domain] = address.split('@');
+        const localDigits = (local || '').replace(/\D/g, '').slice(-10);
+        const isOurDomain = (domain || '').includes('alphastack.wwisvnr.com') || (domain || '').includes('hostingersite.com') || (domain || '').includes('phonemail.com');
+
+        if (localDigits && localDigits.length === 10 && localDigits !== cleanPhone) {
+          if (!contactMap.has(localDigits)) {
+            contactMap.set(localDigits, {
+              phone_number: localDigits,
+              email_address: `${localDigits}@${config.domainName || 'alphastack.wwisvnr.com'}`,
+              display_name: displayName && !/^User\s*\d+/i.test(displayName) ? displayName : `+91 ${localDigits.slice(0, 5)} ${localDigits.slice(5)}`,
+              registration_channel: 'SAVED_CONTACT',
+              source
+            });
+          }
+        } else if (!address.toLowerCase().includes(cleanPhone)) {
+          const cleanEmail = address.toLowerCase();
+          if (!contactMap.has(cleanEmail)) {
+            contactMap.set(cleanEmail, {
+              id: 'ext_' + Buffer.from(cleanEmail).toString('hex').slice(0, 10),
+              phone_number: cleanEmail,
+              email_address: cleanEmail,
+              display_name: displayName || local,
+              registration_channel: 'EXTERNAL_EMAIL',
+              is_external: !isOurDomain,
+              source
+            });
+          }
+        }
+      } else {
+        const digits = address.replace(/\D/g, '').slice(-10);
+        if (digits && digits.length === 10 && digits !== cleanPhone) {
+          if (!contactMap.has(digits)) {
+            contactMap.set(digits, {
+              phone_number: digits,
+              email_address: `${digits}@${config.domainName || 'alphastack.wwisvnr.com'}`,
+              display_name: displayName && !/^User\s*\d+/i.test(displayName) ? displayName : `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`,
+              registration_channel: 'SAVED_CONTACT',
+              source
+            });
+          }
+        }
+      }
+    };
+
+    // 1. Fetch from conversation_participants for cleanPhone
+    try {
+      const convParticipants = await dbOps.queryAll(`
+        SELECT DISTINCT cp2.phone_number
+        FROM conversation_participants cp1
+        JOIN conversation_participants cp2 ON cp1.conversation_id = cp2.conversation_id
+        WHERE (cp1.phone_number = ? OR cp1.phone_number LIKE ?)
+          AND (cp2.phone_number != ? AND cp2.phone_number NOT LIKE ?)
+      `, [cleanPhone, `%${cleanPhone}%`, cleanPhone, `%${cleanPhone}%`]);
+
+      for (const cp of convParticipants) {
+        ingestContact(cp.phone_number, 'CONVERSATION');
+      }
+    } catch (e) {
+      console.warn('Contacts convParticipants error:', e.message);
+    }
+
+    // 2. Fetch from conversations table (participant_phone)
+    try {
+      const convOwners = await dbOps.queryAll(`
+        SELECT DISTINCT c.participant_phone
+        FROM conversations c
+        JOIN conversation_participants cp ON c.id = cp.conversation_id
+        WHERE (cp.phone_number = ? OR cp.phone_number LIKE ?)
+          AND c.participant_phone IS NOT NULL
+          AND c.participant_phone != ''
+          AND c.participant_phone != ?
+          AND c.participant_phone NOT LIKE ?
+      `, [cleanPhone, `%${cleanPhone}%`, cleanPhone, `%${cleanPhone}%`]);
+
+      for (const co of convOwners) {
+        ingestContact(co.participant_phone, 'CONVERSATION');
+      }
+    } catch (e) {
+      console.warn('Contacts convOwners error:', e.message);
+    }
+
+    // 3. Fetch from past emails sent to or received by cleanPhone
+    try {
+      const pastEmails = await dbOps.queryAll(`
+        SELECT recipient_emails, sender_email FROM emails 
+        WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
+        ORDER BY created_at DESC LIMIT 100
+      `, [`%${cleanPhone}%`, `%${cleanPhone}%`]);
+
+      for (const pe of pastEmails) {
+        let list = [];
+        try {
+          list = typeof pe.recipient_emails === 'string' ? JSON.parse(pe.recipient_emails) : pe.recipient_emails;
+        } catch (_) {
+          list = [pe.recipient_emails];
+        }
+        if (!Array.isArray(list)) list = [list];
+        if (pe.sender_email) list.push(pe.sender_email);
+
+        for (const item of list) {
+          ingestContact(item, 'EMAIL');
+        }
+      }
+    } catch (e) {
+      console.warn('Contacts pastEmails error:', e.message);
+    }
+
+    // 4. Fetch from user_contacts table
+    try {
+      const savedContacts = await dbOps.queryAll(`
+        SELECT contact_phone, contact_email, contact_name 
+        FROM user_contacts 
+        WHERE user_phone = ?
+      `, [cleanPhone]);
+
+      for (const sc of (savedContacts || [])) {
+        if (sc.contact_phone) {
+          const digits = String(sc.contact_phone).replace(/\D/g, '').slice(-10);
+          if (digits && digits.length === 10 && digits !== cleanPhone) {
+            const existing = contactMap.get(digits) || {};
+            contactMap.set(digits, {
+              ...existing,
+              phone_number: digits,
+              email_address: sc.contact_email || existing.email_address || `${digits}@${config.domainName || 'alphastack.wwisvnr.com'}`,
+              display_name: sc.contact_name || existing.display_name || `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`,
+              registration_channel: 'SAVED_CONTACT',
+              source: 'USER_CONTACTS'
+            });
+          }
+        } else if (sc.contact_email) {
+          const cleanEmail = String(sc.contact_email).trim().toLowerCase();
+          const existing = contactMap.get(cleanEmail) || {};
+          contactMap.set(cleanEmail, {
+            ...existing,
+            id: 'ext_' + Buffer.from(cleanEmail).toString('hex').slice(0, 10),
+            phone_number: cleanEmail,
+            email_address: cleanEmail,
+            display_name: sc.contact_name || existing.display_name || cleanEmail.split('@')[0],
+            registration_channel: 'EXTERNAL_EMAIL',
+            is_external: true,
+            source: 'USER_CONTACTS'
+          });
+        }
+      }
+    } catch (e) {}
+
+    // 5. Enrich phone numbers with registered profile details (display_name, avatar_url)
+    // NOTE: This query ONLY checks the specific phone numbers of the user's contacts.
+    // It NEVER fetches or reveals unassociated platform users.
+    const phoneKeys = Array.from(contactMap.keys()).filter(k => /^\d{10}$/.test(k));
+    if (phoneKeys.length > 0) {
       try {
-        const pastEmails = await dbOps.queryAll(`
-          SELECT recipient_emails, sender_email FROM emails 
-          WHERE (recipient_emails LIKE ? OR sender_email LIKE ?) 
-          ORDER BY created_at DESC LIMIT 20
-        `, [searchPattern, searchPattern]);
+        const placeholders = phoneKeys.map(() => '?').join(',');
+        const matchedUsers = await dbOps.queryAll(`
+          SELECT id, phone_number, email_address, display_name, avatar_url, registration_channel
+          FROM users
+          WHERE phone_number IN (${placeholders})
+        `, phoneKeys);
 
-        for (const pe of pastEmails) {
-          let list = [];
-          try {
-            list = typeof pe.recipient_emails === 'string' ? JSON.parse(pe.recipient_emails) : pe.recipient_emails;
-          } catch (_) {
-            list = [pe.recipient_emails];
-          }
-          if (!Array.isArray(list)) list = [list];
-          if (pe.sender_email) list.push(pe.sender_email);
-
-          for (const item of list) {
-            const str = String(item || '').trim();
-            const digits = str.replace(/\D/g, '').slice(-10);
-            if (digits && digits.length === 10 && digits !== cleanPhone) {
-              const alreadyHas = contacts.some(c => String(c.phone_number || '').replace(/\D/g, '').slice(-10) === digits);
-              if (!alreadyHas) {
-                let userRow = await dbOps.queryOne('SELECT id, phone_number, email_address, display_name, registration_channel FROM users WHERE phone_number LIKE ?', [`%${digits}%`]);
-                if (!userRow) {
-                  let dName = `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
-                  const angle = str.match(/^(?:"?([^"@<]+)"?\s*)?<([^>]+)>/);
-                  if (angle && angle[1] && !/^User\s*\d+/i.test(angle[1])) dName = angle[1].trim();
-
-                  const newId = 'user_' + digits;
-                  const newEmail = `${digits}@${config.domainName || 'alphastack.wwisvnr.com'}`;
-                  await dbOps.execute(`
-                    INSERT INTO users (id, phone_number, email_address, display_name, registration_channel, has_mobile_app)
-                    VALUES (?, ?, ?, ?, 'SAVED_CONTACT', 1)
-                  `, [newId, digits, newEmail, dName]).catch(() => {});
-
-                  userRow = {
-                    id: newId,
-                    phone_number: digits,
-                    email_address: newEmail,
-                    display_name: dName,
-                    registration_channel: 'SAVED_CONTACT'
-                  };
-                }
-                contacts.push(userRow);
-              }
-            } else if (str.includes('@') && !str.includes('alphastack.wwisvnr.com')) {
-              const cleanExt = str.replace(/^[<"']+|[>"']+$/g, '').trim();
-              if (cleanExt && !contacts.some(c => c.email_address === cleanExt || c.phone_number === cleanExt)) {
-                contacts.push({
-                  id: 'ext_' + Buffer.from(cleanExt).toString('hex').slice(0, 10),
-                  phone_number: cleanExt,
-                  email_address: cleanExt,
-                  display_name: cleanExt.split('@')[0],
-                  registration_channel: 'EXTERNAL_EMAIL',
-                  is_external: true
-                });
-              }
+        for (const u of (matchedUsers || [])) {
+          const digits = String(u.phone_number || '').replace(/\D/g, '').slice(-10);
+          if (contactMap.has(digits)) {
+            const existing = contactMap.get(digits);
+            let finalName = existing.display_name;
+            if (u.display_name && !/^User\s*\d+/i.test(u.display_name)) {
+              finalName = u.display_name;
             }
+            contactMap.set(digits, {
+              ...existing,
+              id: u.id,
+              phone_number: digits,
+              email_address: u.email_address || existing.email_address,
+              display_name: finalName,
+              avatar_url: u.avatar_url || null,
+              registration_channel: u.registration_channel || existing.registration_channel,
+              is_registered: true
+            });
           }
         }
-      } catch (e) {}
-
-      // Enrich contacts so display_name is never raw 'User XXXXXXXXXX'
-      for (const c of contacts) {
-        if (c.phone_number && (!c.display_name || /^User\s*\d+/i.test(c.display_name))) {
-          const cleanP = c.phone_number.replace(/\D/g, '').slice(-10);
-          c.display_name = `+91 ${cleanP.slice(0, 5)} ${cleanP.slice(5)}`;
-        }
-      }
-
-      return res.json({ contacts, isSearch: true });
-    }
-
-    // Default: Return all registered and saved users
-    const contacts = await dbOps.queryAll(`
-      SELECT id, phone_number, email_address, display_name, registration_channel
-      FROM users 
-      WHERE phone_number != ?
-      ORDER BY created_at DESC LIMIT 30
-    `, [cleanPhone]);
-
-    for (const c of contacts) {
-      if (c.phone_number && (!c.display_name || /^User\s*\d+/i.test(c.display_name))) {
-        const cleanP = c.phone_number.replace(/\D/g, '').slice(-10);
-        c.display_name = `+91 ${cleanP.slice(0, 5)} ${cleanP.slice(5)}`;
+      } catch (e) {
+        console.warn('Contacts profile enrichment error:', e.message);
       }
     }
 
-    res.json({ contacts, isRecent: true });
+    let allContacts = Array.from(contactMap.values());
+
+    // 6. If search query is provided, filter strictly WITHIN the user's own contacts
+    if (q.length >= 1) {
+      const qLower = q.toLowerCase();
+      const filtered = allContacts.filter(c => {
+        const name = String(c.display_name || '').toLowerCase();
+        const phone = String(c.phone_number || '').toLowerCase();
+        const email = String(c.email_address || '').toLowerCase();
+        return name.includes(qLower) || phone.includes(qLower) || email.includes(qLower);
+      });
+      return res.json({ contacts: filtered.slice(0, 20), isSearch: true });
+    }
+
+    // Default: Return the user's contacts (no strangers!)
+    res.json({ contacts: allContacts.slice(0, 30), isRecent: true });
 
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1241,6 +1379,27 @@ router.post('/contacts/filter-phonemail', async (req, res) => {
       ...u,
       phone_number: String(u.phone_number || '').replace(/\D/g, '').slice(-10)
     }));
+
+    // If requesting user is known, save these confirmed device contacts to their user_contacts
+    const reqUserPhone = req.body.userPhone || req.body.phone || req.query.phone;
+    const cleanUserPhone = String(reqUserPhone || '').replace(/\D/g, '').slice(-10);
+    if (cleanUserPhone && cleanUserPhone.length === 10) {
+      for (const reg of normalized) {
+        if (reg.phone_number && reg.phone_number !== cleanUserPhone) {
+          const contactId = 'uc_' + cleanUserPhone + '_' + reg.phone_number;
+          await dbOps.execute(`
+            INSERT INTO user_contacts (id, user_phone, contact_phone, contact_email, contact_name)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE contact_name = VALUES(contact_name)
+          `, [contactId, cleanUserPhone, reg.phone_number, reg.email_address, reg.display_name]).catch(async () => {
+            await dbOps.execute(`
+              INSERT OR REPLACE INTO user_contacts (id, user_phone, contact_phone, contact_email, contact_name)
+              VALUES (?, ?, ?, ?, ?)
+            `, [contactId, cleanUserPhone, reg.phone_number, reg.email_address, reg.display_name]).catch(() => {});
+          });
+        }
+      }
+    }
 
     res.json({ registeredContacts: normalized });
   } catch (err) {

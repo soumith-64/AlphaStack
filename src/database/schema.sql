@@ -82,3 +82,13 @@ CREATE TABLE IF NOT EXISTS telephony_logs (
   status VARCHAR(32) DEFAULT 'DELIVERED',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- User Personal Contacts (Scoped per user)
+CREATE TABLE IF NOT EXISTS user_contacts (
+  id VARCHAR(64) PRIMARY KEY,
+  user_phone VARCHAR(32) NOT NULL,
+  contact_phone VARCHAR(32),
+  contact_email VARCHAR(191),
+  contact_name VARCHAR(191),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);

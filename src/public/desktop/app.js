@@ -1533,7 +1533,7 @@ async function syncContactsRealtime(silent = true) {
     const res = await fetch('/api/contacts/filter-phonemail', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phoneNumbers: rawPhones })
+      body: JSON.stringify({ phoneNumbers: rawPhones, userPhone: currentUser ? currentUser.phone : '' })
     });
     const data = await res.json();
     const registered = data.registeredContacts || [];
@@ -3494,7 +3494,7 @@ async function pickDeviceContacts() {
         const res = await fetch('/api/contacts/filter-phonemail', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phoneNumbers: rawPhones })
+          body: JSON.stringify({ phoneNumbers: rawPhones, userPhone: currentUser ? currentUser.phone : '' })
         });
         const data = await res.json();
         const registered = data.registeredContacts || [];
@@ -3528,8 +3528,8 @@ async function pickDeviceContacts() {
   } else {
     // Elegant fallback prompt dialog
     showPromptDialog({
-      title: 'Search PhoneMail Contacts',
-      message: 'Enter a 10-digit mobile number or name to search registered PhoneMail users:',
+      title: 'Search Contacts',
+      message: 'Enter a 10-digit mobile number or name to search your saved contacts:',
       placeholder: 'e.g. 9876543210 or Rahul',
       confirmText: 'Search',
       onConfirm: async (q) => {
@@ -3537,14 +3537,35 @@ async function pickDeviceContacts() {
         try {
           const res = await fetch(`/api/contacts?phone=${currentUser ? currentUser.phone : ''}&q=${encodeURIComponent(q)}`);
           const data = await res.json();
-          const list = data.contacts || [];
+          let list = data.contacts || [];
+
+          // Also match cached device contacts
+          try {
+            const rawCached = localStorage.getItem('phonemail_cached_device_contacts');
+            if (rawCached) {
+              const devList = JSON.parse(rawCached);
+              if (Array.isArray(devList)) {
+                const qLow = q.toLowerCase();
+                devList.forEach(dc => {
+                  const name = (dc.display_name || dc.name || dc.device_name || '').toLowerCase();
+                  const phone = String(dc.phone_number || dc.phone || '');
+                  if (name.includes(qLow) || phone.includes(qLow)) {
+                    if (!list.some(item => String(item.phone_number || '').replace(/\D/g, '').slice(-10) === phone.replace(/\D/g, '').slice(-10))) {
+                      list.push({ ...dc, is_device: true });
+                    }
+                  }
+                });
+              }
+            }
+          } catch (e) {}
+
           if (list.length === 0) {
-            showNotify.info(`No registered PhoneMail user found for "${q}". External email addresses can be entered directly.`, 'No Matches');
+            showNotify.info(`No contact found for "${q}". External email addresses or 10-digit mobile numbers can be entered directly.`, 'No Matches');
           } else if (list.length === 1) {
             if (input) input.value = list[0].phone_number;
             showNotify.success(`Selected ${list[0].display_name} (+91 ${list[0].phone_number})`, 'Contact Selected');
           } else {
-            renderContactsDropdown(list, `Matching Registered Users for "${q}"`);
+            renderContactsDropdown(list, `Matching Contacts for "${q}"`);
           }
         } catch (err) {
           showNotify.error('Failed to search contacts: ' + err.message, 'Search Error');
@@ -3566,7 +3587,7 @@ function setupContactsAutocomplete() {
       if (!currentUser) return;
       const q = query.trim();
 
-      // If search query is >= 2 characters, search registered users
+      // If search query is >= 2 characters, search user's contacts
       if (q.length >= 2) {
         // If it's a full email address (e.g. gmail), no need to search phone numbers
         if (q.includes('@') && (q.endsWith('.com') || q.endsWith('.net') || q.endsWith('.org') || q.endsWith('.in'))) {
@@ -3576,20 +3597,41 @@ function setupContactsAutocomplete() {
 
         const res = await fetch(`/api/contacts?phone=${currentUser.phone}&q=${encodeURIComponent(q)}`);
         const data = await res.json();
-        const matches = data.contacts || [];
+        let matches = data.contacts || [];
+
+        // Also match cached device contacts from localStorage
+        try {
+          const rawCached = localStorage.getItem('phonemail_cached_device_contacts');
+          if (rawCached) {
+            const devList = JSON.parse(rawCached);
+            if (Array.isArray(devList)) {
+              const qLow = q.toLowerCase();
+              devList.forEach(dc => {
+                const name = (dc.display_name || dc.name || dc.device_name || '').toLowerCase();
+                const phone = String(dc.phone_number || dc.phone || '');
+                const em = String(dc.email_address || dc.email || '').toLowerCase();
+                if (name.includes(qLow) || phone.includes(qLow) || em.includes(qLow)) {
+                  if (!matches.some(m => String(m.phone_number || '').replace(/\D/g, '').slice(-10) === phone.replace(/\D/g, '').slice(-10))) {
+                    matches.push({ ...dc, is_device: true });
+                  }
+                }
+              });
+            }
+          }
+        } catch (e) {}
 
         if (matches.length === 0) {
           dropdown.innerHTML = `
             <div class="contacts-autocomplete-header" style="color: var(--text-dim); font-size: 11px; font-weight: normal; padding: 10px;">
-              No registered PhoneMail users matching "${escapeHtml(q)}".<br>
-              <span style="color: var(--green-main); font-size: 11px;">External emails (e.g. @gmail.com) can be entered directly.</span>
+              No saved contacts matching "${escapeHtml(q)}".<br>
+              <span style="color: var(--green-main); font-size: 11px;">External emails (e.g. @gmail.com) or 10-digit mobile numbers can be entered directly.</span>
             </div>
           `;
           dropdown.style.display = 'block';
           return;
         }
 
-        renderContactsDropdown(matches, 'Registered PhoneMail Users');
+        renderContactsDropdown(matches, 'Saved Contacts');
         return;
       }
 
@@ -3607,7 +3649,8 @@ function setupContactsAutocomplete() {
           const deviceList = JSON.parse(rawCached);
           if (Array.isArray(deviceList)) {
             deviceList.forEach(dc => {
-              if (!combined.some(item => item.phone_number === dc.phone_number)) {
+              const dcPhone = String(dc.phone_number || dc.phone || '').replace(/\D/g, '').slice(-10);
+              if (dcPhone && !combined.some(item => String(item.phone_number || item.phone || '').replace(/\D/g, '').slice(-10) === dcPhone)) {
                 combined.push({
                   ...dc,
                   is_device: true
@@ -3623,7 +3666,7 @@ function setupContactsAutocomplete() {
         return;
       }
 
-      renderContactsDropdown(combined, 'Recent & Synced Device Contacts');
+      renderContactsDropdown(combined, 'Recent & Synced Contacts');
     } catch (err) {
       console.warn('Failed to load contacts for autocomplete:', err);
     }
