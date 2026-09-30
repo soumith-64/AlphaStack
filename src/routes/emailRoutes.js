@@ -30,15 +30,16 @@ router.get('/conversations', async (req, res) => {
           (SELECT phone_number FROM conversation_participants WHERE conversation_id = c.id AND phone_number NOT LIKE ? LIMIT 1),
           c.participant_phone
         ) as participant_phone,
-        (SELECT body_text FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT sender_email FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_sender,
-        (SELECT subject FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_subject,
-        (SELECT created_at FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_time,
-        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id AND is_read = 0 AND sender_email NOT LIKE ?) as unread_count,
-        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id) as message_count,
-        (SELECT MAX(is_starred) FROM emails WHERE conversation_id = c.id) as is_starred,
-        (SELECT MAX(is_important) FROM emails WHERE conversation_id = c.id) as is_important,
-        (SELECT folder FROM emails WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as folder
+        (SELECT body_text FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL) ORDER BY created_at DESC LIMIT 1) as last_message,
+        (SELECT sender_email FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL) ORDER BY created_at DESC LIMIT 1) as last_sender,
+        (SELECT subject FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL) ORDER BY created_at DESC LIMIT 1) as last_subject,
+        (SELECT created_at FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL) ORDER BY created_at DESC LIMIT 1) as last_time,
+        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id AND is_read = 0 AND (folder != 'TRASH' OR folder IS NULL) AND sender_email NOT LIKE ?) as unread_count,
+        (SELECT COUNT(*) FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL)) as message_count,
+        (SELECT MAX(is_starred) FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL)) as is_starred,
+        (SELECT MAX(is_important) FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL)) as is_important,
+        (SELECT MAX(is_pinned) FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL)) as is_pinned,
+        (SELECT folder FROM emails WHERE conversation_id = c.id AND (folder != 'TRASH' OR folder IS NULL) ORDER BY created_at DESC LIMIT 1) as folder
       FROM conversations c
       JOIN conversation_participants cp ON c.id = cp.conversation_id
       WHERE ${whereClause}
@@ -74,7 +75,8 @@ router.get('/conversations', async (req, res) => {
       }
     } catch (uErr) {}
 
-    res.json({ conversations });
+    const validConversations = conversations.filter(c => Number(c.message_count || 0) > 0);
+    res.json({ conversations: validConversations });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -104,9 +106,10 @@ router.get('/conversations/:id', async (req, res) => {
       }
     }
 
+    const folderFilter = req.query.folder === 'TRASH' ? "folder = 'TRASH'" : "(folder != 'TRASH' OR folder IS NULL)";
     const messages = await dbOps.queryAll(`
       SELECT * FROM emails 
-      WHERE conversation_id = ? 
+      WHERE conversation_id = ? AND ${folderFilter}
       ORDER BY created_at ASC
     `, [id]);
 
@@ -999,6 +1002,65 @@ router.post('/emails/:id/move', async (req, res) => {
 
     await dbOps.execute('UPDATE emails SET folder = ? WHERE id = ?', [folder.toUpperCase(), id]);
     res.json({ success: true, folder: folder.toUpperCase() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Pin or Unpin an email
+ */
+router.post('/emails/:id/pin', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const email = await dbOps.queryOne('SELECT id, is_pinned, conversation_id FROM emails WHERE id = ?', [id]);
+    if (!email) return res.status(404).json({ error: 'Email not found' });
+
+    const newPinned = typeof req.body.pinned !== 'undefined' 
+      ? (req.body.pinned ? 1 : 0) 
+      : (email.is_pinned ? 0 : 1);
+
+    await dbOps.execute('UPDATE emails SET is_pinned = ? WHERE id = ?', [newPinned, id]);
+    res.json({ success: true, id, is_pinned: newPinned, conversation_id: email.conversation_id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Edit email message content (WhatsApp-style inline message editing)
+ */
+router.post('/emails/:id/edit', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { bodyText, bodyHtml } = req.body;
+    if (typeof bodyText === 'undefined' && typeof bodyHtml === 'undefined') {
+      return res.status(400).json({ error: 'bodyText or bodyHtml is required' });
+    }
+
+    const email = await dbOps.queryOne('SELECT id, body_text, body_html, conversation_id FROM emails WHERE id = ?', [id]);
+    if (!email) return res.status(404).json({ error: 'Email not found' });
+
+    const newText = (bodyText || '').trim();
+    const newHtml = bodyHtml || (newText ? `<div>${newText.replace(/\n/g, '<br>')}</div>` : '');
+
+    const encText = cryptoService.encrypt(newText);
+    const encHtml = cryptoService.encrypt(newHtml);
+
+    await dbOps.execute(`
+      UPDATE emails 
+      SET body_text = ?, body_html = ?, is_edited = 1 
+      WHERE id = ?
+    `, [encText, encHtml, id]);
+
+    res.json({ 
+      success: true, 
+      id, 
+      body_text: newText, 
+      body_html: newHtml, 
+      is_edited: 1,
+      conversation_id: email.conversation_id 
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

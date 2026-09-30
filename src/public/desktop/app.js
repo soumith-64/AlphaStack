@@ -2769,14 +2769,22 @@ function createEmailRowElement(email) {
     </div>
     <div class="item-content-preview">
       ${sourceBadgeHtml}
+      ${email.is_pinned === 1 ? '<span title="Pinned mail" style="color: #059669; font-weight: 700; margin-right: 5px;">📌</span>' : ''}
       ${isImportant ? '<span style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 800; color: #e11d48; background: #ffe4e6; padding: 1px 6px; border-radius: 4px; margin-right: 4px;"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>PRIORITY</span>' : ''}
       <span class="item-subject-title">${escapeHtml(email.subject || '(No Subject)')}</span>
+      ${email.is_edited === 1 ? '<span style="font-size: 11px; font-style: italic; color: var(--text-dim); margin-left: 4px;">(edited)</span>' : ''}
       <span class="item-body-snippet"> — ${escapeHtml(cleanBodySnippet)}</span>
     </div>
     <div class="item-date-col">${timeDisplay}</div>
 
     <!-- Desktop Hover Actions -->
     <div class="row-quick-actions" onclick="event.stopPropagation()">
+      <button class="quick-action-btn" onclick="togglePinDesktopEmail('${email.id}', event)" title="${email.is_pinned === 1 ? 'Unpin Mail' : 'Pin Mail'}">
+        <span style="font-size: 13px;">${email.is_pinned === 1 ? '📍' : '📌'}</span>
+      </button>
+      <button class="quick-action-btn" onclick="openEditDesktopEmailModal('${email.id}', event)" title="Edit Mail">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
       <button class="quick-action-btn" onclick="toggleReadStatus('${email.id}', event)" title="${email.is_read === 0 ? 'Mark as Read' : 'Mark as Unread'}">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
           ${email.is_read === 0 
@@ -2967,6 +2975,23 @@ function renderDesktopEmailReadingView(email) {
   if (!container) return;
   container.innerHTML = '';
 
+  // Sticky Pinned Email Banner
+  if (email.is_pinned === 1) {
+    const banner = document.createElement('div');
+    banner.className = 'whatsapp-desktop-pinned-banner';
+    banner.id = `desktop-pinned-banner-${email.id}`;
+    banner.innerHTML = `
+      <span style="font-size: 15px;">📌</span>
+      <span style="font-weight: 700; color: #059669; font-size: 13px;">PINNED MAIL</span>
+      <span style="color: var(--text-dim); margin: 0 4px;">•</span>
+      <span style="color: var(--text-dim); font-size: 12.5px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        ${escapeHtml((email.subject || email.body_text || 'Pinned Mail').substring(0, 90))}
+      </span>
+      <button type="button" onclick="togglePinDesktopEmail('${email.id}', event)" style="background: transparent; border: none; cursor: pointer; color: var(--text-muted); font-size: 14px; padding: 2px 6px;" title="Unpin this mail">✕</button>
+    `;
+    container.appendChild(banner);
+  }
+
   const isSentByMe = Boolean(email.sender_email && currentUser && email.sender_email.includes(currentUser.phone));
   const formattedSender = formatSenderDisplay(email.sender_email, false, email.sender_name);
   const timeDisplay = new Date(email.created_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
@@ -3105,6 +3130,11 @@ function renderDesktopEmailReadingView(email) {
                 : '<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>External Provider</span>'
               }
             </span>
+            ${email.is_pinned === 1 ? `
+              <span class="badge-source-tag" style="background: rgba(5, 150, 105, 0.12); color: #059669; border: 1px solid rgba(5, 150, 105, 0.3); font-weight: 700; padding: 2px 7px; border-radius: 6px; font-size: 11px;">
+                <span>📌 Pinned</span>
+              </span>
+            ` : ''}
             <span class="badge-source-tag badge-encrypted-pill" onclick="showEncryptionDetails('${escapeHtml(email.security_fingerprint || 'INAI-SEC-AES256')}', event)" title="Protected with AES-256-GCM authenticated payload encryption & TLS 1.3 transport. Tap for cryptographic certificate.">
               <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 2px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
               <span>AES-256 Encrypted</span>
@@ -3112,6 +3142,7 @@ function renderDesktopEmailReadingView(email) {
           </div>
           <div class="thread-time" style="display: flex; align-items: center; gap: 8px;">
             <span>${timeDisplay}</span>
+            ${email.is_edited === 1 ? '<span style="font-size: 11px; font-style: italic; color: var(--text-dim);">(edited)</span>' : ''}
             <span style="color: var(--text-dim); font-size: 11px;">To: ${escapeHtml(getRecipientsDisplay(email) || 'Me')}</span>
           </div>
         </div>
@@ -3125,6 +3156,18 @@ function renderDesktopEmailReadingView(email) {
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
           <span>Forward</span>
         </button>
+        <button type="button" class="btn-card-action ${email.is_pinned === 1 ? 'pinned' : ''}" onclick="togglePinDesktopEmail('${email.id}', event)" title="${email.is_pinned === 1 ? 'Unpin mail' : 'Pin mail'}">
+          <span style="font-size: 13px;">${email.is_pinned === 1 ? '📍' : '📌'}</span>
+          <span>${email.is_pinned === 1 ? 'Unpin' : 'Pin'}</span>
+        </button>
+        <button type="button" class="btn-card-action" onclick="openEditDesktopEmailModal('${email.id}', event)" title="Edit mail body">
+          <span style="font-size: 13px;">✏️</span>
+          <span>Edit</span>
+        </button>
+        <button type="button" class="btn-card-action danger-action" onclick="confirmDeleteDesktopEmail('${email.id}', event)" title="Delete mail">
+          <span style="font-size: 13px;">🗑️</span>
+          <span>Delete</span>
+        </button>
       </div>
     </div>
     <div class="thread-card-body" style="margin-top: 14px; font-size: 14px; line-height: 1.6; color: var(--text-main);">
@@ -3134,7 +3177,309 @@ function renderDesktopEmailReadingView(email) {
     ${attachmentsHtml}
   `;
 
+  // WhatsApp-style context menu on clicking card (excluding controls)
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('button, a, audio, .voice-waveform-area, .voice-speed-chip, .voice-play-toggle, .btn-card-action, .thread-avatar, .badge-encrypted-pill')) {
+      return;
+    }
+    openWhatsAppDesktopEmailMenu(email.id, e);
+  });
+
   container.appendChild(card);
+}
+
+// ==================== WHATSAPP-GRADE DESKTOP MAIL INTERACTIONS (PIN, EDIT, DELETE) ====================
+
+function openWhatsAppDesktopEmailMenu(emailId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  const email = allEmails.find(e => String(e.id) === String(emailId)) || (activeEmail && String(activeEmail.id) === String(emailId) ? activeEmail : null);
+  if (!email) return;
+
+  closeWhatsAppDesktopEmailMenu();
+
+  const isPinned = email.is_pinned === 1;
+  let previewText = (email.body_text || email.body_html || email.subject || 'Email message')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (previewText.length > 55) {
+    previewText = previewText.substring(0, 52) + '...';
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whatsapp-msg-overlay active';
+  overlay.id = 'whatsapp-desktop-msg-overlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeWhatsAppDesktopEmailMenu();
+  };
+  overlay.innerHTML = `
+    <div class="whatsapp-msg-sheet" onclick="event.stopPropagation()">
+      <div class="whatsapp-sheet-preview">${escapeHtml(previewText)}</div>
+      <button type="button" class="whatsapp-menu-item" onclick="togglePinDesktopEmail('${email.id}', event)">
+        <span class="whatsapp-menu-item-icon">${isPinned ? '📍' : '📌'}</span>
+        <span>${isPinned ? 'Unpin mail' : 'Pin mail'}</span>
+      </button>
+      <button type="button" class="whatsapp-menu-item" onclick="openEditDesktopEmailModal('${email.id}', event)">
+        <span class="whatsapp-menu-item-icon">✏️</span>
+        <span>Edit mail</span>
+      </button>
+      <button type="button" class="whatsapp-menu-item danger" onclick="confirmDeleteDesktopEmail('${email.id}', event)">
+        <span class="whatsapp-menu-item-icon">🗑️</span>
+        <span>Delete mail</span>
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeWhatsAppDesktopEmailMenu() {
+  const overlay = document.getElementById('whatsapp-desktop-msg-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 220);
+}
+
+async function togglePinDesktopEmail(id, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  closeWhatsAppDesktopEmailMenu();
+  try {
+    const res = await fetch(`/api/emails/${id}/pin`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      allEmails.forEach(e => {
+        if (String(e.id) === String(id)) e.is_pinned = data.is_pinned;
+      });
+      if (activeEmail && String(activeEmail.id) === String(id)) {
+        activeEmail.is_pinned = data.is_pinned;
+        renderDesktopEmailReadingView(activeEmail);
+      }
+      renderEmailList(allEmails);
+      if (window.showNotify && window.showNotify.info) {
+        window.showNotify.info(data.is_pinned ? 'Mail pinned 📌' : 'Mail unpinned 📍', 'Pin Status');
+      }
+    } else {
+      if (window.showNotify && window.showNotify.error) {
+        window.showNotify.error(data.error || 'Failed to update pin', 'Error');
+      }
+    }
+  } catch (err) {
+    console.error('Error toggling pin:', err);
+    if (window.showNotify && window.showNotify.error) {
+      window.showNotify.error('Failed to update pin: ' + err.message, 'Network Error');
+    }
+  }
+}
+
+function openEditDesktopEmailModal(id, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  closeWhatsAppDesktopEmailMenu();
+  const email = allEmails.find(e => String(e.id) === String(id)) || (activeEmail && String(activeEmail.id) === String(id) ? activeEmail : null);
+  if (!email) return;
+
+  const existing = document.getElementById('whatsapp-desktop-edit-overlay');
+  if (existing) existing.remove();
+
+  let plainText = (email.body_text || '').replace(/\[image:[^\]]*\]/gi, '').trim();
+  if (!plainText && email.body_html) {
+    plainText = email.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whatsapp-edit-overlay active';
+  overlay.id = 'whatsapp-desktop-edit-overlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeEditDesktopEmailModal();
+  };
+  overlay.innerHTML = `
+    <div class="whatsapp-edit-card" onclick="event.stopPropagation()">
+      <div class="whatsapp-edit-header">
+        <div class="whatsapp-edit-title">
+          <span>✏️</span>
+          <span>Edit Mail</span>
+        </div>
+        <button type="button" class="whatsapp-edit-close" onclick="closeEditDesktopEmailModal(event)">✕</button>
+      </div>
+      <div class="whatsapp-edit-body">
+        <div class="whatsapp-edit-subtext">Update message content for this mail. Changes are saved securely.</div>
+        <textarea class="whatsapp-edit-textarea" id="whatsapp-desktop-edit-textarea" rows="5" placeholder="Enter updated email content...">${escapeHtml(plainText)}</textarea>
+      </div>
+      <div class="whatsapp-edit-footer">
+        <button type="button" class="whatsapp-btn-cancel" onclick="closeEditDesktopEmailModal(event)">Cancel</button>
+        <button type="button" class="whatsapp-btn-save" id="whatsapp-desktop-btn-save-${id}" onclick="saveEditedDesktopEmail('${id}')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Save Changes</span>
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => {
+    const ta = document.getElementById('whatsapp-desktop-edit-textarea');
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }, 100);
+}
+
+function closeEditDesktopEmailModal() {
+  const overlay = document.getElementById('whatsapp-desktop-edit-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 220);
+}
+
+async function saveEditedDesktopEmail(id) {
+  const ta = document.getElementById('whatsapp-desktop-edit-textarea');
+  if (!ta) return;
+  const newText = ta.value.trim();
+  if (!newText) {
+    if (window.showNotify && window.showNotify.warning) {
+      window.showNotify.warning('Email content cannot be empty', 'Empty Message');
+    }
+    return;
+  }
+
+  const saveBtn = document.getElementById(`whatsapp-desktop-btn-save-${id}`);
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span>Saving...</span>';
+  }
+
+  try {
+    const res = await fetch(`/api/emails/${id}/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bodyText: newText,
+        bodyHtml: `<p>${escapeHtml(newText).replace(/\n/g, '<br>')}</p>`
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      allEmails.forEach(e => {
+        if (String(e.id) === String(id)) {
+          e.body_text = newText;
+          e.body_html = `<p>${escapeHtml(newText).replace(/\n/g, '<br>')}</p>`;
+          e.is_edited = 1;
+        }
+      });
+      if (activeEmail && String(activeEmail.id) === String(id)) {
+        activeEmail.body_text = newText;
+        activeEmail.body_html = `<p>${escapeHtml(newText).replace(/\n/g, '<br>')}</p>`;
+        activeEmail.is_edited = 1;
+        renderDesktopEmailReadingView(activeEmail);
+      }
+      renderEmailList(allEmails);
+      closeEditDesktopEmailModal();
+      if (window.showNotify && window.showNotify.success) {
+        window.showNotify.success('Mail updated successfully ✓', 'Mail Saved');
+      }
+    } else {
+      if (window.showNotify && window.showNotify.error) {
+        window.showNotify.error(data.error || 'Failed to edit mail', 'Save Error');
+      }
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span>Save Changes</span>';
+      }
+    }
+  } catch (err) {
+    console.error('Error saving edited email:', err);
+    if (window.showNotify && window.showNotify.error) {
+      window.showNotify.error('Error saving mail: ' + err.message, 'Save Error');
+    }
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<span>Save Changes</span>';
+    }
+  }
+}
+
+function confirmDeleteDesktopEmail(id, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  closeWhatsAppDesktopEmailMenu();
+
+  const existing = document.getElementById('whatsapp-desktop-delete-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whatsapp-delete-overlay active';
+  overlay.id = 'whatsapp-desktop-delete-overlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeDeleteDesktopEmailModal();
+  };
+  overlay.innerHTML = `
+    <div class="whatsapp-delete-card" onclick="event.stopPropagation()">
+      <div class="whatsapp-delete-icon">🗑️</div>
+      <div class="whatsapp-delete-title">Delete Mail?</div>
+      <div class="whatsapp-delete-body">This mail will be removed and moved to your Trash folder.</div>
+      <div class="whatsapp-delete-actions">
+        <button type="button" class="whatsapp-btn-del-cancel" onclick="closeDeleteDesktopEmailModal(event)">Cancel</button>
+        <button type="button" class="whatsapp-btn-del-confirm" onclick="executeDeleteDesktopEmail('${id}')">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeDeleteDesktopEmailModal() {
+  const overlay = document.getElementById('whatsapp-desktop-delete-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 220);
+}
+
+async function executeDeleteDesktopEmail(id) {
+  closeDeleteDesktopEmailModal();
+  try {
+    const cardEl = document.getElementById(`email-view-card-${id}`);
+    if (cardEl) {
+      cardEl.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'translateY(-10px) scale(0.95)';
+    }
+
+    const res = await fetch(`/api/emails/${id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      allEmails = allEmails.filter(e => String(e.id) !== String(id));
+      if (emailFolderCache[currentFolder]) {
+        emailFolderCache[currentFolder] = emailFolderCache[currentFolder].filter(e => String(e.id) !== String(id));
+      }
+      setTimeout(() => {
+        if (activeEmail && String(activeEmail.id) === String(id)) {
+          closeReadingPane();
+        }
+        renderEmailList(allEmails);
+        updateFolderCountsFromList(allEmails);
+      }, 250);
+      if (window.showNotify && window.showNotify.info) {
+        window.showNotify.info('Mail moved to Trash 🗑️', 'Deleted');
+      }
+    } else {
+      if (window.showNotify && window.showNotify.error) {
+        window.showNotify.error(data.error || 'Failed to delete mail', 'Delete Error');
+      }
+    }
+  } catch (err) {
+    console.error('Error deleting mail:', err);
+    if (window.showNotify && window.showNotify.error) {
+      window.showNotify.error('Error deleting mail: ' + err.message, 'Delete Error');
+    }
+  }
 }
 
 function showEncryptionDetails(fingerprint, e) {

@@ -1708,6 +1708,7 @@ function groupEmailsIntoConversations(emails) {
 
     if (email.is_starred === 1) conv.is_starred = 1;
     if (email.is_important === 1) conv.is_important = 1;
+    if (email.is_pinned === 1) conv.is_pinned = 1;
     if (email.has_attachments || (email.attachments && email.attachments.length > 0)) {
       conv.has_attachments = true;
     }
@@ -2166,7 +2167,9 @@ function createMobileTraditionalEmailCard(email) {
         </div>
 
         <div class="trad-email-subject-line ${email.is_read === 0 ? 'bold-unread' : ''}">
+          ${email.is_pinned === 1 ? '<span style="color: #059669; font-weight: 700; margin-right: 4px;">📌</span>' : ''}
           ${escapeHtml(email.subject || '(No Subject)')}
+          ${email.is_edited === 1 ? '<span style="font-size: 11px; font-style: italic; color: var(--text-dim); margin-left: 4px;">(edited)</span>' : ''}
         </div>
 
         <div class="trad-email-snippet-line">
@@ -2606,6 +2609,7 @@ function createMobileConversationCard(conv) {
           </div>
 
           <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+            ${conv.is_pinned === 1 ? '<span style="color: #059669; display: inline-flex;" title="Pinned Conversation"><svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg></span>' : ''}
             ${isImportant ? '<span style="color: #ef4444; display: inline-flex;" title="Priority"><svg viewBox="0 0 24 24" width="13" height="13" fill="#ef4444" stroke="#ef4444" stroke-width="1"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></span>' : ''}
             ${isStarred ? '<span style="color: #eab308; display: inline-flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="#eab308" stroke="#eab308" stroke-width="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></span>' : ''}
             ${conv.has_attachments ? '<span style="color: var(--text-dim); display: inline-flex;"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></span>' : ''}
@@ -2774,6 +2778,28 @@ function renderChatTimeline(conv) {
   const timeline = document.getElementById('mob-chat-timeline');
   if (!timeline) return;
   timeline.innerHTML = '';
+
+  // WhatsApp Pinned Message Banner (sticky at the top of timeline)
+  const pinnedMsg = (conv.messages || []).find(m => m.is_pinned === 1);
+  if (pinnedMsg) {
+    const pinnedBanner = document.createElement('div');
+    pinnedBanner.className = 'whatsapp-pinned-banner';
+    pinnedBanner.onclick = () => scrollToChatMessage(pinnedMsg.id);
+    const pinnedSnippet = (pinnedMsg.body_text || pinnedMsg.body_html || 'Pinned mail')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    pinnedBanner.innerHTML = `
+      <div class="whatsapp-pinned-banner-stripe"></div>
+      <div class="whatsapp-pinned-banner-icon">📌</div>
+      <div class="whatsapp-pinned-banner-body">
+        <span class="whatsapp-pinned-banner-title">Pinned Mail</span>
+        <span class="whatsapp-pinned-banner-snippet">${escapeHtml(pinnedSnippet.substring(0, 75))}</span>
+      </div>
+      <button type="button" class="whatsapp-pinned-banner-close" onclick="togglePinChatMessage('${pinnedMsg.id}', event)" title="Unpin mail">✕</button>
+    `;
+    timeline.appendChild(pinnedBanner);
+  }
 
   // End-to-end verified encryption badge
   const securityBanner = document.createElement('div');
@@ -3014,15 +3040,25 @@ function renderChatTimeline(conv) {
       `;
     }
 
+    const isPinned = msg.is_pinned === 1;
+    const isEdited = msg.is_edited === 1;
+
     bubbleWrapper.innerHTML = `
       <div class="chat-bubble ${isOutgoing ? 'outgoing' : 'incoming'} ${hasLongContent ? 'has-rich-email' : ''}">
         ${senderBadgeHtml}
         ${subjectHtml}
+        ${isPinned ? `
+          <div class="bubble-pinned-tag">
+            <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M16 12V4h1V2H7v2h1v8l-2 2v2h5.2v6h1.6v-6H18v-2l-2-2z"/></svg>
+            <span>Pinned</span>
+          </div>
+        ` : ''}
         ${quotedReplyHtml}
         ${bodyContentHtml}
         <div class="chat-bubble-footer">
           <div class="bubble-footer-left">
             ${replyActionHtml}
+            ${isEdited ? `<span class="bubble-edited-tag">(edited)</span>` : ''}
           </div>
           <div class="bubble-footer-right">
             <span class="chat-encryption-lock" onclick="showMobileSecurityModal('${escapeHtml(msg.security_fingerprint || '')}', event)" title="AES-256-GCM Encrypted">
@@ -3037,13 +3073,28 @@ function renderChatTimeline(conv) {
                 </svg>
               </span>
             ` : ''}
+            <button type="button" class="bubble-options-btn" onclick="openWhatsAppMessageMenu('${msg.id}', event)" title="Mail options">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor">
+                <circle cx="12" cy="5" r="2"/>
+                <circle cx="12" cy="12" r="2"/>
+                <circle cx="12" cy="19" r="2"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
     `;
 
-    // Swipe-right-to-reply touch gesture on bubble
+    // Click bubble to open WhatsApp-style message options (Pin, Edit, Delete)
     const bubbleEl = bubbleWrapper.querySelector('.chat-bubble');
+    bubbleEl.addEventListener('click', (e) => {
+      if (e.target.closest('button, a, audio, .voice-waveform-area, .voice-speed-chip, .voice-play-toggle, .bubble-image-preview, .btn-chat-link, .btn-toggle-transcript, .chat-encryption-lock, .bubble-options-btn')) {
+        return;
+      }
+      openWhatsAppMessageMenu(msg.id, e);
+    });
+
+    // Swipe-right-to-reply touch gesture on bubble
     let touchStartX = 0;
     bubbleEl.addEventListener('touchstart', (e) => {
       touchStartX = e.touches[0].clientX;
@@ -3059,6 +3110,307 @@ function renderChatTimeline(conv) {
 
     timeline.appendChild(bubbleWrapper);
   });
+}
+
+// ==================== WHATSAPP-STYLE MESSAGE INTERACTION (PIN, EDIT, DELETE) ====================
+
+function openWhatsAppMessageMenu(msgId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  if (!activeConversation || !Array.isArray(activeConversation.messages)) return;
+  const msg = activeConversation.messages.find(m => String(m.id) === String(msgId));
+  if (!msg) return;
+
+  closeWhatsAppMessageMenu();
+
+  const isPinned = msg.is_pinned === 1;
+  let previewText = (msg.body_text || msg.body_html || 'Email message')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (previewText.length > 55) {
+    previewText = previewText.substring(0, 52) + '...';
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whatsapp-msg-overlay active';
+  overlay.id = 'whatsapp-msg-overlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeWhatsAppMessageMenu();
+  };
+  overlay.innerHTML = `
+    <div class="whatsapp-msg-sheet" onclick="event.stopPropagation()">
+      <div class="whatsapp-sheet-handle"></div>
+      <div class="whatsapp-sheet-preview">${escapeHtml(previewText)}</div>
+      <button type="button" class="whatsapp-menu-item" onclick="togglePinChatMessage('${msg.id}', event)">
+        <span class="whatsapp-menu-item-icon">${isPinned ? '📍' : '📌'}</span>
+        <span>${isPinned ? 'Unpin message' : 'Pin message'}</span>
+      </button>
+      <button type="button" class="whatsapp-menu-item" onclick="openEditChatMessageModal('${msg.id}', event)">
+        <span class="whatsapp-menu-item-icon">✏️</span>
+        <span>Edit mail</span>
+      </button>
+      <button type="button" class="whatsapp-menu-item danger" onclick="confirmDeleteChatMessage('${msg.id}', event)">
+        <span class="whatsapp-menu-item-icon">🗑️</span>
+        <span>Delete mail</span>
+      </button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeWhatsAppMessageMenu() {
+  const overlay = document.getElementById('whatsapp-msg-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 220);
+}
+
+function scrollToChatMessage(msgId) {
+  const el = document.getElementById(`chat-msg-${msgId}`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const bubble = el.querySelector('.chat-bubble');
+  if (bubble) {
+    bubble.classList.remove('whatsapp-highlight-pulse');
+    void bubble.offsetWidth;
+    bubble.classList.add('whatsapp-highlight-pulse');
+    setTimeout(() => {
+      bubble.classList.remove('whatsapp-highlight-pulse');
+    }, 1500);
+  }
+}
+
+async function togglePinChatMessage(msgId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  closeWhatsAppMessageMenu();
+  try {
+    const res = await fetch(`/api/emails/${msgId}/pin`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      if (activeConversation && Array.isArray(activeConversation.messages)) {
+        activeConversation.messages.forEach(m => {
+          if (String(m.id) === String(msgId)) {
+            m.is_pinned = data.is_pinned;
+          }
+        });
+      }
+      allEmails.forEach(e => {
+        if (String(e.id) === String(msgId)) e.is_pinned = data.is_pinned;
+      });
+      renderChatTimeline(activeConversation);
+      showToastNotification(data.is_pinned ? 'Mail pinned 📌' : 'Mail unpinned 📍', 'info');
+    } else {
+      showToastNotification(data.error || 'Failed to update pin', 'error');
+    }
+  } catch (err) {
+    console.error('Error toggling pin:', err);
+    showToastNotification('Failed to update pin', 'error');
+  }
+}
+
+function openEditChatMessageModal(msgId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  closeWhatsAppMessageMenu();
+  if (!activeConversation || !Array.isArray(activeConversation.messages)) return;
+  const msg = activeConversation.messages.find(m => String(m.id) === String(msgId));
+  if (!msg) return;
+
+  const existing = document.getElementById('whatsapp-edit-overlay');
+  if (existing) existing.remove();
+
+  let plainText = (msg.body_text || '').replace(/\[image:[^\]]*\]/gi, '').trim();
+  if (!plainText && msg.body_html) {
+    plainText = msg.body_html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whatsapp-edit-overlay active';
+  overlay.id = 'whatsapp-edit-overlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeEditChatMessageModal();
+  };
+  overlay.innerHTML = `
+    <div class="whatsapp-edit-card" onclick="event.stopPropagation()">
+      <div class="whatsapp-edit-header">
+        <div class="whatsapp-edit-title">
+          <span>✏️</span>
+          <span>Edit Mail</span>
+        </div>
+        <button type="button" class="whatsapp-edit-close" onclick="closeEditChatMessageModal(event)">✕</button>
+      </div>
+      <div class="whatsapp-edit-body">
+        <div class="whatsapp-edit-subtext">Update message content for this conversation thread.</div>
+        <textarea class="whatsapp-edit-textarea" id="whatsapp-edit-textarea" rows="4" placeholder="Enter updated message...">${escapeHtml(plainText)}</textarea>
+      </div>
+      <div class="whatsapp-edit-footer">
+        <button type="button" class="whatsapp-btn-cancel" onclick="closeEditChatMessageModal(event)">Cancel</button>
+        <button type="button" class="whatsapp-btn-save" id="whatsapp-btn-save-${msgId}" onclick="saveEditedChatMessage('${msgId}')">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Save Changes</span>
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  setTimeout(() => {
+    const ta = document.getElementById('whatsapp-edit-textarea');
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }, 100);
+}
+
+function closeEditChatMessageModal() {
+  const overlay = document.getElementById('whatsapp-edit-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 220);
+}
+
+async function saveEditedChatMessage(msgId) {
+  const ta = document.getElementById('whatsapp-edit-textarea');
+  if (!ta) return;
+  const newText = ta.value.trim();
+  if (!newText) {
+    showToastNotification('Message cannot be empty', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById(`whatsapp-btn-save-${msgId}`);
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span>Saving...</span>';
+  }
+
+  try {
+    const res = await fetch(`/api/emails/${msgId}/edit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bodyText: newText,
+        bodyHtml: `<p>${escapeHtml(newText).replace(/\n/g, '<br>')}</p>`
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (activeConversation && Array.isArray(activeConversation.messages)) {
+        const msg = activeConversation.messages.find(m => String(m.id) === String(msgId));
+        if (msg) {
+          msg.body_text = newText;
+          msg.body_html = `<p>${escapeHtml(newText).replace(/\n/g, '<br>')}</p>`;
+          msg.is_edited = 1;
+        }
+      }
+      allEmails.forEach(e => {
+        if (String(e.id) === String(msgId)) {
+          e.body_text = newText;
+          e.body_html = `<p>${escapeHtml(newText).replace(/\n/g, '<br>')}</p>`;
+          e.is_edited = 1;
+        }
+      });
+      closeEditChatMessageModal();
+      renderChatTimeline(activeConversation);
+      showToastNotification('Mail updated successfully ✓', 'success');
+    } else {
+      showToastNotification(data.error || 'Failed to edit mail', 'error');
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span>Save Changes</span>';
+      }
+    }
+  } catch (err) {
+    console.error('Error saving edited message:', err);
+    showToastNotification('Failed to edit mail', 'error');
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = '<span>Save Changes</span>';
+    }
+  }
+}
+
+function confirmDeleteChatMessage(msgId, event) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  closeWhatsAppMessageMenu();
+
+  const existing = document.getElementById('whatsapp-delete-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'whatsapp-delete-overlay active';
+  overlay.id = 'whatsapp-delete-overlay';
+  overlay.onclick = (e) => {
+    if (e.target === overlay) closeDeleteChatMessageModal();
+  };
+  overlay.innerHTML = `
+    <div class="whatsapp-delete-card" onclick="event.stopPropagation()">
+      <div class="whatsapp-delete-icon">🗑️</div>
+      <div class="whatsapp-delete-title">Delete Mail?</div>
+      <div class="whatsapp-delete-body">This mail will be removed from your conversation and moved to Trash.</div>
+      <div class="whatsapp-delete-actions">
+        <button type="button" class="whatsapp-btn-del-cancel" onclick="closeDeleteChatMessageModal(event)">Cancel</button>
+        <button type="button" class="whatsapp-btn-del-confirm" onclick="executeDeleteChatMessage('${msgId}')">Delete</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeDeleteChatMessageModal() {
+  const overlay = document.getElementById('whatsapp-delete-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  setTimeout(() => overlay.remove(), 220);
+}
+
+async function executeDeleteChatMessage(msgId) {
+  closeDeleteChatMessageModal();
+  try {
+    const rowEl = document.getElementById(`chat-msg-${msgId}`);
+    if (rowEl) {
+      rowEl.style.transition = 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+      rowEl.style.opacity = '0';
+      rowEl.style.transform = 'translateY(-10px) scale(0.95)';
+    }
+
+    const res = await fetch(`/api/emails/${msgId}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (data.success) {
+      if (activeConversation && Array.isArray(activeConversation.messages)) {
+        activeConversation.messages = activeConversation.messages.filter(m => String(m.id) !== String(msgId));
+      }
+      allEmails = allEmails.filter(e => String(e.id) !== String(msgId));
+
+      setTimeout(() => {
+        if (!activeConversation || activeConversation.messages.length === 0) {
+          closeConversationScreen();
+          loadConversations();
+        } else {
+          renderChatTimeline(activeConversation);
+        }
+      }, 300);
+      showToastNotification('Mail moved to Trash 🗑️', 'info');
+    } else {
+      showToastNotification(data.error || 'Failed to delete mail', 'error');
+      if (activeConversation) renderChatTimeline(activeConversation);
+    }
+  } catch (err) {
+    console.error('Error deleting message:', err);
+    showToastNotification('Failed to delete mail', 'error');
+    if (activeConversation) renderChatTimeline(activeConversation);
+  }
 }
 
 function showMobileSecurityModal(fingerprint, e) {

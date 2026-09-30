@@ -44,7 +44,9 @@ if (useMysql) {
         'CREATE TABLE IF NOT EXISTS deleted_email_signatures (signature VARCHAR(191) PRIMARY KEY, message_id VARCHAR(191), sender VARCHAR(191), subject VARCHAR(255), deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)',
         'CREATE TABLE IF NOT EXISTS blocked_senders (id INT AUTO_INCREMENT PRIMARY KEY, user_phone VARCHAR(20) NOT NULL, blocked_sender VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_user_block (user_phone, blocked_sender))',
         'ALTER TABLE emails ADD COLUMN sms_delayed_notified INT DEFAULT 0',
-        'CREATE TABLE IF NOT EXISTS user_contacts (id VARCHAR(64) PRIMARY KEY, user_phone VARCHAR(32) NOT NULL, contact_phone VARCHAR(32), contact_email VARCHAR(191), contact_name VARCHAR(191), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_user_contact (user_phone, contact_phone, contact_email))'
+        'CREATE TABLE IF NOT EXISTS user_contacts (id VARCHAR(64) PRIMARY KEY, user_phone VARCHAR(32) NOT NULL, contact_phone VARCHAR(32), contact_email VARCHAR(191), contact_name VARCHAR(191), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_user_contact (user_phone, contact_phone, contact_email))',
+        'ALTER TABLE emails ADD COLUMN is_pinned INT DEFAULT 0',
+        'ALTER TABLE emails ADD COLUMN is_edited INT DEFAULT 0'
       ];
       for (const m of migrations) {
         try {
@@ -167,6 +169,12 @@ async function getSqliteDb() {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE (user_phone, contact_phone, contact_email)
       );`);
+    } catch (e) {}
+    try {
+      db.run('ALTER TABLE emails ADD COLUMN is_pinned INT DEFAULT 0;');
+    } catch (e) {}
+    try {
+      db.run('ALTER TABLE emails ADD COLUMN is_edited INT DEFAULT 0;');
     } catch (e) {}
     try {
       db.run("UPDATE emails SET is_read = 1 WHERE sender_email LIKE '%@alphastack.wwisvnr.com%' AND is_read = 0;");
